@@ -411,6 +411,7 @@
       {@const d = bounds.maxY - bounds.minY}
       {@const off = 20 * k}
       {@const tick = 5 * k}
+      {@const labelY = Math.max(bounds.maxY, ...strips.flatMap((s) => s.outline.map((p) => p.y)))}
       <g class="dims" pointer-events="none" font-size={12 * k} style:--halo="{3 * k}px">
         <rect class="envelope" x={bounds.minX} y={bounds.minY} width={w} height={d} />
         <!-- larghezza -->
@@ -424,7 +425,7 @@
         <line x1={bounds.minX - 2 * k} x2={bounds.minX - off - tick} y1={bounds.maxY} y2={bounds.maxY} />
         <text transform="translate({bounds.minX - off - 8 * k} {(bounds.minY + bounds.maxY) / 2}) rotate(-90)">{len(d, 1)}</text>
         <!-- altezza (asse verticale delle celle, non visibile da sopra) -->
-        <text class="h" x={bounds.maxX} y={bounds.maxY + 14 * k}>{t(bounds.withHolder ? 'editor.heightPack' : 'editor.heightCells', { height: len(bounds.heightMm, 1) })}</text>
+        <text class="h" x={bounds.maxX} y={labelY + 14 * k}>{t(bounds.withHolder ? 'editor.heightPack' : 'editor.heightCells', { height: len(bounds.heightMm, 1) })}</text>
       </g>
     {/if}
 
