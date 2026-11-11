@@ -1,6 +1,7 @@
 import { buildDxf } from '../core/dxf';
 import { buildCutListCsv, buildCutSummary, buildSvg } from '../core/lamelleExport';
 import type { Project } from '../core/types';
+import { buildToleranceTest } from '../core/holder';
 import { holderOf } from './holder';
 import { holderStl, type HolderHalf } from './holderMesh';
 import { reportOf, stripsOf } from './lamelle';
@@ -67,4 +68,12 @@ export function exportStl(project: Project, half: HolderHalf) {
   const model = holderOf(project, ui.holder).model;
   if (!model) return;
   save(holderStl(model, half) as BlobPart, `${slug(project.name)}-portacelle-${faceName(half)}.stl`, 'model/stl');
+}
+
+/** Piastra di prova con tasche a giochi diversi, per tarare la stampante; usa il tipo di cella del progetto. */
+export function exportToleranceTest(project: Project, clearancesMm: readonly number[]) {
+  const typeId = project.cells[0]?.typeId ?? '18650-3000-10a';
+  const model = buildToleranceTest(project, typeId, clearancesMm, ui.holder);
+  if (!model) return;
+  save(holderStl(model, 'bottom') as BlobPart, `pezzo-test-tolleranze-${clearancesMm.map((c) => c.toFixed(2)).join('-')}.stl`, 'model/stl');
 }

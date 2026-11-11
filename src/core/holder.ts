@@ -1,4 +1,5 @@
 import { findCellType } from './catalog';
+import { digitPolygons } from './engrave';
 import { convexHull } from './polygon';
 import { circlePolygon, closeRegions, differenceRegions, offsetRegions, regionArea, unionAll, type Region } from './clip';
 import type { Rect } from './geometry';
@@ -179,14 +180,31 @@ function rampContours(outer: readonly Region[], inner: readonly Region[]): { a: 
 }
 
 
+/** Opzioni per i pezzi speciali (pezzo test); il portacelle normale non ne usa. */
+export interface BuildOptions {
+  /** Gioco per cella (stesso ordine di `project.cells`) al posto di `settings.clearanceMm`. */
+  clearances?: readonly number[];
+  /** Forme piene da unire alla sagoma esterna (per esempio una striscia per le scritte). */
+  addOuter?: readonly (readonly Pt[])[];
+  /** Forme da incidere sul bordo delle pareti, per `engraveMm` di profondità. */
+  engrave?: readonly (readonly Pt[])[];
+  engraveMm?: number;
+}
+
 /**
  * Con `smooth` lo smusso non è una scala di gradini (che serve solo se vuoi vederli come strati di stampa) ma una
  * rampa inclinata continua: le fette restano poche e in `ramp` ci sono i contorni da raccordare.
  */
-export function buildHolder(project: Project, settings: HolderSettings = DEFAULT_HOLDER_SETTINGS, smooth = false): HolderModel | null {
-  const cells = project.cells.flatMap((c) => {
+export function buildHolder(
+  project: Project,
+  settings: HolderSettings = DEFAULT_HOLDER_SETTINGS,
+  smooth = false,
+  opts: BuildOptions = {},
+): HolderModel | null {
+  const { clearances } = opts;
+  const cells = project.cells.flatMap((c, i) => {
     const t = findCellType(project, c.typeId);
-    return t ? [{ c, r: t.diameterMm / 2, h: t.heightMm }] : [];
+    return t ? [{ c, r: t.diameterMm / 2, h: t.heightMm, cl: clearances?.[i] ?? settings.clearanceMm }] : [];
   });
   if (cells.length === 0) return null;
   const s = settings;
@@ -197,7 +215,7 @@ export function buildHolder(project: Project, settings: HolderSettings = DEFAULT
   // lo smusso non può mangiare tutta la parete né più di metà piastra
   const chamferMm = Math.max(0, Math.min(s.chamferMm, s.wallMm * 0.75, totalMm / 2 - 0.05));
 
-  const merged = unionAll(cells.map(({ c, r }) => circlePolygon(c.x, c.y, r + s.clearanceMm + s.wallMm)));
+  const merged = unionAll([...cells.map(({ c, r, cl }) => circlePolygon(c.x, c.y, r + cl + s.wallMm)), ...(opts.addOuter ?? [])]);
   let outer: Region[];
   if (s.shape === 'rounded') {
     // Contorno convesso di ogni gruppo di celle: i bordi tondi sono gli archi delle celle d'angolo.
@@ -209,7 +227,7 @@ export function buildHolder(project: Project, settings: HolderSettings = DEFAULT
       holes: reg.holes.filter((hole) => regionArea({ outline: hole, holes: [] }) >= MIN_OPEN_GAP_MM2),
     }));
   }
-  const pockets = cells.map(({ c, r }) => circlePolygon(c.x, c.y, r + s.clearanceMm));
+  const pockets = cells.map(({ c, r, cl }) => circlePolygon(c.x, c.y, r + cl));
   const openings = cells.map(({ c, r }) => circlePolygon(c.x, c.y, Math.max(r - s.ledgeMm, 1)));
   const wall = differenceRegions(outer, pockets);
   const slab = s.lockCells ? differenceRegions(outer, openings) : [];
@@ -222,7 +240,10 @@ export function buildHolder(project: Project, settings: HolderSettings = DEFAULT
   }
 
   // Fette: ai bordi dello smusso la sagoma esterna si ritira a gradini; sotto `floorMm` si taglia con i fori, sopra con le tasche.
+  const engrave = opts.engrave && opts.engrave.length > 0 ? opts.engrave : null;
+  const engraveFromZ = totalMm - Math.max(0, Math.min(opts.engraveMm ?? 0, totalMm - floorMm - 0.4));
   const cuts = new Set<number>([0, floorMm, totalMm]);
+  if (engrave) cuts.add(engraveFromZ);
   if (ramp) {
     cuts.add(chamferMm);
     cuts.add(totalMm - chamferMm);
@@ -249,10 +270,12 @@ export function buildHolder(project: Project, settings: HolderSettings = DEFAULT
         ? Math.max(0, chamferMm - mid, mid - (totalMm - chamferMm))
         : 0;
     const useSlab = s.lockCells && mid < floorMm;
-    const key = `${inset.toFixed(4)}|${useSlab ? 's' : 'w'}`;
+    const engraved = !!engrave && mid > engraveFromZ && !useSlab;
+    const key = `${inset.toFixed(4)}|${useSlab ? 's' : 'w'}${engraved ? 'e' : ''}`;
     let regions = cache.get(key);
     if (!regions) {
       regions = differenceRegions(inset > 1e-9 ? offsetRegions(outer, -inset) : outer, useSlab ? openings : pockets);
+      if (engraved) regions = differenceRegions(regions, engrave!);
       cache.set(key, regions);
     }
     const prev = layers[layers.length - 1];
@@ -349,4 +372,62 @@ export function analyzeHolder(project: Project, model: HolderModel): HolderRepor
     volumeMm3: model.layers.reduce((v, l) => v + regionsArea(l.regions) * (l.z1 - l.z0), 0) + rampVolume(model),
     issues,
   };
+}
+
+/** Profondità delle pareti del pezzo test, mm: basta a sentire il gioco senza sprecare plastica. */
+const TOLERANCE_TEST_LIP_MM = 4;
+/** Cifre incise: altezza, tratto (due passate con ugello da 0,4) e profondità, mm. */
+const TEST_DIGIT_MM = 5;
+const TEST_STROKE_MM = 0.8;
+const TEST_ENGRAVE_MM = 1;
+
+export const DEFAULT_TEST_CLEARANCES_MM = [0.1, 0.2, 0.3];
+
+/** Il gioco scritto sul pezzo: centesimi di mm, quindi 0,15 mm → «15». */
+export const clearanceLabel = (clearanceMm: number) => String(Math.round(clearanceMm * 100));
+
+/**
+ * Pezzo test per tarare il gioco: una piastra bassa con una fila di tasche, ognuna con un gioco diverso
+ * (dalla più stretta a sinistra alla più larga a destra). Sotto ogni tasca una striscia con il gioco inciso
+ * in centesimi di mm («10» = 0,10 mm). Ha le stesse impostazioni del portacelle vero, così la prova vale
+ * per quello che poi si stampa. Null se il tipo di cella non esiste o non ci sono giochi.
+ */
+export function buildToleranceTest(
+  project: Pick<Project, 'customCellTypes'>,
+  typeId: string,
+  clearancesMm: readonly number[] = DEFAULT_TEST_CLEARANCES_MM,
+  settings: HolderSettings = DEFAULT_HOLDER_SETTINGS,
+): HolderModel | null {
+  const t = findCellType(project, typeId);
+  if (!t || clearancesMm.length === 0) return null;
+  const clearances = [...clearancesMm].sort((a, b) => a - b);
+  const r = t.diameterMm / 2;
+  const clMax = clearances[clearances.length - 1]!;
+  const pitch = t.diameterMm + 2 * clMax + settings.wallMm;
+  const cells = clearances.map((_, i) => ({
+    id: `test${i}`,
+    typeId,
+    x: i * pitch,
+    y: 0,
+    plusUp: true,
+    group: null,
+  }));
+  const test: Project = { version: 1, name: 'test', customCellTypes: project.customCellTypes, cells };
+
+  // striscia sotto la fila: parte dentro le tasche (che la bucano) e arriva sotto il raggio esterno
+  const edge = r + clMax + settings.wallMm;
+  const textY = edge + 1.2 + TEST_DIGIT_MM / 2;
+  const strip: Pt[] = [
+    { x: -edge, y: 0 },
+    { x: (clearances.length - 1) * pitch + edge, y: 0 },
+    { x: (clearances.length - 1) * pitch + edge, y: textY + TEST_DIGIT_MM / 2 + 1.2 },
+    { x: -edge, y: textY + TEST_DIGIT_MM / 2 + 1.2 },
+  ];
+  const engrave = clearances.flatMap((cl, i) => digitPolygons(clearanceLabel(cl), i * pitch, textY + i * 0.021, TEST_DIGIT_MM, TEST_STROKE_MM));
+  return buildHolder(test, { ...settings, lipMm: Math.min(settings.lipMm, TOLERANCE_TEST_LIP_MM) }, true, {
+    clearances,
+    addOuter: [strip],
+    engrave,
+    engraveMm: TEST_ENGRAVE_MM,
+  });
 }

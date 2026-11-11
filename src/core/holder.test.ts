@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { closeRegions, differenceRegions, circlePolygon, regionArea, unionAll } from './clip';
-import { analyzeHolder, buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
+import { analyzeHolder, buildHolder, buildToleranceTest, clearanceLabel, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { generateGrid } from './layout';
 import { replaceCells } from './ops';
 import { createProject } from './project';
@@ -254,5 +254,53 @@ describe('geometria arrotondata', () => {
     const a = regionArea(buildHolder(p, rounded)!.slab[0]!);
     const b = regionArea(buildHolder(p)!.slab[0]!);
     expect(a).toBeCloseTo(b, -1);
+  });
+});
+
+describe('buildToleranceTest', () => {
+  const none = { customCellTypes: [] };
+
+  it('tipo di cella sconosciuto o nessun gioco: niente', () => {
+    expect(buildToleranceTest(none, 'non-esiste')).toBeNull();
+    expect(buildToleranceTest(none, T, [])).toBeNull();
+  });
+
+  it('una tasca per gioco, ognuna larga quanto cella + 2 giochi', () => {
+    const h = buildToleranceTest(none, T, [0.3, 0.1, 0.2])!;
+    expect(h.wall).toHaveLength(1);
+    const widths = h.wall[0]!.holes
+      .map((ring) => {
+        const xs = ring.map((p) => p.x);
+        return Math.max(...xs) - Math.min(...xs);
+      })
+      .sort((a, b) => a - b);
+    expect(widths).toHaveLength(3);
+    [0.1, 0.2, 0.3].forEach((cl, i) => expect(widths[i]).toBeCloseTo(21.4 + 2 * cl, 1));
+  });
+
+  it('pareti basse: fondo + 4 mm al massimo', () => {
+    const h = buildToleranceTest(none, T)!;
+    expect(h.lipMm).toBeLessThanOrEqual(4);
+    expect(h.totalMm).toBeCloseTo(DEFAULT_HOLDER_SETTINGS.floorMm + h.lipMm, 6);
+  });
+
+  it('i giochi sono incisi sul bordo delle pareti, solo negli strati alti', () => {
+    const h = buildToleranceTest(none, T)!;
+    const holes = (l: { regions: { holes: unknown[] }[] }) => l.regions.reduce((n, r) => n + r.holes.length, 0);
+    const top = h.layers[h.layers.length - 1]!;
+    const wallLow = h.layers.find((l) => l.z0 <= 2 && l.z1 >= 2)!;
+    expect(top.z1).toBeCloseTo(h.totalMm, 6);
+    expect(holes(top)).toBeGreaterThan(holes(wallLow));
+    expect(clearanceLabel(0.15)).toBe('15');
+  });
+
+  it('i giochi si ordinano: il più stretto a sinistra', () => {
+    const h = buildToleranceTest(none, T, [0.3, 0.1])!;
+    const holes = h.wall[0]!.holes.map((ring) => ({
+      cx: (Math.max(...ring.map((p) => p.x)) + Math.min(...ring.map((p) => p.x))) / 2,
+      w: Math.max(...ring.map((p) => p.x)) - Math.min(...ring.map((p) => p.x)),
+    }));
+    holes.sort((a, b) => a.cx - b.cx);
+    expect(holes[0]!.w).toBeLessThan(holes[1]!.w);
   });
 });

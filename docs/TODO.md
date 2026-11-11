@@ -9,7 +9,7 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 
 ## Holder (phase 4 follow-ups)
 
-- [ ] Tolerance test piece: a small plate with pockets at different clearances (0.1 / 0.2 / 0.3 mm) to calibrate the printer.
+- [x] Tolerance test piece (Esporta tab, `buildToleranceTest`): low plate with pockets at 0.1 / 0.2 / 0.3 mm (editable). Clearance engraved under each pocket in 1/100 mm (7-segment digits, `core/engrave.ts`). Not yet printed: check that the 5 mm / 0.8 mm digits are legible.
 - [ ] Split big plates into pieces with joints when they exceed the print bed (today only a warning above 220×220 mm). The owner said "wait" on this one: ask before starting.
 - [ ] Cooling and cable windows in the walls.
 - [ ] Modular holder: one tile per cell with interlocks (lattice layouts only).

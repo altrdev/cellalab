@@ -2,7 +2,8 @@
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
   import { history } from '../state';
-  import { exportCutList, exportDxf, exportStl, exportSvg } from './exports';
+  import { exportCutList, exportDxf, exportStl, exportSvg, exportToleranceTest } from './exports';
+  import { DEFAULT_TEST_CLEARANCES_MM } from '../core/holder';
   import { holderOf } from './holder';
   import { reportOf } from './lamelle';
   import { ui } from './ui.svelte';
@@ -17,6 +18,9 @@
   const holderStatus = $derived(
     !holderReport ? 'empty' : holderReport.issues.some((i) => i.level === 'error') ? 'error' : holderReport.issues.some((i) => i.level === 'warning') ? 'warning' : 'ok',
   );
+
+  let testClearances = $state([...DEFAULT_TEST_CLEARANCES_MM]);
+  const testValid = $derived(testClearances.every((c) => Number.isFinite(c) && c >= 0 && c <= 1));
 
   const text: Record<string, string> = {
     empty: 'Aggiungi delle celle per poter esportare.',
@@ -63,6 +67,18 @@
     {#if holderStatus === 'warning' || holderStatus === 'error'}
       <button type="button" class="goto" onclick={() => (ui.sideTab = 'holder')}>Vai al portacelle →</button>
     {/if}
+    <div class="test">
+      <span class="lbl">Pezzo test tolleranze · gioco (mm)</span>
+      <div class="gaps">
+        {#each testClearances as _, i (i)}
+          <input type="number" min="0" max="1" step="0.05" bind:value={testClearances[i]} aria-label="Gioco tasca {i + 1}" />
+        {/each}
+      </div>
+      <div class="exp">
+        <button disabled={!testValid} onclick={() => exportToleranceTest(project, testClearances)} title="Piastra bassa con una tasca per gioco, dalla più stretta (sinistra) alla più larga">STL pezzo test</button>
+      </div>
+      <Help label="A cosa serve">Stampa il pezzo test con le impostazioni del portacelle e prova una cella in ogni tasca: scegli quella che entra senza forzare e senza ballare, poi imposta quel gioco. Le tasche vanno dalla più stretta (sinistra) alla più larga (destra); sotto ognuna c'è il gioco inciso in centesimi di mm (10 = 0,10 mm).</Help>
+    </div>
   </section>
 </div>
 
@@ -119,6 +135,26 @@
   .exp button {
     padding: 4px 10px;
     font-size: 0.8rem;
+  }
+  .test {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+  .lbl {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .gaps {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .gaps input {
+    flex: 1;
+    min-width: 0;
   }
   .pill {
     margin-left: auto;
