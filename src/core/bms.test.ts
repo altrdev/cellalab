@@ -5,6 +5,7 @@ import { generateGrid } from './layout';
 import { addCustomBms, removeCustomBms, replaceCells, setBms, setCurrentLimit } from './ops';
 import { createProject, parseProject, serializeProject } from './project';
 import { computeStats } from './stats';
+import { buildStrips } from './strips';
 import type { Project } from './types';
 
 const T = '21700-5000-10a';
@@ -97,5 +98,43 @@ describe('salvataggio', () => {
     const back = parseProject(JSON.stringify(raw));
     expect(back.bmsId).toBeUndefined();
     expect(back.customBmsTypes).toBeUndefined();
+  });
+});
+
+describe('linguette di presa', () => {
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2 } as const;
+  const withBms = (p: Project) => setBms(p, 'bms-13s-40a-li-ion');
+
+  it('senza BMS non ci sono linguette', () => {
+    expect(buildStrips(pack(4, 2), { tabs }).filter((s) => s.tab)).toHaveLength(0);
+  });
+
+  it('con un BMS: una linguetta per giunzione (S+1) con foro', () => {
+    const strips = buildStrips(withBms(pack(4, 2)), { tabs });
+    const withTab = strips.filter((s) => s.tab);
+    expect(new Set(withTab.map((s) => s.joint)).size).toBe(5);
+    expect(withTab).toHaveLength(5);
+    for (const s of withTab) {
+      expect(s.tab!.holeDiameterMm).toBe(2);
+      expect(s.holes.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('la linguetta sporge dal lato scelto e non intralcia nel pacco a colonne', () => {
+    const p = withBms(pack(4, 2));
+    const plain = buildStrips(p);
+    const strips = buildStrips(p, { tabs });
+    for (const s of strips.filter((x) => x.tab)) {
+      const before = plain.find((x) => x.id === s.id)!;
+      expect(Math.min(...s.outline.map((q) => q.y))).toBeLessThan(Math.min(...before.outline.map((q) => q.y)) - 7);
+      expect(s.areaMm2).toBeGreaterThan(before.areaMm2);
+      expect(s.tab!.blockedBy).toBeNull();
+    }
+  });
+
+  it('una linguetta che finisce su una cella di un’altra giunzione è segnalata', () => {
+    const p = withBms(pack(4, 2));
+    const strips = buildStrips(p, { tabs: { ...tabs, side: 'left', lengthMm: 40 } });
+    expect(strips.some((s) => s.tab?.blockedBy)).toBe(true);
   });
 });

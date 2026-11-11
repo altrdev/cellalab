@@ -65,6 +65,10 @@ export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
       out[k] = v === null ? null : typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
     } else if (typeof v === typeof def && (typeof v !== 'number' || Number.isFinite(v))) out[k] = v;
   }
+  if (!['top', 'bottom', 'left', 'right'].includes(base.tabSide)) base.tabSide = DEFAULT_LAMELLA_SETTINGS.tabSide;
+  for (const k of ['tabWidthMm', 'tabLengthMm', 'tabHoleMm'] as const) {
+    if (!(base[k] > 0)) base[k] = DEFAULT_LAMELLA_SETTINGS[k];
+  }
   if (!(base.cooling in COOLING)) base.cooling = DEFAULT_LAMELLA_SETTINGS.cooling;
   if (base.spotsPerTerminal !== null) base.spotsPerTerminal = Math.min(Math.max(Math.round(base.spotsPerTerminal), 1), 12);
   base.layers = Math.min(Math.max(Math.floor(base.layers) || 1, 1), 5);

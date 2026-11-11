@@ -1,5 +1,6 @@
 import { findCellType } from './catalog';
-import { regionArea, unionPolygons, type Region } from './clip';
+import { bmsOf } from './bms';
+import { intersectRegions, regionArea, unionPolygons, type Region } from './clip';
 import { circlePoints, convexHull, type Pt } from './polygon';
 import type { PlacedCell, Project } from './types';
 
@@ -36,6 +37,21 @@ export interface StripNode {
   reachMm: number;
 }
 
+export type TabSide = 'top' | 'bottom' | 'left' | 'right';
+
+/** Linguetta di presa per il filo di bilanciamento del BMS: sporge dalla lamella (e ne fa parte) ed è forata. */
+export interface StripTab {
+  side: TabSide;
+  /** Rettangolo della linguetta, mm del disegno. */
+  rect: Pt[];
+  /** Centro e diametro del foro per il filo. */
+  holeX: number;
+  holeY: number;
+  holeDiameterMm: number;
+  /** Cosa intralcia la linguetta: un'altra lamella della stessa faccia o una cella; null = libera. */
+  blockedBy: 'strip' | 'cell' | null;
+}
+
 export interface Strip {
   id: string;
   face: Face;
@@ -60,6 +76,8 @@ export interface Strip {
   /** Quante celle in parallelo dividono la corrente: ogni banda porta circa I/P. */
   parallelCount: number;
   areaMm2: number;
+  /** Presente solo sulle lamelle che portano un filo di bilanciamento (con un BMS scelto). */
+  tab?: StripTab;
   /** Vero se manca uno dei due lati di un collegamento in serie (es. gruppo con polarità miste). */
   partial: boolean;
 }
@@ -71,6 +89,15 @@ export interface StripOptions {
   contactDiameterMm?: number | null;
   /** Larghezza delle bande tra le celle vicine, mm; assente = automatica (60% dell'appoggio). */
   widthMm?: number | null;
+  /** Linguette di presa per il BMS: solo se il progetto ha un BMS; assente o null = nessuna. */
+  tabs?: TabOptions | null;
+}
+
+export interface TabOptions {
+  side: TabSide;
+  widthMm: number;
+  lengthMm: number;
+  holeMm: number;
 }
 
 export const DEFAULT_STRIP_MARGIN_MM = 1;
@@ -215,7 +242,90 @@ export function buildStrips(project: Project, options: StripOptions = {}): Strip
       });
     }
   }
+  if (options.tabs && bmsOf(project)) addTabs(project, strips, options.tabs);
   return strips;
+}
+
+const SIDE_VECTOR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+
+/**
+ * Un filo di bilanciamento per ogni giunzione (S+1 in tutto): sulla lamella completa, di preferenza della faccia
+ * sopra. La linguetta parte dalla cella più vicina al lato scelto e sporge in fuori; larghezza e foro si adattano
+ * all'appoggio.
+ */
+function addTabs(project: Project, strips: Strip[], o: TabOptions): void {
+  const d = SIDE_VECTOR[o.side];
+  const perp = { x: -d.y, y: d.x };
+  const byJoint = new Map<number, Strip>();
+  for (const s of strips) {
+    const cur = byJoint.get(s.joint);
+    const better = !cur || (cur.partial && !s.partial) || (cur.partial === s.partial && cur.face === 'bottom' && s.face === 'top');
+    if (better) byJoint.set(s.joint, s);
+  }
+  const chosen = new Set(byJoint.values());
+  for (const s of strips) {
+    if (!chosen.has(s)) continue;
+    const along = (n: StripNode) => n.x * d.x + n.y * d.y;
+    const side = (n: StripNode) => n.x * perp.x + n.y * perp.y;
+    const meanSide = s.nodes.reduce((a, n) => a + side(n), 0) / s.nodes.length;
+    // Nodo più avanti verso il lato scelto (a parità, il più vicino al centro della lamella).
+    const node = s.nodes.reduce((a, b) => {
+      const ea = along(a) + a.reachMm;
+      const eb = along(b) + b.reachMm;
+      if (Math.abs(ea - eb) > 1e-6) return eb > ea ? b : a;
+      return Math.abs(side(b) - meanSide) < Math.abs(side(a) - meanSide) ? b : a;
+    });
+    const w = Math.min(o.widthMm, 2 * node.reachMm);
+    const lengthMm = Math.max(o.lengthMm, 1);
+    const reach = node.reachMm + lengthMm;
+    const at = (a: number, p: number): Pt => ({ x: node.x + d.x * a + perp.x * p, y: node.y + d.y * a + perp.y * p });
+    const rect = convexHull([at(0, -w / 2), at(0, w / 2), at(reach, w / 2), at(reach, -w / 2)]);
+    const hole = Math.min(o.holeMm, w - 1, lengthMm - 1);
+    const hc = at(node.reachMm + lengthMm / 2, 0);
+    const region: Region = unionPolygons([s.outline, rect]);
+    const holes = [...s.holes];
+    if (hole >= 0.5) holes.push(circlePoints(hc.x, hc.y, hole / 2, circleSegments(hole / 2)));
+    s.outline = region.outline;
+    s.holes = holes;
+    s.areaMm2 = regionArea({ outline: s.outline, holes });
+    s.tab = { side: o.side, rect, holeX: hc.x, holeY: hc.y, holeDiameterMm: hole >= 0.5 ? hole : 0, blockedBy: null };
+  }
+  // Intralci: celle dell'altra parte e lamelle della stessa faccia (con le loro linguette).
+  for (const s of strips) {
+    const tab = s.tab;
+    if (!tab) continue;
+    const own = new Set(s.nodes.map((n) => n.cellId));
+    for (const c of project.cells) {
+      if (own.has(c.id)) continue;
+      const r = (findCellType(project, c.typeId)?.diameterMm ?? 0) / 2;
+      if (distToRect(c, tab.rect) < r - 0.01) tab.blockedBy = 'cell';
+    }
+    if (tab.blockedBy) continue;
+    for (const o2 of strips) {
+      if (o2 === s || o2.face !== s.face) continue;
+      const hit = intersectRegions({ outline: o2.outline, holes: o2.holes }, [tab.rect]);
+      if (hit.some((h) => regionArea(h) > 0.01)) {
+        tab.blockedBy = 'strip';
+        break;
+      }
+    }
+  }
+}
+
+/** Distanza di un punto da un rettangolo (poligono convesso); 0 se dentro. */
+function distToRect(p: Pt, rect: readonly Pt[]): number {
+  let inside = true;
+  let best = Infinity;
+  for (let i = 0; i < rect.length; i++) {
+    const a = rect[i]!;
+    const b = rect[(i + 1) % rect.length]!;
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    if (ex * (p.y - a.y) - ey * (p.x - a.x) < 0) inside = false;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * ex + (p.y - a.y) * ey) / (ex * ex + ey * ey)));
+    best = Math.min(best, Math.hypot(p.x - (a.x + t * ex), p.y - (a.y + t * ey)));
+  }
+  return inside ? 0 : best;
 }
 
 /** Larghezza utile dove passa la corrente: quella delle bande tra le celle. */

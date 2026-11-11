@@ -8,6 +8,7 @@
   import { COOLING, type CoolingId } from '../core/sizing';
   import { CUTTER_PROFILES, WELDER_PROFILES } from '../core/profiles';
   import { LAMELLA_MATERIALS } from '../core/materials';
+  import { bmsOf } from '../core/bms';
   import { history } from '../state';
   import { reportOf } from './lamelle';
   import { ui } from './ui.svelte';
@@ -117,6 +118,26 @@
     <UnitInput kind="len" min={1} max={30} step={0.5} nullable placeholder="auto" value={ui.lamella.contactDiameterMm} onchange={(v) => (ui.lamella.contactDiameterMm = v)} />
   </label>
   <Help label={t('lam.what')}>{t('lam.weldAreaHelp', { edge: len(1, 0) })}</Help>
+
+  {#if bmsOf(project)}
+    <label><span><input type="checkbox" bind:checked={ui.lamella.tabs} /> {t('lam.tabs')}</span></label>
+    {#if ui.lamella.tabs}
+      <label>{t('lam.tabSide')}
+        <select bind:value={ui.lamella.tabSide}>
+          <option value="top">{t('lam.tabSide.top')}</option>
+          <option value="bottom">{t('lam.tabSide.bottom')}</option>
+          <option value="left">{t('lam.tabSide.left')}</option>
+          <option value="right">{t('lam.tabSide.right')}</option>
+        </select>
+      </label>
+      <div class="row">
+        <label>{t('lam.tabWidth')}<UnitInput kind="len" min={2} max={30} step={0.5} value={ui.lamella.tabWidthMm} onchange={(v) => { if (v !== null) ui.lamella.tabWidthMm = v; }} /></label>
+        <label>{t('lam.tabLength')}<UnitInput kind="len" min={2} max={60} step={0.5} value={ui.lamella.tabLengthMm} onchange={(v) => { if (v !== null) ui.lamella.tabLengthMm = v; }} /></label>
+      </div>
+      <label>{t('lam.tabHole')}<UnitInput kind="len" min={0} max={10} step={0.5} value={ui.lamella.tabHoleMm} onchange={(v) => { if (v !== null) ui.lamella.tabHoleMm = v; }} /></label>
+      <Help label={t('lam.what')}>{t('lam.tabsHelp')}</Help>
+    {/if}
+  {/if}
 
   <label>{t('lam.spotsPer')}
     <select

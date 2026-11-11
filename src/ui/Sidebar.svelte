@@ -71,7 +71,7 @@
     const strips = project.cells.length > 0 ? reportOf(project, ui.lamella).status : 'empty';
     const issues = holderOf(project, ui.holder).report?.issues ?? [];
     return {
-      pack: $drc.some((i) => i.severity === 'error') ? 'error' : $drc.length > 0 ? 'warning' : null,
+      pack: $drc.some((i) => i.severity === 'error') ? 'error' : $drc.some((i) => i.severity === 'warning') ? 'warning' : null,
       strips: strips === 'error' ? 'error' : strips === 'warning' ? 'warning' : null,
       holder: issues.some((i) => i.level === 'error') ? 'error' : issues.some((i) => i.level === 'warning') ? 'warning' : null,
       file: null,

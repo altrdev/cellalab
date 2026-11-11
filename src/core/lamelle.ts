@@ -20,7 +20,7 @@ import {
   spotsNeeded,
   type CoolingId,
 } from './sizing';
-import { neckWidthMm, type Strip, type StripOptions } from './strips';
+import { neckWidthMm, type Strip, type StripOptions, type TabSide } from './strips';
 import type { Project } from './types';
 import { len, tempDelta } from '../units';
 
@@ -58,6 +58,13 @@ export interface LamellaSettings {
   contactDiameterMm: number | null;
   /** Larghezza minima del collegamento, mm; null = automatica. */
   widthMm: number | null;
+  /** Linguette di presa per i fili del BMS (solo se è scelto un BMS). */
+  tabs: boolean;
+  /** Lato del disegno verso cui sporgono: i fili escono tutti da lì. */
+  tabSide: TabSide;
+  tabWidthMm: number;
+  tabLengthMm: number;
+  tabHoleMm: number;
 }
 
 export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
@@ -78,12 +85,18 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   peakDeltaTK: 100,
   contactDiameterMm: null,
   widthMm: null,
+  tabs: true,
+  tabSide: 'top',
+  tabWidthMm: 6,
+  tabLengthMm: 8,
+  tabHoleMm: 2,
 };
 
 /** Parametri di forma delle lamelle ricavati dalle impostazioni. */
 export const stripOptionsOf = (s: LamellaSettings): StripOptions => ({
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
+  tabs: s.tabs ? { side: s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: s.tabHoleMm } : null,
 });
 
 export type IssueSeverity = 'error' | 'warning' | 'info';
@@ -438,6 +451,13 @@ export function analyzeLamelle(
           });
         }
       }
+    }
+  }
+
+  // Una linguetta sopra una cella di un'altra giunzione la metterebbe in corto (se tocca un'altra lamella lo dice già il controllo sopra).
+  for (const s of strips) {
+    if (s.tab?.blockedBy === 'cell') {
+      issues.push({ severity: 'warning', message: t('lamelle.issue.tabCell', { strip: s.label, face: faceName(s.face) }), stripIds: [s.id] });
     }
   }
 
