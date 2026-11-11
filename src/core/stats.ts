@@ -1,3 +1,4 @@
+import { bmsOf } from './bms';
 import { findCellType } from './catalog';
 import type { PlacedCell, Project } from './types';
 
@@ -128,7 +129,9 @@ export function computeStats(project: Project): PackStats {
     maxCurrentA = Math.min(maxCurrentA, groupA);
   }
 
-  const limit = project.currentLimitA !== undefined && project.currentLimitA > 0 ? project.currentLimitA : undefined;
+  // Tetto di corrente: il più basso tra la corrente di progetto e quella del BMS scelto.
+  const limits = [project.currentLimitA, bmsOf(project)?.maxCurrentA].filter((v): v is number => v !== undefined && v > 0);
+  const limit = limits.length > 0 ? Math.min(...limits) : undefined;
   const series = indices.length;
   const parallel = sizes.size === 1 ? [...sizes][0]! : null;
   return {

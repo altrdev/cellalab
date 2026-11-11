@@ -1,5 +1,6 @@
 import { slotIndexOf, slotPosition } from './lattice';
-import type { CellType, PackGenerator, PlacedCell, Project } from './types';
+import { findBmsType } from './bms';
+import type { BmsType, CellType, PackGenerator, PlacedCell, Project } from './types';
 import { t } from '../i18n';
 
 /** Operazioni pure sul progetto: ricevono un Project e ne restituiscono uno nuovo. */
@@ -206,6 +207,28 @@ export function setCurrentLimit(project: Project, limitA: number | undefined): P
   if (limitA !== undefined && Number.isFinite(limitA) && limitA > 0) return { ...project, currentLimitA: limitA };
   const { currentLimitA: _limit, ...rest } = project;
   return rest;
+}
+
+/** Sceglie il BMS del pacco; `undefined` lo toglie. */
+export function setBms(project: Project, id: string | undefined): Project {
+  if (id === undefined || id === '') {
+    const { bmsId: _id, ...rest } = project;
+    return rest;
+  }
+  return project.bmsId === id ? project : { ...project, bmsId: id };
+}
+
+export function addCustomBms(project: Project, type: BmsType): Project {
+  if (findBmsType(project, type.id)) throw new Error(t('ops.err.dupBms', { id: type.id }));
+  return { ...project, customBmsTypes: [...(project.customBmsTypes ?? []), type] };
+}
+
+/** Toglie un BMS personalizzato; se era quello scelto, il pacco resta senza BMS. */
+export function removeCustomBms(project: Project, id: string): Project {
+  if (!project.customBmsTypes?.some((b) => b.id === id)) return project;
+  const { bmsId, customBmsTypes, ...rest } = project;
+  const left = customBmsTypes.filter((b) => b.id !== id);
+  return { ...rest, ...(left.length > 0 && { customBmsTypes: left }), ...(bmsId !== undefined && bmsId !== id && { bmsId }) };
 }
 
 /** Cambia il tipo di cella delle celle indicate (tutte se `ids` è omesso). Posizioni, gruppi e polarità restano. */

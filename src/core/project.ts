@@ -1,5 +1,6 @@
+import { findBmsType } from './bms';
 import { findCellType } from './catalog';
-import type { CellType, Chemistry, PackGenerator, PlacedCell, Project } from './types';
+import type { BmsType, CellType, Chemistry, PackGenerator, PlacedCell, Project } from './types';
 import { t } from '../i18n';
 
 export class ProjectParseError extends Error {
@@ -87,6 +88,20 @@ function parseCellType(raw: unknown, index: number): CellType {
   return type;
 }
 
+/** Un BMS personalizzato malformato si scarta (il resto del progetto resta valido). */
+function parseBms(raw: unknown): BmsType | undefined {
+  if (!isObj(raw)) return undefined;
+  const { id, name, minSeries, maxSeries, maxCurrentA, chemistries, ntc } = raw;
+  const posInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1;
+  if (typeof id !== 'string' || id === '' || typeof name !== 'string' || name === '') return undefined;
+  if (!posInt(minSeries) || !posInt(maxSeries) || maxSeries < minSeries) return undefined;
+  if (typeof maxCurrentA !== 'number' || !Number.isFinite(maxCurrentA) || maxCurrentA <= 0) return undefined;
+  if (!Array.isArray(chemistries)) return undefined;
+  const chems = chemistries.filter((c): c is Chemistry => c === 'li-ion' || c === 'lifepo4');
+  if (chems.length === 0) return undefined;
+  return { id, name, minSeries, maxSeries, maxCurrentA, chemistries: chems, ntc: ntc === true };
+}
+
 function parseCell(raw: unknown, index: number): PlacedCell {
   const where = `cells[${index}]`;
   if (!isObj(raw)) throw new ProjectParseError(t('project.err.object', { where }));
@@ -140,6 +155,13 @@ export function parseProject(json: string): Project {
   if (typeof raw.currentLimitA === 'number' && Number.isFinite(raw.currentLimitA) && raw.currentLimitA > 0) {
     project.currentLimitA = raw.currentLimitA;
   }
+
+  if (Array.isArray(raw.customBmsTypes)) {
+    const list = raw.customBmsTypes.map(parseBms).filter((b): b is BmsType => b !== undefined);
+    if (list.length > 0) project.customBmsTypes = list;
+  }
+  // Un BMS scelto che non esiste più (file modificato a mano) si ignora.
+  if (typeof raw.bmsId === 'string' && findBmsType(project, raw.bmsId)) project.bmsId = raw.bmsId;
 
   const seen = new Set<string>();
   for (const cell of cells) {

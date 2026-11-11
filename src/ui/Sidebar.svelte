@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t, tn } from '../i18n';
   import { lenLabel, lenNum, money } from '../units';
+  import BmsPanel from './BmsPanel.svelte';
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
   import UnitInput from './UnitInput.svelte';
@@ -498,6 +499,11 @@
       {:else if stats.limitedByBms}{t('side.currentHelp.limited', { design: stats.maxCurrentA?.toFixed(0) ?? '', cells: stats.cellCurrentA.toFixed(0) })}
       {:else}{t('side.currentHelp.default', { cells: stats.cellCurrentA.toFixed(0) })}{/if}
     </Help>
+  </details>
+
+  <details class="sec">
+    <summary><Icon name="battery" /> {t('bms.section')}</summary>
+    <BmsPanel />
   </details>
   {/if}
 

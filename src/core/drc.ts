@@ -1,5 +1,6 @@
 import { t, tn } from '../i18n';
 import { len } from '../units';
+import { bmsOf, seriesLabel } from './bms';
 import { findCellType } from './catalog';
 import { computeStats } from './stats';
 import type { PlacedCell, Project } from './types';
@@ -21,7 +22,11 @@ export type IssueCode =
   | 'unequal-parallel'
   | 'mixed-types'
   | 'split-group'
-  | 'current-over-cells';
+  | 'current-over-cells'
+  | 'bms-series'
+  | 'bms-chemistry'
+  | 'bms-current'
+  | 'bms-wires';
 
 export interface Issue {
   code: IssueCode;
@@ -275,6 +280,38 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
         message: t('drc.currentOverCells', { limit, cells: cellA.toFixed(0) }),
         cellIds: [],
       });
+    }
+  }
+
+  const bms = bmsOf(project);
+  if (bms && cells.length > 0) {
+    const series = computeStats(project).series ?? 0;
+    if (series > 0 && (series < bms.minSeries || series > bms.maxSeries)) {
+      issues.push({
+        code: 'bms-series',
+        severity: 'error',
+        message: t('drc.bmsSeries', { bms: seriesLabel(bms), pack: `${series}S` }),
+        cellIds: [],
+      });
+    }
+    const wrong = new Set<string>();
+    for (const c of cells) {
+      const type = findCellType(project, c.typeId);
+      if (type && !bms.chemistries.includes(type.chemistry)) wrong.add(c.id);
+    }
+    if (wrong.size > 0) {
+      issues.push({ code: 'bms-chemistry', severity: 'error', message: t('drc.bmsChemistry', { bms: bms.name }), cellIds: [...wrong] });
+    }
+    if (limit !== undefined && limit > bms.maxCurrentA + 1e-9) {
+      issues.push({
+        code: 'bms-current',
+        severity: 'warning',
+        message: t('drc.bmsCurrent', { limit, bms: bms.maxCurrentA }),
+        cellIds: [],
+      });
+    }
+    if (series > 0) {
+      issues.push({ code: 'bms-wires', severity: 'info', message: t('drc.bmsWires', { n: series + 1 }), cellIds: [] });
     }
   }
 

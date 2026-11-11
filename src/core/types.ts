@@ -26,6 +26,22 @@ export interface CellType {
   generic?: boolean;
 }
 
+/** BMS: quante celle in serie regge, quanta corrente continua e con quale chimica. */
+export interface BmsType {
+  id: string;
+  name: string;
+  /** Numero di serie supportato: minimo e massimo (uguali per un BMS a S fissa). */
+  minSeries: number;
+  maxSeries: number;
+  /** Corrente continua massima di scarica, A. */
+  maxCurrentA: number;
+  chemistries: Chemistry[];
+  /** Ha l'ingresso per il sensore di temperatura (NTC). */
+  ntc: boolean;
+  /** Valori generici del catalogo: da verificare sulla scheda tecnica del BMS reale. */
+  generic?: boolean;
+}
+
 export interface PlacedCell {
   id: string;
   typeId: string;
@@ -55,6 +71,10 @@ export interface Project {
   name: string;
   /** Tipi di cella definiti dall'utente, oltre al catalogo predefinito. */
   customCellTypes: CellType[];
+  /** BMS definiti dall'utente, oltre al catalogo predefinito. */
+  customBmsTypes?: BmsType[];
+  /** BMS scelto per il pacco (catalogo o personalizzato); assente = nessun BMS. */
+  bmsId?: string;
   cells: PlacedCell[];
   /** Presente solo se il pacco è stato generato in automatico e le celle sono ancora sul suo reticolo. */
   generator?: PackGenerator;
