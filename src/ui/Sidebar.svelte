@@ -326,7 +326,7 @@
 <div class="side">
   <header>
     <div class="brand">
-      <h1>CellaLab <small class="ver" title={t('side.version')}>v{__APP_VERSION__}</small></h1>
+      <h1><img class="logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width="26" height="26" />CellaLab <small class="ver" title={t('side.version')}>v{__APP_VERSION__}</small></h1>
       <SettingsMenu />
     </div>
     <input
@@ -684,10 +684,19 @@
   }
   h1 {
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 1.2rem;
   }
+  .logo {
+    flex: none;
+    border-radius: 6px;
+  }
   .ver {
-    margin-left: 4px;
+    margin-left: -2px;
+    align-self: flex-end;
+    padding-bottom: 3px;
     font-size: 0.65rem;
     font-weight: 400;
     color: var(--muted);
