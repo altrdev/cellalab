@@ -35,6 +35,64 @@ export function minThicknessThermalMm(widthMm: number, i: ThermalInput): number 
   return ((-w + Math.sqrt(w * w + 4 * k)) / 2) / MM;
 }
 
+export interface ConductionInput extends ThermalInput {
+  /** Lunghezza libera della banda tra i due appoggi saldati sulle celle, mm. */
+  lengthMm: number;
+  /** Conducibilità termica del materiale, W/(m·K). */
+  conductivityWmK: number;
+  /** Aumento di temperatura delle estremità (le celle) rispetto all'ambiente, K. */
+  endDeltaK: number;
+}
+
+/**
+ * Aumento di temperatura (K, rispetto all'ambiente) al centro di una banda lunga `lengthMm` con le estremità
+ * saldate alle celle, che stanno a `endDeltaK`. È il modello della «aletta» con generazione di calore:
+ * θ(x) = θp + (θe − θp)·cosh(m·(x − L/2)) / cosh(m·L/2), con θp il valore della banda infinita (aria libera)
+ * e m = √(h·P/(k·A)). Per L → ∞ torna a `steadyDeltaTK`.
+ */
+export function conductionDeltaTK(widthMm: number, thicknessMm: number, i: ConductionInput): number {
+  if (!(widthMm > 0) || !(thicknessMm > 0)) return Infinity;
+  const w = widthMm * MM;
+  const t = thicknessMm * MM;
+  const A = w * t;
+  const P = 2 * (w + t);
+  const thetaP = (i.currentA * i.currentA * i.resistivityOhmM) / (i.hWm2K * P * A);
+  const m = Math.sqrt((i.hWm2K * P) / (i.conductivityWmK * A));
+  const c = Math.cosh((m * i.lengthMm * MM) / 2);
+  return thetaP + (i.endDeltaK - thetaP) / c;
+}
+
+/** Spessore massimo che si prova nel calcolo con conduzione, mm. */
+const MAX_SEARCH_MM = 20;
+
+/**
+ * Spessore minimo (mm) per cui la banda, con le estremità sulle celle, resta entro ΔT. Le estremità non vengono
+ * considerate più calde dell'80% di ΔT, altrimenti non ci sarebbe soluzione. Se anche `MAX_SEARCH_MM` non basta
+ * restituisce `MAX_SEARCH_MM`.
+ */
+export function minThicknessConductionMm(widthMm: number, i: ConductionInput): number {
+  if (!(widthMm > 0) || !(i.currentA > 0)) return 0;
+  const inp = { ...i, endDeltaK: Math.max(0, Math.min(i.endDeltaK, 0.8 * i.deltaTK)) };
+  const ok = (t: number) => conductionDeltaTK(widthMm, t, inp) <= i.deltaTK;
+  // cerca a passi geometrici il primo spessore che va bene, poi affina con la bisezione
+  let lo = 0.005;
+  if (ok(lo)) return lo;
+  let hi = lo;
+  while (hi < MAX_SEARCH_MM) {
+    lo = hi;
+    hi *= 1.05;
+    if (ok(hi)) {
+      for (let k = 0; k < 40; k++) {
+        const mid = (lo + hi) / 2;
+        if (ok(mid)) hi = mid;
+        else lo = mid;
+      }
+      return hi;
+    }
+  }
+  return MAX_SEARCH_MM;
+}
+
 /** Larghezza minima (mm) per uno spessore dato, con lo stesso criterio. */
 export function minWidthThermalMm(thicknessMm: number, i: ThermalInput): number {
   if (!(thicknessMm > 0) || !(i.currentA > 0)) return 0;

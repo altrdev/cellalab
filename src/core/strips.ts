@@ -51,6 +51,12 @@ export interface Strip {
   holes: Pt[][];
   /** Larghezza delle bande tra le celle vicine, mm. */
   bandMm: number;
+  /**
+   * Lunghezza libera della banda più lunga tra due appoggi (distanza tra i bordi dei contatti saldati), mm:
+   * è il tratto che scalda, con le estremità tenute dalle celle. Con una cella sola non ci sono bande:
+   * si prende il diametro dell'appoggio.
+   */
+  bandLengthMm: number;
   /** Quante celle in parallelo dividono la corrente: ogni banda porta circa I/P. */
   parallelCount: number;
   areaMm2: number;
@@ -175,7 +181,11 @@ export function buildStrips(project: Project, options: StripOptions = {}): Strip
       // I terminali raccolgono la corrente di più celle: la banda non è mai più stretta dell'appoggio.
       if (kind !== 'series') bandMm = Math.max(bandMm, Math.min(padDiameter, cap));
       const polys = nodes.map((n) => circlePoints(n.x, n.y, n.reachMm, CIRCLE_SEGMENTS));
-      for (const [a, b] of neighbourEdges(nodes)) {
+      const edges = neighbourEdges(nodes);
+      const bandLengthMm = edges.length
+        ? Math.max(...edges.map(([a, b]) => Math.max(1, Math.hypot(a.x - b.x, a.y - b.y) - a.contactRadiusMm - b.contactRadiusMm)))
+        : 2 * nodes[0]!.reachMm;
+      for (const [a, b] of edges) {
         polys.push(
           convexHull([...circlePoints(a.x, a.y, bandMm / 2, CIRCLE_SEGMENTS), ...circlePoints(b.x, b.y, bandMm / 2, CIRCLE_SEGMENTS)]),
         );
@@ -195,6 +205,7 @@ export function buildStrips(project: Project, options: StripOptions = {}): Strip
         outline,
         holes,
         bandMm,
+        bandLengthMm,
         parallelCount: Math.max(1, minus.length, plus.length),
         areaMm2,
         partial: kind === 'series' && !(hasMinus && hasPlus),

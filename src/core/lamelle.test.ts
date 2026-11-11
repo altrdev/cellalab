@@ -43,11 +43,31 @@ describe('analyzeLamelle', () => {
 
   it('corrente alta con nichel e saldatrice hobby: errore, con alternative', () => {
     const { project, strips } = setup(4, 3);
-    const r = analyzeLamelle(project, strips, cfg({ currentA: 60 }), 30);
+    const r = analyzeLamelle(project, strips, cfg({ currentA: 150 }), 30);
     expect(r.status).toBe('error');
     expect(r.issues.some((i) => /spessore/i.test(i.message))).toBe(true);
     expect(r.alternatives.length).toBeGreaterThan(0);
     expect(r.alternatives.some((a) => /due livelli/i.test(a))).toBe(true);
+  });
+
+  it('3S2P di 18650 da 3 Ah (20 A, 10 A per banda): i default bastano, con un nichel sottile', () => {
+    const cells = generateGrid({ typeId: '18650-3000-10a', diameterMm: 18.4, series: 3, parallel: 2, kind: 'hex', gapMm: 1.5 });
+    const project = replaceCells(createProject(), cells);
+    const strips = buildStrips(project);
+    const r = analyzeLamelle(project, strips, cfg(), 20);
+    expect(r.status).toBe('ok');
+    expect(r.thicknessMm).toBeLessThanOrEqual(0.15);
+    // le bande sono corte (distanza tra le celle meno gli appoggi), non infinite
+    for (const s of strips) expect(s.bandLengthMm).toBeGreaterThan(5);
+    for (const s of strips) expect(s.bandLengthMm).toBeLessThan(20);
+  });
+
+  it('celle più calde: servono lamelle più spesse', () => {
+    const { project, strips } = setup(4, 3);
+    const cold = worstRequiredMm(strips, findMaterial('nichel-puro')!, cfg({ cellRiseK: 0 }), 60);
+    const hot = worstRequiredMm(strips, findMaterial('nichel-puro')!, cfg({ cellRiseK: 20 }), 60);
+    expect(hot).toBeGreaterThan(cold);
+    expect(project.cells.length).toBe(12);
   });
 
   it('più strati: se due strati bastano, lo spessore è scelto tra i commerciali', () => {
@@ -61,7 +81,7 @@ describe('analyzeLamelle', () => {
 
   it('spessore imposto troppo sottile: errore con il ΔT previsto', () => {
     const { project, strips } = setup(4, 3);
-    const r = analyzeLamelle(project, strips, cfg({ currentA: 30, thicknessMm: 0.1 }), 30);
+    const r = analyzeLamelle(project, strips, cfg({ currentA: 90, thicknessMm: 0.1 }), 30);
     expect(r.auto).toBe(false);
     expect(r.status).toBe('error');
     const worst = Math.max(...r.strips.map((s) => s.deltaTK ?? 0));

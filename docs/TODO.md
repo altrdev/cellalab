@@ -4,7 +4,7 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 
 ## Verify
 
-- [ ] Open the holder STL (both plates) in a real slicer (PrusaSlicer / Cura): check walls, pockets, floor holes and the chamfer ramp slice correctly. Never tested.
+- [x] Holder STL opened in Bambu Studio (tolerance piece and a real holder): no open edges, slices fine. Still to do: actually print one, and try PrusaSlicer / Cura if convenient.
 - [ ] Check the 3D view on a real GPU.
 
 ## Holder (phase 4 follow-ups)
@@ -37,7 +37,7 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 ## UI
 
 - [ ] The sidebar result card repeats configuration, V, Wh and A, which are now also in the data strip. The owner chose to leave it for now.
-- [ ] Busbar settings defaults for a 3S2P show "problems" (pure nickel is not enough): pre-existing behaviour, review the defaults.
+- [x] Busbar defaults showed "problems" for a 3S2P: the thermal model now uses the band length (fin model, ends on the cells at `cellRiseK`, default 15 K) instead of an infinite strip in air. Open: no current-density cap (0.1 mm nickel passes at ~10 A/mm²), spot-weld/contact heating not modelled; check against a real pack.
 
 ## Project housekeeping
 

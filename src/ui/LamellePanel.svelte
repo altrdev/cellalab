@@ -228,6 +228,13 @@
       <label>Temperatura ambiente (°C)
         <input type="number" step="1" value={ui.lamella.ambientC} onchange={(e) => (ui.lamella.ambientC = num(e, -20, 60) ?? 25)} />
       </label>
+      <label>Celle più calde di (°C)
+        <input type="number" step="1" min="0" max="40" value={ui.lamella.cellRiseK} onchange={(e) => (ui.lamella.cellRiseK = num(e, 0, 40) ?? 15)} />
+      </label>
+    </div>
+    <Help label="Perché le celle">Le bande sono corte e saldate alle celle, che portano via parte del calore. Qui metti di quanto pensi che le celle si scaldino sopra l'ambiente sotto carico: più sono calde, meno calore smaltiscono le lamelle.</Help>
+
+    <div class="row">
       <label>Picchi di corrente (×)
         <input type="number" step="0.1" min="1" value={ui.lamella.peakFactor} onchange={(e) => (ui.lamella.peakFactor = num(e, 1, 10) ?? 1.5)} />
       </label>

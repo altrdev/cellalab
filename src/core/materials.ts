@@ -19,6 +19,8 @@ export interface LamellaMaterial {
   specificHeatJKgK: number;
   /** Coefficiente di temperatura della resistività, 1/K. */
   tempCoeffPerK: number;
+  /** Conducibilità termica, W/(m·K): il calore che la lamella porta verso le celle. */
+  conductivityWmK: number;
   weldability: Weldability;
   /** Spessori commerciali tipici in mm, in ordine crescente. */
   thicknessesMm: number[];
@@ -36,6 +38,7 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     densityKgM3: 8890,
     specificHeatJKgK: 456,
     tempCoeffPerK: 0.006,
+    conductivityWmK: 90,
     weldability: 'good',
     thicknessesMm: [0.1, 0.15, 0.2, 0.3],
     note: 'Il riferimento per le saldature a punti: si salda facilmente e non si ossida. Resistivo: per correnti alte servono più strati o rame.',
@@ -48,6 +51,7 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     densityKgM3: 7850,
     specificHeatJKgK: 490,
     tempCoeffPerK: 0.005,
+    conductivityWmK: 50,
     weldability: 'good',
     thicknessesMm: [0.1, 0.15, 0.2],
     note: 'Economico e facile da saldare, ma più resistivo del nichel puro (circa +60%): scalda di più a pari corrente.',
@@ -60,6 +64,7 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     densityKgM3: 8960,
     specificHeatJKgK: 385,
     tempCoeffPerK: 0.0039,
+    conductivityWmK: 380,
     weldability: 'fair',
     thicknessesMm: [0.1, 0.15, 0.2, 0.3],
     note: 'Conduce molto meglio del nichel, ma richiede più energia per la saldatura a punti: serve una saldatrice potente.',
@@ -72,6 +77,7 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     densityKgM3: 8960,
     specificHeatJKgK: 385,
     tempCoeffPerK: 0.0039,
+    conductivityWmK: 390,
     weldability: 'poor',
     thicknessesMm: [0.1, 0.2, 0.3, 0.5, 1.0],
     note: 'Ottimo conduttore, ma con una saldatrice a punti hobby di norma non si salda (riflette e disperde il calore): si usa saldato a stagno o con linguette di nichel.',
@@ -84,6 +90,7 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     densityKgM3: 8500,
     specificHeatJKgK: 380,
     tempCoeffPerK: 0.0015,
+    conductivityWmK: 120,
     weldability: 'poor',
     thicknessesMm: [0.1, 0.2, 0.3, 0.5],
     note: 'Si salda male a punti; di solito si salda a stagno.',
@@ -96,6 +103,7 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     densityKgM3: 2700,
     specificHeatJKgK: 900,
     tempCoeffPerK: 0.0043,
+    conductivityWmK: 225,
     weldability: 'poor',
     thicknessesMm: [0.2, 0.3, 0.5, 1.0],
     note: 'Non si salda a punti in modo affidabile: richiede ultrasuoni o bonding. Poco adatto a un laboratorio domestico.',

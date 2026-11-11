@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  conductionDeltaTK,
   minAreaPeakMm2,
+  minThicknessConductionMm,
   minThicknessThermalMm,
   minWidthThermalMm,
   spotCapacity,
@@ -126,5 +128,51 @@ describe('spotPositions', () => {
     const cap = spotCapacity(5.4, 2, 3);
     expect(spotPositions(5.4, 2, 3, cap).length === cap || cap % 2 === 1).toBe(true);
     expect(spotPositions(5.4, 2, 3, cap + 1)).toEqual([]);
+  });
+});
+
+describe('conduzione verso le celle', () => {
+  // nichel, banda 5,7 mm, 10 A, aria libera
+  const band = { currentA: 10, resistivityOhmM: 1.12e-7, deltaTK: 25, hWm2K: 10, conductivityWmK: 90, endDeltaK: 0 };
+
+  it('banda lunghissima: torna al caso di aria libera', () => {
+    const inf = conductionDeltaTK(5.7, 0.3, { ...band, lengthMm: 1e6 });
+    expect(inf).toBeCloseTo(steadyDeltaTK(5.7, 0.3, 10, 1.12e-7, 10), 4);
+  });
+
+  it('caso a mano: 5,7 × 0,15 mm, 10 A, L = 12 mm, estremità a 0 K', () => {
+    // θp = I²ρ/(h·P·A) ≈ 113 K; m = √(hP/(kA)) ≈ 38,8 /m; cosh(m·L/2) ≈ 1,027 → θ ≈ θp·(1 − 1/cosh) ≈ 3 K
+    const th = conductionDeltaTK(5.7, 0.15, { ...band, lengthMm: 12 });
+    expect(th).toBeGreaterThan(2.5);
+    expect(th).toBeLessThan(3.6);
+  });
+
+  it('con le estremità calde il centro non scende sotto di loro', () => {
+    const th = conductionDeltaTK(5.7, 0.15, { ...band, lengthMm: 12, endDeltaK: 10 });
+    expect(th).toBeGreaterThan(10);
+    expect(th).toBeLessThan(15);
+  });
+
+  it('più corta la banda, meno scalda', () => {
+    const a = conductionDeltaTK(5.7, 0.15, { ...band, lengthMm: 30 });
+    const b = conductionDeltaTK(5.7, 0.15, { ...band, lengthMm: 10 });
+    expect(b).toBeLessThan(a);
+  });
+
+  it('lo spessore minimo trovato rispetta ΔT e uno più sottile no', () => {
+    const inp = { ...band, lengthMm: 25, endDeltaK: 10 };
+    const t = minThicknessConductionMm(10, { ...inp, currentA: 40 });
+    expect(conductionDeltaTK(10, t, { ...inp, currentA: 40 })).toBeLessThanOrEqual(25 + 1e-6);
+    expect(conductionDeltaTK(10, t * 0.9, { ...inp, currentA: 40 })).toBeGreaterThan(25);
+  });
+
+  it('non chiede mai più dell\'aria libera con le estremità fredde', () => {
+    const air = minThicknessThermalMm(5.7, { currentA: 10, resistivityOhmM: 1.12e-7, deltaTK: 25, hWm2K: 10 });
+    expect(minThicknessConductionMm(5.7, { ...band, lengthMm: 12 })).toBeLessThan(air);
+  });
+
+  it('corrente nulla: niente spessore; estremità oltre ΔT: comunque una risposta', () => {
+    expect(minThicknessConductionMm(5.7, { ...band, currentA: 0, lengthMm: 12 })).toBe(0);
+    expect(minThicknessConductionMm(5.7, { ...band, lengthMm: 12, endDeltaK: 100 })).toBeGreaterThan(0);
   });
 });

@@ -10,11 +10,12 @@ import {
 } from './profiles';
 import {
   COOLING,
+  conductionDeltaTK,
   minAreaPeakMm2,
+  minThicknessConductionMm,
   minThicknessThermalMm,
   spotCapacity,
   spotsNeeded,
-  steadyDeltaTK,
   type CoolingId,
 } from './sizing';
 import { neckWidthMm, type Strip, type StripOptions } from './strips';
@@ -40,6 +41,8 @@ export interface LamellaSettings {
   /** Aumento di temperatura ammesso a regime, K. */
   deltaTK: number;
   ambientC: number;
+  /** Di quanto si scaldano le celle sopra l'ambiente, K: le estremità delle bande stanno a quella temperatura. */
+  cellRiseK: number;
   /** Picco = corrente × fattore, per `peakSeconds` secondi, con aumento ammesso `peakDeltaTK`. */
   peakFactor: number;
   peakSeconds: number;
@@ -62,6 +65,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   cooling: 'free',
   deltaTK: 25,
   ambientC: 25,
+  cellRiseK: 15,
   peakFactor: 1.5,
   peakSeconds: 1,
   peakDeltaTK: 100,
@@ -142,11 +146,13 @@ function requirementFor(strip: Strip, material: LamellaMaterial, s: LamellaSetti
     strip.kind === 'series' ? currentA / strip.parallelCount : currentA / 2;
   const h = COOLING[s.cooling].h;
   const rhoHot = resistivityAt(material, s.ambientC + s.deltaTK);
-  const thermal = minThicknessThermalMm(neck, {
-    currentA: neckCurrent,
-    resistivityOhmM: rhoHot,
-    deltaTK: s.deltaTK,
-    hWm2K: h,
+  const thermalInput = { currentA: neckCurrent, resistivityOhmM: rhoHot, deltaTK: s.deltaTK, hWm2K: h };
+  // Una banda corta, saldata alle celle, scarica il calore verso di loro: conta la lunghezza libera.
+  const thermal = minThicknessConductionMm(neck, {
+    ...thermalInput,
+    lengthMm: strip.bandLengthMm,
+    conductivityWmK: material.conductivityWmK,
+    endDeltaK: s.cellRiseK,
   });
   const rhoPeak = resistivityAt(material, s.ambientC + s.peakDeltaTK / 2);
   const area = minAreaPeakMm2({
@@ -246,7 +252,18 @@ export function analyzeLamelle(
       thermalMm: r.thermalMm,
       peakMm: r.peakMm,
       requiredMm: r.requiredMm,
-      deltaTK: totalThicknessMm === null ? null : steadyDeltaTK(r.neckMm, totalThicknessMm, r.neckCurrentA, rhoHot, h),
+      deltaTK:
+        totalThicknessMm === null
+          ? null
+          : conductionDeltaTK(r.neckMm, totalThicknessMm, {
+              currentA: r.neckCurrentA,
+              resistivityOhmM: rhoHot,
+              deltaTK: settings.deltaTK,
+              hWm2K: h,
+              lengthMm: s.bandLengthMm,
+              conductivityWmK: material.conductivityWmK,
+              endDeltaK: Math.min(settings.cellRiseK, 0.8 * settings.deltaTK),
+            }),
       cellCurrentA: maxCellCurrent,
       spotsNeeded: need,
       spotCapacity: Number.isFinite(cap) ? cap : 0,
@@ -308,6 +325,7 @@ export function analyzeLamelle(
     });
   }
   for (const r of reports) {
+    const where = `Lamella ${r.label} (${faceName(r.face)})`;
     if (r.spotCapacity < r.spotsNeeded) {
       issues.push({
         severity: 'error',
