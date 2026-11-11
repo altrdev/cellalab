@@ -65,6 +65,8 @@ export interface LamellaSettings {
   tabWidthMm: number;
   tabLengthMm: number;
   tabHoleMm: number;
+  /** Distanza della piega dal bordo della cella, mm: oltre la parete del holder. */
+  tabBendMm: number;
 }
 
 export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
@@ -90,13 +92,14 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   tabWidthMm: 6,
   tabLengthMm: 8,
   tabHoleMm: 2,
+  tabBendMm: 2.5,
 };
 
 /** Parametri di forma delle lamelle ricavati dalle impostazioni. */
 export const stripOptionsOf = (s: LamellaSettings): StripOptions => ({
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
-  tabs: s.tabs ? { side: s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: s.tabHoleMm } : null,
+  tabs: s.tabs ? { side: s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: s.tabHoleMm, bendMm: s.tabBendMm } : null,
 });
 
 export type IssueSeverity = 'error' | 'warning' | 'info';

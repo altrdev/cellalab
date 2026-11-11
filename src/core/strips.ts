@@ -48,7 +48,7 @@ export interface StripTab {
   holeX: number;
   holeY: number;
   holeDiameterMm: number;
-  /** Linea di piega consigliata (al bordo della cella, prima del foro), da segnare e non da tagliare. */
+  /** Linea di piega consigliata (oltre il bordo del holder, prima del foro), da segnare e non da tagliare. */
   bend: [Pt, Pt];
   /** Cosa intralcia la linguetta: un'altra lamella della stessa faccia o una cella; null = libera. */
   blockedBy: 'strip' | 'cell' | null;
@@ -98,8 +98,11 @@ export interface StripOptions {
 export interface TabOptions {
   side: TabSide;
   widthMm: number;
+  /** Lunghezza della parte piegata, oltre la linea di piega, mm. */
   lengthMm: number;
   holeMm: number;
+  /** Dove si piega: distanza dal bordo della cella, mm (deve superare il bordo del holder: parete + gioco). */
+  bendMm: number;
 }
 
 export const DEFAULT_STRIP_MARGIN_MM = 1;
@@ -279,19 +282,18 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions): void {
     });
     const w = Math.min(o.widthMm, 2 * node.reachMm);
     const lengthMm = Math.max(o.lengthMm, 1);
-    const reach = node.reachMm + lengthMm;
+    const bendAlong = Math.max(node.cellRadiusMm + o.bendMm, node.reachMm);
+    const reach = bendAlong + lengthMm;
     const at = (a: number, p: number): Pt => ({ x: node.x + d.x * a + perp.x * p, y: node.y + d.y * a + perp.y * p });
     const rect = convexHull([at(0, -w / 2), at(0, w / 2), at(reach, w / 2), at(reach, -w / 2)]);
     const hole = Math.min(o.holeMm, w - 1, lengthMm - 1);
-    const hc = at(node.reachMm + lengthMm / 2, 0);
+    const hc = at(bendAlong + lengthMm / 2, 0);
     const region: Region = unionPolygons([s.outline, rect]);
     const holes = [...s.holes];
     if (hole >= 0.5) holes.push(circlePoints(hc.x, hc.y, hole / 2, circleSegments(hole / 2)));
     s.outline = region.outline;
     s.holes = holes;
     s.areaMm2 = regionArea({ outline: s.outline, holes });
-    const holeAlong = node.reachMm + lengthMm / 2;
-    const bendAlong = Math.max(node.reachMm, Math.min(node.cellRadiusMm + 0.5, holeAlong - Math.max(hole, 0) / 2 - 1));
     const bend: [Pt, Pt] = [at(bendAlong, -w / 2), at(bendAlong, w / 2)];
     s.tab = { side: o.side, rect, holeX: hc.x, holeY: hc.y, holeDiameterMm: hole >= 0.5 ? hole : 0, bend, blockedBy: null };
   }

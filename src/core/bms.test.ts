@@ -104,7 +104,7 @@ describe('salvataggio', () => {
 });
 
 describe('linguette di presa', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 2.5 } as const;
   const withBms = (p: Project) => setBms(p, 'bms-13s-40a-li-ion');
 
   it('senza BMS non ci sono linguette', () => {
@@ -128,7 +128,7 @@ describe('linguette di presa', () => {
     const strips = buildStrips(p, { tabs });
     for (const s of strips.filter((x) => x.tab)) {
       const before = plain.find((x) => x.id === s.id)!;
-      expect(Math.min(...s.outline.map((q) => q.y))).toBeLessThan(Math.min(...before.outline.map((q) => q.y)) - 7);
+      expect(Math.min(...s.outline.map((q) => q.y))).toBeLessThan(Math.min(...before.outline.map((q) => q.y)) - 8);
       expect(s.areaMm2).toBeGreaterThan(before.areaMm2);
       expect(s.tab!.blockedBy).toBeNull();
     }
@@ -142,7 +142,7 @@ describe('linguette di presa', () => {
 });
 
 describe('linea di piega della linguetta', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 2.5 } as const;
   const strips = buildStrips(setBms(pack(4, 2), 'bms-4s-30a-li-ion'), { tabs });
 
   it('sta sulla linguetta, tra la cella e il foro', () => {
