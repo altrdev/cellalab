@@ -43,4 +43,4 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 ## Project housekeeping
 
 - [x] Author e-mail in the git history replaced with the GitHub no-reply address (done before going public).
-- [ ] Before making the repo public: re-check the licence (MIT for now).
+- [x] Licence re-checked: staying with MIT; the README safety notice covers the lithium-pack risks.
