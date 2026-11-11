@@ -6,11 +6,15 @@ import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.j
 import { findCellType } from '../core/catalog';
 import type { HolderModel } from '../core/holder';
 import { explodeOffsets } from '../core/explode';
+import { intersectRegions, type Region } from '../core/clip';
 import { boundsOfCells } from '../core/geometry';
-import type { Strip } from '../core/strips';
+import type { Strip, TabSide } from '../core/strips';
 import type { Project } from '../core/types';
 import { groupHue } from './colors';
 import { holderHalfGeometries } from './holderMesh';
+
+/** Direzione della linguetta nel disegno (y verso il basso). */
+const SIDE_DIR: Record<TabSide, { x: number; y: number }> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
 /**
  * Scena 3D del pacco. Coordinate: x e y del disegno 2D diventano X e Z (y verso chi guarda),
@@ -411,15 +415,62 @@ export class PackScene {
       this.busRoot.remove(m);
     }
     for (const s of strips) {
-      const shape = new THREE.Shape(s.outline.map((p) => new THREE.Vector2(p.x, p.y)));
-      for (const h of s.holes) shape.holes.push(new THREE.Path(h.map((p) => new THREE.Vector2(p.x, p.y))));
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
-      geo.rotateX(Math.PI / 2); // y del disegno -> Z, l'estrusione scende lungo -Y
-      const mesh = new THREE.Mesh(geo, this.busMat);
-      mesh.position.y = s.face === 'top' ? height + lift + thickness : -lift;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      this.busRoot.add(mesh);
+      const top = s.face === 'top';
+      const sheetY = top ? height + lift + thickness : -lift;
+      const add = (geo: THREE.BufferGeometry, mesh?: (m: THREE.Mesh) => void) => {
+        const m = new THREE.Mesh(geo, this.busMat);
+        mesh?.(m);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        this.busRoot.add(m);
+      };
+      const extrude = (r: Region) => {
+        const shape = new THREE.Shape(r.outline.map((p) => new THREE.Vector2(p.x, p.y)));
+        for (const h of r.holes) shape.holes.push(new THREE.Path(h.map((p) => new THREE.Vector2(p.x, p.y))));
+        return new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+      };
+      const region: Region = { outline: s.outline, holes: s.holes };
+      const tab = s.tab;
+      if (!tab) {
+        const geo = extrude(region);
+        geo.rotateX(Math.PI / 2); // y del disegno -> Z, l'estrusione scende lungo -Y
+        add(geo, (m) => (m.position.y = sheetY));
+        continue;
+      }
+      // La linguetta si piega a 90° sulla linea di piega: verso il basso (faccia sopra) o verso l'alto (faccia sotto).
+      const d = SIDE_DIR[tab.side];
+      const perp = { x: -d.y, y: d.x };
+      const mid = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
+      const BIG = 1000;
+      const quad = (u0: number, u1: number): { x: number; y: number }[] =>
+        [[u0, -BIG], [u1, -BIG], [u1, BIG], [u0, BIG]].map(([u, v]) => ({ x: mid.x + d.x * u! + perp.x * v!, y: mid.y + d.y * u! + perp.y * v! }));
+      for (const r of intersectRegions(region, [quad(-BIG, 0)])) {
+        const geo = extrude(r);
+        geo.rotateX(Math.PI / 2);
+        add(geo, (m) => (m.position.y = sheetY));
+      }
+      // Pezzo piegato: disegnato in (u lungo la linguetta, v di lato) e poi messo in piedi sul bordo della lamella.
+      const sy = top ? -1 : 1;
+      const xAxis = new THREE.Vector3(0, sy, 0);
+      const yAxis = new THREE.Vector3(perp.x, 0, perp.y);
+      const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis);
+      const outward = new THREE.Vector3(d.x, 0, d.y);
+      for (const r of intersectRegions(region, [quad(0, BIG)])) {
+        const local = (p: { x: number; y: number }) => {
+          const dx = p.x - mid.x;
+          const dy = p.y - mid.y;
+          return new THREE.Vector2(dx * d.x + dy * d.y, dx * perp.x + dy * perp.y);
+        };
+        const shape = new THREE.Shape(r.outline.map(local));
+        for (const h of r.holes) shape.holes.push(new THREE.Path(h.map(local)));
+        const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+        if (zAxis.dot(outward) < 0) geo.translate(0, 0, -thickness); // lo spessore resta verso l'esterno
+        add(geo, (m) => {
+          m.matrixAutoUpdate = false;
+          m.matrix.makeBasis(xAxis, yAxis, zAxis).setPosition(mid.x, top ? sheetY : sheetY - thickness, mid.y);
+          m.matrixWorldNeedsUpdate = true;
+        });
+      }
     }
     this.busKey = { strips, thickness, height, lift };
   }
