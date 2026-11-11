@@ -32,6 +32,9 @@ describe('impostazioni nel file del progetto', () => {
     expect(l.thicknessMm).toBeNull();
     expect(l.layers).toBe(5);
     expect(l.cooling).toBe(DEFAULT_LAMELLA_SETTINGS.cooling);
+    expect(sanitizeLamellaSettings({ spotsPerTerminal: 99 }).spotsPerTerminal).toBe(12);
+    expect(sanitizeLamellaSettings({ spotsPerTerminal: 'x' }).spotsPerTerminal).toBeNull();
+    expect(sanitizeLamellaSettings({ spotsPerTerminal: 3.6, spotCurrentA: -1 })).toMatchObject({ spotsPerTerminal: 4, spotCurrentA: null });
     // il vecchio campo currentA non esiste più: un file o un salvataggio che lo contiene lo ignora
     expect('currentA' in l).toBe(false);
     const h = sanitizeHolderSettings({ wallMm: 999, shape: 'strano', lockCells: 'sì' });

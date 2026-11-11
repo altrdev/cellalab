@@ -88,6 +88,50 @@ describe('analyzeLamelle', () => {
     expect(worst).toBeGreaterThan(25);
   });
 
+  describe('punti di saldatura', () => {
+    // 4S3P di 21700: sul bottone entrano 6 punti (2 mm, passo 3 mm); con 3 celle in parallelo la corrente per cella è I/3
+    const spots = (over: Partial<LamellaSettings>, packA: number) => {
+      const { project, strips } = setup(4, 3);
+      const r = analyzeLamelle(project, strips, cfg(over), packA);
+      return { r, s: r.strips[0]! };
+    };
+
+    it('automatico: i punti seguono la corrente, a coppie', () => {
+      expect(spots({}, 15).s.spotsNeeded).toBe(2); // 5 A per cella → 1 punto → minimo 2
+      expect(spots({}, 30).s.spotsNeeded).toBe(2); // 10 A per cella → 2 punti
+      expect(spots({}, 36).s.spotsNeeded).toBe(4); // 12 A → 3 punti → a coppie: 4
+      expect(spots({}, 60).s.spotsNeeded).toBe(4); // 20 A → 4 punti
+      expect(spots({}, 60).s.spotsForCurrent).toBe(4);
+    });
+
+    it('numero scelto: viene usato e mostra la corrente che reggono', () => {
+      const { s, r } = spots({ spotsPerTerminal: 4 }, 30);
+      expect(s.spotsNeeded).toBe(4);
+      expect(s.spotsCarryA).toBe(20);
+      expect(r.issues.some((i) => /punti/.test(i.message))).toBe(false);
+    });
+
+    it('numero scelto troppo basso per la corrente: errore', () => {
+      const { r } = spots({ spotsPerTerminal: 2 }, 60); // 20 A per cella, 2 punti = 10 A
+      expect(r.status).toBe('error');
+      expect(r.issues.some((i) => /reggono circa 10 A/.test(i.message))).toBe(true);
+    });
+
+    it('numero scelto che non entra sul contatto: errore', () => {
+      const { r } = spots({ spotsPerTerminal: 12 }, 30);
+      expect(r.issues.some((i) => /hai scelto 12 punti/.test(i.message))).toBe(true);
+    });
+
+    it('corrente per punto e distanza modificabili: cambiano i punti e la saldatrice del rapporto', () => {
+      const a = spots({ spotCurrentA: 10 }, 60); // 20 A per cella a 10 A a punto → 2 punti
+      expect(a.s.spotsNeeded).toBe(2);
+      expect(a.r.welder.spotCurrentA).toBe(10);
+      const b = spots({ spotSpacingMm: 5 }, 30);
+      expect(b.r.welder.spotSpacingMm).toBe(5);
+      expect(b.s.spotCapacity).toBeLessThan(spots({}, 30).s.spotCapacity);
+    });
+  });
+
   it('oltre lo spessore massimo della saldatrice: avviso', () => {
     const { project, strips } = setup(4, 3);
     const r = analyzeLamelle(project, strips, cfg({ thicknessMm: 0.3 }), 5);

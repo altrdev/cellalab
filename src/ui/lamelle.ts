@@ -59,12 +59,13 @@ export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
   for (const k of Object.keys(base) as (keyof LamellaSettings)[]) {
     const v = data[k];
     const def = base[k];
-    const nullable = k === 'thicknessMm' || k === 'contactDiameterMm' || k === 'widthMm';
+    const nullable = k === 'thicknessMm' || k === 'contactDiameterMm' || k === 'widthMm' || k === 'spotsPerTerminal' || k === 'spotCurrentA' || k === 'spotSpacingMm';
     if (nullable) {
       out[k] = v === null ? null : typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
     } else if (typeof v === typeof def && (typeof v !== 'number' || Number.isFinite(v))) out[k] = v;
   }
   if (!(base.cooling in COOLING)) base.cooling = DEFAULT_LAMELLA_SETTINGS.cooling;
+  if (base.spotsPerTerminal !== null) base.spotsPerTerminal = Math.min(Math.max(Math.round(base.spotsPerTerminal), 1), 12);
   base.layers = Math.min(Math.max(Math.floor(base.layers) || 1, 1), 5);
   return base;
 }

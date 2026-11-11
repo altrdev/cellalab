@@ -155,12 +155,12 @@
                 <td>{fmt(s.neckMm, 1)}</td>
                 <td>{fmt(s.neckCurrentA, 0)}</td>
                 <td>{fmt(s.requiredMm)}</td>
-                <td class:low={s.spotCapacity < s.spotsNeeded}>{s.spotsNeeded}/{s.spotCapacity}</td>
+                <td class:low={s.spotCapacity < s.spotsNeeded || s.spotsCarryA < s.cellCurrentA} title="{s.spotsNeeded} punti reggono circa {fmt(s.spotsCarryA, 0)} A; la cella ne porta {fmt(s.cellCurrentA, 1)}">{s.spotsNeeded}/{s.spotCapacity} <small>({fmt(s.spotsCarryA, 0)} A)</small></td>
               </tr>
             {/each}
           </tbody>
         </table>
-        <Help label="Come leggere la tabella">Larghezza della banda in mm, corrente in A che la attraversa, spessore minimo in mm; punti di saldatura = necessari/possibili (in rosso se non bastano).</Help>
+        <Help label="Come leggere la tabella">Larghezza della banda in mm, corrente in A che la attraversa, spessore minimo in mm; punti di saldatura = da mettere/che entrano, con tra parentesi la corrente che reggono (in rosso se i punti non entrano o non bastano per la cella).</Help>
       {/if}
     </details>
   {/if}
@@ -173,7 +173,40 @@
         {#each WELDER_PROFILES as w (w.id)}<option value={w.id}>{w.name}</option>{/each}
       </select>
     </label>
-    <Help label="Spiegazione">Decide lo spessore massimo che riesci a saldare e quanti punti servono.</Help>
+    <Help label="Spiegazione">Decide lo spessore massimo che riesci a saldare e i valori di partenza per i punti.</Help>
+
+    <label>Punti per terminale
+      <select
+        value={ui.lamella.spotsPerTerminal ?? 'auto'}
+        onchange={(e) => (ui.lamella.spotsPerTerminal = e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value))}
+      >
+        <option value="auto">Automatico (in base alla corrente)</option>
+        {#each [2, 4, 6, 8] as n (n)}<option value={n}>{n} punti</option>{/each}
+      </select>
+    </label>
+    <div class="row">
+      <label>Corrente per punto (A)
+        <input
+          type="number"
+          min="1"
+          step="0.5"
+          placeholder={fmt(report.welder.spotCurrentA, 0)}
+          value={ui.lamella.spotCurrentA ?? ''}
+          onchange={(e) => (ui.lamella.spotCurrentA = e.currentTarget.value === '' ? null : num(e, 1, 100))}
+        />
+      </label>
+      <label>Distanza punti (mm)
+        <input
+          type="number"
+          min="1"
+          step="0.5"
+          placeholder={fmt(report.welder.spotSpacingMm, 1)}
+          value={ui.lamella.spotSpacingMm ?? ''}
+          onchange={(e) => (ui.lamella.spotSpacingMm = e.currentTarget.value === '' ? null : num(e, 1, 20))}
+        />
+      </label>
+    </div>
+    <Help label="Come si scelgono i punti">In automatico i punti sono quelli che servono per la corrente della cella, a coppie perché la penna ne fa due per volta (con 5 A a punto: fino a 10 A → 2, fino a 20 A → 4). Se ne scegli un numero, l'app controlla che reggano la corrente e che entrino sul contatto. «Corrente per punto» è una stima: confermala con una prova di strappo. «Distanza punti» è quella tra i due elettrodi della penna.</Help>
 
     <label>Come tagli le lamelle
       <select bind:value={ui.lamella.cutterId}>

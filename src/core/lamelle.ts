@@ -34,6 +34,12 @@ export interface LamellaSettings {
   /** Strati sovrapposti (saldati insieme). */
   layers: number;
   welderId: string;
+  /** Punti di saldatura per terminale; null = automatico (quanti servono per la corrente, a coppie). */
+  spotsPerTerminal: number | null;
+  /** Corrente continua che regge un punto, A; null = quella del profilo della saldatrice. */
+  spotCurrentA: number | null;
+  /** Distanza minima tra i punti (tra gli elettrodi della penna), mm; null = quella del profilo. */
+  spotSpacingMm: number | null;
   cutterId: string;
   cooling: CoolingId;
   /** Aumento di temperatura ammesso a regime, K. */
@@ -58,6 +64,9 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   thicknessMm: null,
   layers: 1,
   welderId: 'hobby',
+  spotsPerTerminal: null,
+  spotCurrentA: null,
+  spotSpacingMm: null,
   cutterId: 'manual',
   cooling: 'free',
   deltaTK: 25,
@@ -102,7 +111,13 @@ export interface StripReport {
   /** Aumento di temperatura a regime con lo spessore scelto, K (null se non c'è uno spessore). */
   deltaTK: number | null;
   cellCurrentA: number;
+  /** Punti da mettere su ogni terminale: quelli scelti, o in automatico quelli per la corrente (a coppie). */
   spotsNeeded: number;
+  /** Punti che servirebbero come minimo per la corrente della cella. */
+  spotsForCurrent: number;
+  /** Corrente che reggono i punti scelti, A. */
+  spotsCarryA: number;
+  /** Punti che entrano sul contatto più piccolo. */
   spotCapacity: number;
 }
 
@@ -183,7 +198,12 @@ export function analyzeLamelle(
   packCurrentA: number,
 ): LamellaReport {
   const material = findMaterial(settings.materialId) ?? LAMELLA_MATERIALS[0]!;
-  const welder = findWelder(settings.welderId) ?? WELDER_PROFILES[0]!;
+  const profile = findWelder(settings.welderId) ?? WELDER_PROFILES[0]!;
+  const welder: WelderProfile = {
+    ...profile,
+    spotCurrentA: settings.spotCurrentA ?? profile.spotCurrentA,
+    spotSpacingMm: settings.spotSpacingMm ?? profile.spotSpacingMm,
+  };
   const cutter = findCutter(settings.cutterId) ?? CUTTER_PROFILES[0]!;
   const currentA = packCurrentA;
   const layers = Math.max(1, Math.floor(settings.layers));
@@ -236,9 +256,13 @@ export function analyzeLamelle(
     const r = reqs[i]!;
     let maxCellCurrent = 0;
     for (const g of s.groups) maxCellCurrent = Math.max(maxCellCurrent, currentA / (groupSize.get(g) ?? 1));
-    const need = spotsNeeded(maxCellCurrent, welder.spotCurrentA, welder.minSpotsPerTerminal);
+    const forCurrent = spotsNeeded(maxCellCurrent, welder.spotCurrentA, welder.minSpotsPerTerminal);
     let cap = Infinity;
     for (const n of s.nodes) cap = Math.min(cap, spotCapacity(n.contactRadiusMm, welder.spotDiameterMm, welder.spotSpacingMm));
+    const capacity = Number.isFinite(cap) ? cap : 0;
+    // La penna salda due punti per volta: in automatico si sale a coppie, salvo che il contatto ne tenga uno solo in meno.
+    let chosen = settings.spotsPerTerminal ?? (forCurrent % 2 === 0 ? forCurrent : forCurrent + 1);
+    if (settings.spotsPerTerminal === null && chosen > capacity && forCurrent <= capacity) chosen = forCurrent;
     return {
       stripId: s.id,
       label: s.label,
@@ -262,8 +286,10 @@ export function analyzeLamelle(
               endDeltaK: Math.min(settings.cellRiseK, 0.8 * settings.deltaTK),
             }),
       cellCurrentA: maxCellCurrent,
-      spotsNeeded: need,
-      spotCapacity: Number.isFinite(cap) ? cap : 0,
+      spotsNeeded: chosen,
+      spotsForCurrent: forCurrent,
+      spotsCarryA: chosen * welder.spotCurrentA,
+      spotCapacity: capacity,
     };
   });
 
@@ -321,14 +347,24 @@ export function analyzeLamelle(
       stripIds: [],
     });
   }
+  const fixedSpots = settings.spotsPerTerminal !== null;
   for (const r of reports) {
     const where = `Lamella ${r.label} (${faceName(r.face)})`;
     if (r.spotCapacity < r.spotsNeeded) {
       issues.push({
         severity: 'error',
+        message: fixedSpots
+          ? `${where}: hai scelto ${r.spotsNeeded} punti per terminale ma sul contatto più piccolo ne entrano ${r.spotCapacity}.`
+          : `${where}: servono ${r.spotsForCurrent} punti per terminale (${fmt(r.cellCurrentA, 1)} A per cella, ${fmt(welder.spotCurrentA, 0)} A a punto) ` +
+            `ma sul contatto più piccolo ne entrano ${r.spotCapacity}.`,
+        stripIds: [r.stripId],
+      });
+    } else if (fixedSpots && r.spotsNeeded < r.spotsForCurrent) {
+      issues.push({
+        severity: 'error',
         message:
-          `Lamella ${r.label} (${faceName(r.face)}): servono ${r.spotsNeeded} punti per terminale (${fmt(r.cellCurrentA, 1)} A per cella, ${fmt(welder.spotCurrentA, 0)} A a punto) ` +
-          `ma sul contatto più piccolo ne entrano ${r.spotCapacity}.`,
+          `${where}: ${r.spotsNeeded} punti per terminale reggono circa ${fmt(r.spotsCarryA, 0)} A ma la cella ne porta ${fmt(r.cellCurrentA, 1)} ` +
+          `(${fmt(welder.spotCurrentA, 0)} A a punto): ne servono almeno ${r.spotsForCurrent}.`,
         stripIds: [r.stripId],
       });
     }
