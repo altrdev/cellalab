@@ -3,6 +3,24 @@
   "private": true,
   "license": "MIT",
   "version": "0.0.1",
+  "description": "Browser-based designer for DIY lithium battery packs: cell holder STL and busbar DXF/SVG",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/altrdev/cellalab.git"
+  },
+  "bugs": {
+    "url": "https://github.com/altrdev/cellalab/issues"
+  },
+  "keywords": [
+    "battery-pack",
+    "18650",
+    "21700",
+    "busbar",
+    "3d-printing",
+    "stl",
+    "dxf",
+    "svelte"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
