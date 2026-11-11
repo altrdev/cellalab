@@ -65,7 +65,7 @@ export interface LamellaSettings {
   tabWidthMm: number;
   tabLengthMm: number;
   tabHoleMm: number;
-  /** Distanza della piega dal bordo della cella, mm: oltre la parete del holder. */
+  /** Di quanto la piega supera il bordo del holder, mm. */
   tabBendMm: number;
 }
 
@@ -92,7 +92,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   tabWidthMm: 6,
   tabLengthMm: 8,
   tabHoleMm: 2,
-  tabBendMm: 2.5,
+  tabBendMm: 1,
 };
 
 /** Parametri di forma delle lamelle ricavati dalle impostazioni. */

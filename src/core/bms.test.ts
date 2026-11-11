@@ -5,7 +5,9 @@ import { generateGrid } from './layout';
 import { addCustomBms, removeCustomBms, replaceCells, setBms, setCurrentLimit } from './ops';
 import { createProject, parseProject, serializeProject } from './project';
 import { computeStats } from './stats';
+import { pointInRegions } from './clip';
 import { buildDxf } from './dxf';
+import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { buildSvg } from './lamelleExport';
 import { buildStrips } from './strips';
 import type { Project } from './types';
@@ -104,7 +106,7 @@ describe('salvataggio', () => {
 });
 
 describe('linguette di presa', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 2.5 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1 } as const;
   const withBms = (p: Project) => setBms(p, 'bms-13s-40a-li-ion');
 
   it('senza BMS non ci sono linguette', () => {
@@ -142,7 +144,7 @@ describe('linguette di presa', () => {
 });
 
 describe('linea di piega della linguetta', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 2.5 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1 } as const;
   const strips = buildStrips(setBms(pack(4, 2), 'bms-4s-30a-li-ion'), { tabs });
 
   it('sta sulla linguetta, tra la cella e il foro', () => {
@@ -158,5 +160,30 @@ describe('linea di piega della linguetta', () => {
     expect(buildSvg(strips, { face: 'top', kerfMm: 0, includeContacts: false })).toContain('stroke-dasharray="1.5 0.8"');
     const dxf = buildDxf(strips, { face: 'all', kerfMm: 0, includeContacts: false, includeLabels: false });
     expect(dxf).toMatch(/\n0\r?\nLINE\r?\n/);
+  });
+});
+
+describe('piega oltre il holder', () => {
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1 } as const;
+  const p = setBms(pack(4, 2), 'bms-4s-30a-li-ion');
+
+  it('la piega sta oltre la sagoma del holder, qualunque sia la parete', () => {
+    for (const wallMm of [1.6, 4]) {
+      const model = buildHolder(p, { ...DEFAULT_HOLDER_SETTINGS, wallMm }, true)!;
+      const outline = model.wall.map((r) => ({ outline: r.outline, holes: [] }));
+      const strips = buildStrips(p, { tabs, holderOutline: outline });
+      for (const s of strips.filter((x) => x.tab)) {
+        const [a, b] = s.tab!.bend;
+        for (const q of [a, b, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }]) expect(pointInRegions(q, outline)).toBe(false);
+      }
+    }
+  });
+
+  it('una parete più spessa porta la piega più lontano', () => {
+    const bendY = (wallMm: number) => {
+      const outline = buildHolder(p, { ...DEFAULT_HOLDER_SETTINGS, wallMm }, true)!.wall.map((r) => ({ outline: r.outline, holes: [] }));
+      return Math.min(...buildStrips(p, { tabs, holderOutline: outline }).flatMap((s) => (s.tab ? [s.tab.bend[0].y] : [])));
+    };
+    expect(bendY(4)).toBeLessThan(bendY(1.6) - 2);
   });
 });

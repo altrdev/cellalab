@@ -1,6 +1,6 @@
 import { findCellType } from './catalog';
 import { bmsOf } from './bms';
-import { intersectRegions, regionArea, unionPolygons, type Region } from './clip';
+import { intersectRegions, pointInRegions, regionArea, unionPolygons, type Region } from './clip';
 import { circlePoints, convexHull, type Pt } from './polygon';
 import type { PlacedCell, Project } from './types';
 
@@ -93,6 +93,8 @@ export interface StripOptions {
   widthMm?: number | null;
   /** Linguette di presa per il BMS: solo se il progetto ha un BMS; assente o null = nessuna. */
   tabs?: TabOptions | null;
+  /** Sagoma esterna del holder (senza le tasche): la piega sta oltre questo limite. Assente = parete e gioco di default. */
+  holderOutline?: readonly Region[] | null;
 }
 
 export interface TabOptions {
@@ -101,11 +103,13 @@ export interface TabOptions {
   /** Lunghezza della parte piegata, oltre la linea di piega, mm. */
   lengthMm: number;
   holeMm: number;
-  /** Dove si piega: distanza dal bordo della cella, mm (deve superare il bordo del holder: parete + gioco). */
+  /** Margine della piega oltre il bordo del holder, mm. */
   bendMm: number;
 }
 
 export const DEFAULT_STRIP_MARGIN_MM = 1;
+/** Senza il holder, quanto sporge dalla cella la sua parete (parete 1,6 + gioco 0,15), mm. */
+const DEFAULT_HOLDER_EDGE_MM = 1.75;
 /** Lato massimo dei segmenti con cui si approssima un cerchio, mm: sotto 0,01 mm di scostamento dal cerchio vero. */
 const MAX_CHORD_MM = 0.4;
 /** Segmenti per un cerchio di raggio `r`: un lato lungo al massimo `MAX_CHORD_MM`, multiplo di 4 per toccare gli assi. */
@@ -247,7 +251,7 @@ export function buildStrips(project: Project, options: StripOptions = {}): Strip
       });
     }
   }
-  if (options.tabs && bmsOf(project)) addTabs(project, strips, options.tabs);
+  if (options.tabs && bmsOf(project)) addTabs(project, strips, options.tabs, options.holderOutline ?? null);
   return strips;
 }
 
@@ -258,7 +262,7 @@ const SIDE_VECTOR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0,
  * sopra. La linguetta parte dalla cella più vicina al lato scelto e sporge in fuori; larghezza e foro si adattano
  * all'appoggio.
  */
-function addTabs(project: Project, strips: Strip[], o: TabOptions): void {
+function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: readonly Region[] | null): void {
   const d = SIDE_VECTOR[o.side];
   const perp = { x: -d.y, y: d.x };
   const byJoint = new Map<number, Strip>();
@@ -282,7 +286,16 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions): void {
     });
     const w = Math.min(o.widthMm, 2 * node.reachMm);
     const lengthMm = Math.max(o.lengthMm, 1);
-    const bendAlong = Math.max(node.cellRadiusMm + o.bendMm, node.reachMm);
+    // Fin dove arriva il holder lungo la linguetta (controllando il centro e i due bordi): la piega sta oltre.
+    let exit = node.cellRadiusMm + DEFAULT_HOLDER_EDGE_MM;
+    if (holder && holder.length > 0) {
+      let last = -1;
+      for (let a = 0; a <= 80; a += 0.25) {
+        if ([-w / 2, 0, w / 2].some((v) => pointInRegions({ x: node.x + d.x * a + perp.x * v, y: node.y + d.y * a + perp.y * v }, holder))) last = a;
+      }
+      if (last >= 0) exit = last;
+    }
+    const bendAlong = Math.max(exit + o.bendMm, node.reachMm);
     const reach = bendAlong + lengthMm;
     const at = (a: number, p: number): Pt => ({ x: node.x + d.x * a + perp.x * p, y: node.y + d.y * a + perp.y * p });
     const rect = convexHull([at(0, -w / 2), at(0, w / 2), at(reach, w / 2), at(reach, -w / 2)]);

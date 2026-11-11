@@ -8,7 +8,7 @@ import type { LatticeKind } from '../core/lattice';
 import type { Face } from '../core/strips';
 import type { Project } from '../core/types';
 import { loadHolderSettings, loadHolderView, type HolderView } from './holder';
-import { loadLamellaSettings } from './lamelle';
+import { bindHolderSettings, loadLamellaSettings } from './lamelle';
 
 export type ViewMode = 'draw' | 'split' | '3d';
 export type Tool = 'select' | 'add' | 'series';
@@ -135,3 +135,4 @@ class UiState {
 }
 
 export const ui = new UiState();
+bindHolderSettings(() => ui.holder);

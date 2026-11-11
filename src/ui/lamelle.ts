@@ -4,6 +4,8 @@ import type { Pt } from '../core/polygon';
 import { COOLING, spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
 import { buildStrips, type Strip } from '../core/strips';
+import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
+import { holderOf } from './holder';
 import type { WelderProfile } from '../core/profiles';
 import type { Project } from '../core/types';
 
@@ -11,12 +13,22 @@ import type { Project } from '../core/types';
 
 const stripCache = new WeakMap<Project, { key: string; strips: Strip[] }>();
 
+/** Impostazioni del holder correnti: le registra lo stato dell'interfaccia (qui non si può importare senza un giro). */
+let holderSettings: () => HolderSettings = () => DEFAULT_HOLDER_SETTINGS;
+export function bindHolderSettings(get: () => HolderSettings): void {
+  holderSettings = get;
+}
+
 export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
   const opts = stripOptionsOf(settings);
-  const key = JSON.stringify(opts);
+  const hs = opts.tabs && project.bmsId !== undefined ? holderSettings() : null;
+  const key = JSON.stringify(opts) + (hs ? JSON.stringify(hs) : '');
   const hit = stripCache.get(project);
   if (hit && hit.key === key) return hit.strips;
-  const strips = buildStrips(project, opts);
+  // Le linguette si piegano oltre il holder: serve la sua sagoma esterna (senza le tasche delle celle).
+  const model = hs ? holderOf(project, hs).model : null;
+  const holderOutline = model ? model.wall.map((r) => ({ outline: r.outline, holes: [] })) : null;
+  const strips = buildStrips(project, { ...opts, holderOutline });
   stripCache.set(project, { key, strips });
   return strips;
 }
