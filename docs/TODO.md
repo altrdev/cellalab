@@ -42,4 +42,5 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 
 ## Project housekeeping
 
-- [ ] Before making the repo public: replace the author e-mail in the git history with the GitHub no-reply address; re-check the licence (MIT for now).
+- [x] Author e-mail in the git history replaced with the GitHub no-reply address (done before going public).
+- [ ] Before making the repo public: re-check the licence (MIT for now).
