@@ -2,7 +2,7 @@
   "name": "cellalab",
   "private": true,
   "license": "MIT",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Browser-based designer for DIY lithium battery packs: cell holder STL and busbar DXF/SVG",
   "repository": {
     "type": "git",
