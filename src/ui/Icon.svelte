@@ -1,0 +1,37 @@
+<script lang="ts">
+  /** Icone semplici a tratto (24×24), colorate come il testo. */
+  let { name, size = 16 }: { name: string; size?: number } = $props();
+
+  const paths: Record<string, string> = {
+    battery: 'M3 8h15a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z M23 11v2',
+    bolt: 'M13 2 4 14h7l-1 8 9-12h-7z',
+    grid: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
+    pen: 'M12 20h9 M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+    cursor: 'M4 3l7 17 2-7 7-2z',
+    wand: 'M12 3v4 M12 17v4 M3 12h4 M17 12h4 M6 6l2.5 2.5 M15.5 15.5 18 18 M18 6l-2.5 2.5 M8.5 15.5 6 18',
+    check: 'M20 6 9 17l-5-5',
+    alert: 'M12 9v4 M12 17h.01 M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
+    file: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z M14 3v6h6',
+    layers: 'M12 2 2 7l10 5 10-5z M2 17l10 5 10-5 M2 12l10 5 10-5',
+    box: 'M21 8 12 3 3 8v8l9 5 9-5z M3 8l9 5 9-5 M12 13v8',
+    sliders: 'M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6',
+    download: 'M12 3v12 M7 10l5 5 5-5 M4 21h16',
+    eye: 'M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+    lock: 'M5 11h14v10H5z M8 11V7a4 4 0 0 1 8 0v4',
+    undo: 'M9 14 4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
+    redo: 'M15 14l5-5-5-5 M20 9H9.5a5.5 5.5 0 0 0 0 11H13',
+    plus: 'M12 5v14 M5 12h14',
+    brush: 'M9 12l8-8a2.8 2.8 0 0 1 4 4l-8 8 M7 15c-1.7 0-3 1.3-3 3 0 1.3-2.5 1.5-2 2 1 1.1 2.5 2 4 2 2.2 0 4-1.8 4-4a3 3 0 0 0-3-3z',
+    swap: 'M7 4 3 8l4 4 M3 8h14 M17 20l4-4-4-4 M21 16H7',
+    trash: 'M3 6h18 M8 6V4h8v2 M19 6l-1 14H6L5 6 M10 11v6 M14 11v6',
+    fit: 'M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5',
+    draw: 'M3 5h18v14H3z',
+    split: 'M3 5h18v14H3z M12 5v14',
+    eyeoff: 'M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18.5 18.5 0 0 1 5.1-5.9 M9.9 4.2A9.1 9.1 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.2 3.2 M1 1l22 22 M14.1 14.1a3 3 0 1 1-4.2-4.2',
+    ruler: 'M3 17 17 3l4 4L7 21z M7 13l2 2 M10 10l2 2 M13 7l2 2',
+  };
+</script>
+
+<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d={paths[name] ?? paths.grid} />
+</svg>
