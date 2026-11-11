@@ -326,7 +326,7 @@
 <div class="side">
   <header>
     <div class="brand">
-      <h1>CellaLab</h1>
+      <h1>CellaLab <small class="ver" title={t('side.version')}>v{__APP_VERSION__}</small></h1>
       <SettingsMenu />
     </div>
     <input
@@ -685,6 +685,12 @@
   h1 {
     margin: 0;
     font-size: 1.2rem;
+  }
+  .ver {
+    margin-left: 4px;
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: var(--muted);
   }
   .start h2 {
     margin: 0;

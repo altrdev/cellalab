@@ -1,6 +1,7 @@
 import { boundsOfCells } from '../core/geometry';
 import { loadLocale, saveLocale, setLocale, type Locale } from '../i18n';
 import { getPrefs, setPrefs, type Prefs } from '../prefs';
+import { getTheme, setTheme, type Theme } from '../theme';
 import type { HolderSettings } from '../core/holder';
 import type { LamellaSettings } from '../core/lamelle';
 import type { LatticeKind } from '../core/lattice';
@@ -29,6 +30,12 @@ class UiState {
   settingsOpen = $state(false);
   /** Unità e valuta (si ricordano nel browser); cambiandole App.svelte rimonta tutto. */
   prefs = $state<Prefs>({ ...getPrefs() });
+  /** Tema chiaro/scuro/automatico: non rimonta l'interfaccia, basta l'attributo su <html>. */
+  theme = $state<Theme>(getTheme());
+  setTheme(theme: Theme) {
+    setTheme(theme);
+    this.theme = getTheme();
+  }
   setPref(patch: Partial<Prefs>) {
     // i passi di aggancio dipendono dall'unità: cambiandola si torna all'aggancio a slot
     if (patch.length && patch.length !== getPrefs().length) this.snap = 'slot';

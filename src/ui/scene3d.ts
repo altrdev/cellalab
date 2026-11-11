@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { onThemeChange } from '../theme';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -127,6 +128,7 @@ export class PackScene {
   private envTexture: THREE.Texture | null = null;
   private observer: ResizeObserver;
   private media = window.matchMedia('(prefers-color-scheme: dark)');
+  private offTheme: () => void = () => {};
   private frame = 0;
   private disposed = false;
   private busRoot = new THREE.Group();
@@ -176,6 +178,7 @@ export class PackScene {
 
     this.applyTheme();
     this.media.addEventListener('change', this.onTheme);
+    this.offTheme = onThemeChange(this.onTheme);
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(container);
     this.resize();
@@ -478,6 +481,7 @@ export class PackScene {
     cancelAnimationFrame(this.frame);
     this.observer.disconnect();
     this.media.removeEventListener('change', this.onTheme);
+    this.offTheme();
     this.controls.removeEventListener('change', this.requestRender);
     this.controls.dispose();
     for (const g of this.geometries.values()) {

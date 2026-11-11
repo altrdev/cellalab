@@ -32,6 +32,14 @@
         </div>
       </div>
       <div class="field">
+        <span class="lbl">{t('settings.theme')}</span>
+        <div class="seg">
+          <button type="button" class:on={ui.theme === 'auto'} aria-pressed={ui.theme === 'auto'} onclick={() => ui.setTheme('auto')}>{t('settings.themeAuto')}</button>
+          <button type="button" class:on={ui.theme === 'light'} aria-pressed={ui.theme === 'light'} onclick={() => ui.setTheme('light')}>{t('settings.themeLight')}</button>
+          <button type="button" class:on={ui.theme === 'dark'} aria-pressed={ui.theme === 'dark'} onclick={() => ui.setTheme('dark')}>{t('settings.themeDark')}</button>
+        </div>
+      </div>
+      <div class="field">
         <span class="lbl">{t('settings.length')}</span>
         <div class="seg">
           <button type="button" class:on={ui.prefs.length === 'mm'} aria-pressed={ui.prefs.length === 'mm'} onclick={() => ui.setPref({ length: 'mm' })}>mm</button>
