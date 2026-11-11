@@ -1,64 +1,64 @@
 # CellaLab
 
-**Configuratore per pacchi batteria fai-da-te, nel browser.** Disegni il pacco (o lo generi da serie e parallelo), lo guardi in 3D e ne esporti il portacelle da stampare e le lamelle da tagliare.
+**A browser-based configurator for DIY battery packs.** Design the pack (or generate it from series and parallel counts), view it in 3D, and export a 3D-printable cell holder and busbar strips ready to cut.
 
-[🇬🇧 English](README.en.md) · Italiano
+English · [🇮🇹 Italiano](README.it.md)
 
-## Cosa fa
+## What it does
 
-- **Pacco:** generazione automatica S×P (disposizione esagonale o quadrata) oppure disegno libero cella per cella; serie a pennello, gruppi in parallelo, polarità, annulla/ripristina. Calcola tensione, capacità, energia, corrente, peso, costo e ingombro.
-- **Celle:** catalogo con profili generici e 14 modelli 18650/21700 (BAK, Samsung, Molicel, Murata, LG) con prezzi indicativi; si possono duplicare e modificare.
-- **Corrente e BMS:** la corrente del pacco è la più bassa tra quella delle celle e il limite del BMS; le lamelle si dimensionano su quel valore.
-- **Verifiche:** celle sovrapposte, spazio minimo per il portacelle, gruppi sbilanciati, polarità, limite sopra ciò che reggono le celle.
-- **Anteprima 3D** (three.js): disegno e 3D affiancati, esplosione, viste isometrica/alto/frontale/laterale.
-- **Lamelle:** generate dalla topologia, dimensionate su materiale, spessore e corrente (nichel, rame, ecc.), con punti di saldatura consigliati. Esportazione **DXF** per laser/CNC (con compensazione del taglio), dima **SVG** 1:1 e lista di taglio.
-- **Portacelle stampabile in 3D:** due piastre su misura con tasche, fondo che trattiene le celle, raccordi e smusso a rampa liscia. Esportazione **STL** in posizione di stampa.
-- **Progetto:** salvataggio automatico nel browser; salva e apri file `.cellalab.json` (include le impostazioni di lamelle e portacelle).
+- **Pack:** automatic S×P generation (hexagonal or square layout) or free drawing cell by cell; series brush, parallel groups, polarity, undo/redo. Computes voltage, capacity, energy, current, weight, cost and overall size.
+- **Cells:** a catalogue with generic profiles and 14 commercial 18650/21700 models (BAK, Samsung, Molicel, Murata, LG) with indicative prices; you can duplicate and edit them.
+- **Current and BMS:** pack current is the lower of what the cells can deliver and the BMS limit; the busbars are sized on that value.
+- **Checks:** overlapping cells, minimum spacing for the holder, unbalanced groups, polarity, limit above what the cells can handle.
+- **3D preview** (three.js): drawing and 3D side by side, exploded view, isometric/top/front/side views.
+- **Busbar strips:** generated from the pack topology and sized on material, thickness and current (nickel, copper, etc.), with suggested weld spots. Export a **DXF** for laser/CNC (with kerf compensation), a 1:1 **SVG** template and a cut list.
+- **3D-printable holder:** two custom plates with cell pockets, a floor that retains the cells, fillets and a smooth sloped chamfer. Export an **STL** in print orientation.
+- **Project:** automatic saving in the browser; save and open `.cellalab.json` files (they include the busbar and holder settings).
 
-Interfaccia in italiano.
+The interface is in Italian.
 
-## Avvio rapido
+## Quick start
 
-Serve Node 22 o più recente.
+Requires Node 22 or newer.
 
 ```bash
 npm install
-npm run dev      # sviluppo, di solito su http://localhost:5173
-npm test         # test (Vitest)
-npm run check    # controllo dei tipi (svelte-check)
-npm run build    # versione di produzione in dist/
+npm run dev      # development, usually at http://localhost:5173
+npm test         # tests (Vitest)
+npm run check    # type check (svelte-check)
+npm run build    # production build in dist/
 ```
 
-## Come si usa
+## How to use it
 
-1. **Pacco:** scegli «Genera automaticamente» (imposti S, P, cella e spazio tra le celle) oppure «Disegna a mano».
-2. **Lamelle:** scegli materiale, spessore e saldatrice; la scheda mostra l'esito e gli avvisi.
-3. **Portacelle:** regola pareti, gioco, fondo e smusso.
-4. **Esporta:** DXF, dima, lista di taglio, STL e salvataggio del progetto.
+1. **Pacco (Pack):** choose "Genera automaticamente" (set S, P, cell and spacing) or "Disegna a mano" (draw by hand).
+2. **Lamelle (Busbars):** pick material, thickness and welder; the tab shows the result and warnings.
+3. **Portacelle (Holder):** adjust walls, clearance, floor and chamfer.
+4. **Esporta (Export):** DXF, template, cut list, STL and project saving.
 
-## Stato e limiti
+## Status and limitations
 
-Progetto hobby in sviluppo.
+A hobby project under development.
 
-- L'STL del portacelle **non è ancora stato provato con uno slicer reale**: controlla sempre l'anteprima nello slicer prima di stampare.
-- Il dimensionamento termico delle lamelle è una stima a regime stazionario: ignora il calore verso le celle e la resistenza dei punti di saldatura.
-- Le lamelle sono a un solo livello e di spessore unico.
-- Prezzi e correnti delle celle sono indicativi (da nkon.nl, novembre 2026) e vanno verificati sulla scheda tecnica.
-- Il 3D è stato provato con rendering software, non su GPU reale.
+- The holder STL has **not yet been tested with a real slicer**: always check the preview in your slicer before printing.
+- Thermal sizing of the busbars is a steady-state estimate: it ignores heat flow into the cells and spot-weld resistance.
+- Busbars are single-layer with one thickness.
+- Cell prices and currents are indicative (from nkon.nl, November 2026) and must be checked against the datasheet.
+- The 3D view has been tested with software rendering, not on a real GPU.
 
-## Sicurezza
+## Safety
 
-Un pacco di celle al litio può incendiarsi o esplodere se progettato o costruito male. CellaLab è un aiuto al progetto, **non una certificazione**: i risultati sono stime. Usa un BMS adatto, fusibili e protezioni, conosci i limiti delle tue celle e costruisci sotto la tua responsabilità.
+A lithium cell pack can catch fire or explode if badly designed or built. CellaLab is a design aid, **not a certification**: its results are estimates. Use a suitable BMS, fuses and protection, know the limits of your cells, and build at your own risk.
 
-## Struttura
+## Structure
 
 ```
-src/core   logica pura (modello, calcoli, verifiche, lamelle, portacelle, DXF/STL), con i test
-src/ui     interfaccia Svelte, editor 2D, scena 3D, esportazioni
+src/core   pure logic (model, calculations, checks, busbars, holder, DXF/STL), with tests
+src/ui     Svelte interface, 2D editor, 3D scene, exports
 ```
 
 Stack: Svelte 5, TypeScript, Vite, Vitest, three.js, clipper-lib.
 
-## Licenza
+## License
 
 [MIT](LICENSE) © 2026 Alessandro Travi
