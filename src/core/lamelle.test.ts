@@ -117,6 +117,27 @@ describe('analyzeLamelle', () => {
       expect(r.issues.some((i) => /reggono circa 10 A/.test(i.message))).toBe(true);
     });
 
+    it("il messaggio dice perché 4 punti non entrano: area di saldatura Ø 6 = raggio 3", () => {
+      const { project } = setup(4, 3);
+      const strips = buildStrips(project, { contactDiameterMm: 6 });
+      const r = analyzeLamelle(project, strips, cfg({ spotsPerTerminal: 4, contactDiameterMm: 6 }), 30);
+      const msg = r.issues.find((i) => /hai scelto 4 punti/.test(i.message))!.message;
+      expect(msg).toMatch(/raggio 3,0 mm/);
+      expect(msg).toMatch(/almeno 3,2/);
+      expect(msg).toMatch(/\(Ø 6,4 mm\)/);
+    });
+
+    it('il bordo non toglie spazio ai punti: con Ø 7 entrano 4 punti qualunque sia il bordo', () => {
+      const { project } = setup(4, 3);
+      const check = (contactDiameterMm: number, marginMm: number) => {
+        const strips = buildStrips(project, { contactDiameterMm, marginMm });
+        return analyzeLamelle(project, strips, cfg({ spotsPerTerminal: 4, contactDiameterMm }), 30).strips[0]!.spotCapacity;
+      };
+      expect(check(7, 1)).toBeGreaterThanOrEqual(4);
+      expect(check(7, 4)).toBe(check(7, 1));
+      expect(check(4, 1)).toBeLessThan(4); // area di Ø 4: solo 1 punto
+    });
+
     it('numero scelto che non entra sul contatto: errore', () => {
       const { r } = spots({ spotsPerTerminal: 12 }, 30);
       expect(r.issues.some((i) => /hai scelto 12 punti/.test(i.message))).toBe(true);

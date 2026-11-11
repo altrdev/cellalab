@@ -108,7 +108,7 @@
   </label>
   <Help label="Cosa fa">Tra le celle vicine ci sono bande larghe quanto scegli. Allargandole le finestre si chiudono; tutto a destra = lamella piena.</Help>
 
-  <label>Ø appoggio sulla cella (mm)
+  <label>Ø area di saldatura (mm)
     <input
       type="number"
       min="1"
@@ -118,6 +118,18 @@
       onchange={(e) => (ui.lamella.contactDiameterMm = e.currentTarget.value === '' ? null : num(e, 1, 30))}
     />
   </label>
+  <Help label="Cosa fa">È la zona della cella dove metti i punti. Vuoto = il bottone (polo +). Fuori da questa zona la lamella lascia 1 mm di nichel, perché i punti non finiscano sul taglio.</Help>
+
+  <label>Punti per terminale
+    <select
+      value={ui.lamella.spotsPerTerminal ?? 'auto'}
+      onchange={(e) => (ui.lamella.spotsPerTerminal = e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value))}
+    >
+      <option value="auto">Automatico (in base alla corrente)</option>
+      {#each [2, 4, 6, 8] as n (n)}<option value={n}>{n} punti</option>{/each}
+    </select>
+  </label>
+  <Help label="Come si scelgono i punti">In automatico i punti sono quelli che servono per la corrente della cella, a coppie perché la penna ne fa due per volta (con 5 A a punto: fino a 10 A → 2, fino a 20 A → 4). Se ne scegli un numero, l'app controlla che reggano la corrente e che entrino nell'area di saldatura.</Help>
 
   <label>
     <span class="top"><span>Trasparenza lamelle</span><b>{Math.round((1 - ui.stripOpacity) * 100)}%</b></span>
@@ -175,15 +187,6 @@
     </label>
     <Help label="Spiegazione">Decide lo spessore massimo che riesci a saldare e i valori di partenza per i punti.</Help>
 
-    <label>Punti per terminale
-      <select
-        value={ui.lamella.spotsPerTerminal ?? 'auto'}
-        onchange={(e) => (ui.lamella.spotsPerTerminal = e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value))}
-      >
-        <option value="auto">Automatico (in base alla corrente)</option>
-        {#each [2, 4, 6, 8] as n (n)}<option value={n}>{n} punti</option>{/each}
-      </select>
-    </label>
     <div class="row">
       <label>Corrente per punto (A)
         <input
@@ -206,7 +209,7 @@
         />
       </label>
     </div>
-    <Help label="Come si scelgono i punti">In automatico i punti sono quelli che servono per la corrente della cella, a coppie perché la penna ne fa due per volta (con 5 A a punto: fino a 10 A → 2, fino a 20 A → 4). Se ne scegli un numero, l'app controlla che reggano la corrente e che entrino sul contatto. «Corrente per punto» è una stima: confermala con una prova di strappo. «Distanza punti» è quella tra i due elettrodi della penna.</Help>
+    <Help label="Spiegazione">«Corrente per punto» è una stima: confermala con una prova di strappo. «Distanza punti» è quella tra i due elettrodi della penna. Il numero di punti si sceglie in Forma.</Help>
 
     <label>Come tagli le lamelle
       <select bind:value={ui.lamella.cutterId}>
@@ -240,10 +243,6 @@
       <input type="number" min="1" max="4" step="1" value={ui.lamella.layers} onchange={(e) => (ui.lamella.layers = Math.round(num(e, 1, 4) ?? 1))} />
     </label>
     <Help label="Spiegazione">Più fogli saldati insieme portano più corrente, ma la saldatrice deve riuscire a bucarli tutti.</Help>
-
-    <label>Bordo attorno all'appoggio (mm)
-      <input type="number" min="0" max="10" step="0.5" value={ui.lamella.stripMarginMm} onchange={(e) => (ui.lamella.stripMarginMm = num(e, 0, 10) ?? 1)} />
-    </label>
 
     <div class="row">
       <label>Temperatura ambiente (°C)

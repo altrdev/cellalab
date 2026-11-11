@@ -34,9 +34,9 @@ export function exportDxf(project: Project, face: 'top' | 'bottom') {
   const dxf = buildDxf(stripsOf(project, ui.lamella), {
     face,
     kerfMm: report.cutter.kerfMm,
-    includeContacts: true,
-    includeLabels: true,
-    spotsPerTerminal: spots,
+    includeContacts: ui.dxfReferences,
+    includeLabels: ui.dxfReferences,
+    spotsPerTerminal: ui.dxfReferences ? spots : undefined,
     spotDiameterMm: report.welder.spotDiameterMm,
     spotSpacingMm: report.welder.spotSpacingMm,
   });

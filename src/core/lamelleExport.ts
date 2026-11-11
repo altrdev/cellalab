@@ -1,4 +1,5 @@
 import { offsetRegion, regionRings } from './clip';
+import { labelPlacements } from './dxf';
 import type { Pt } from './polygon';
 import type { LamellaReport } from './lamelle';
 import { spotPositions } from './sizing';
@@ -11,6 +12,7 @@ import type { Face, Strip } from './strips';
 
 const MARGIN_MM = 8;
 const SCALE_BAR_MM = 50;
+const LABEL_SIZE_MM = 3.5;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -30,6 +32,9 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
   const rings = list.map((s) => regionRings(offsetRegion(s, o.kerfMm / 2)));
   const pts = rings.flat(2);
   if (pts.length === 0) pts.push({ x: 0, y: 0 }, { x: 60, y: 30 });
+  // etichette fuori dai pezzi, sotto ognuno: contano anche nelle dimensioni del foglio
+  const labels = labelPlacements(list, o.kerfMm / 2, { heightMm: LABEL_SIZE_MM, textOf: (s) => s.label });
+  for (const l of labels) pts.push({ x: l.x, y: l.y }, { x: l.x + l.width, y: l.y });
   const minX = Math.min(...pts.map((p) => p.x)) - MARGIN_MM;
   const minY = Math.min(...pts.map((p) => p.y)) - MARGIN_MM;
   const maxX = Math.max(...pts.map((p) => p.x)) + MARGIN_MM;
@@ -43,7 +48,6 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
   out.push(`<title>${esc(o.title ?? 'Lamelle')} - faccia ${o.face === 'top' ? 'sopra' : 'sotto'}</title>`);
   out.push('<g fill="none" stroke-linejoin="round" font-family="sans-serif">');
   list.forEach((s, i) => {
-    const outline = (rings[i] as Pt[][])[0] as Pt[];
     out.push(`<path d="${(rings[i] as Pt[][]).map(d).join(' ')}" fill-rule="evenodd" stroke="#d00" stroke-width="0.2"/>`);
     if (o.includeContacts) {
       for (const n of s.nodes) {
@@ -58,9 +62,8 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
         }
       }
     }
-    const cx = outline.reduce((a, p) => a + p.x, 0) / outline.length;
-    const cy = outline.reduce((a, p) => a + p.y, 0) / outline.length;
-    out.push(`<text x="${r3(cx)}" y="${r3(cy)}" font-size="3.5" fill="#000" stroke="none" text-anchor="middle">${esc(s.label)}</text>`);
+    const l = labels[i]!;
+    out.push(`<text x="${r3(l.cx)}" y="${r3(l.y)}" font-size="${LABEL_SIZE_MM}" fill="#000" stroke="none" text-anchor="middle">${esc(l.text)}</text>`);
   });
   const by = maxY - 6;
   out.push(`<path d="M${r3(minX + MARGIN_MM)} ${r3(by)} h${SCALE_BAR_MM} m0 -1.5 v3 m-${SCALE_BAR_MM} 0 v-3" stroke="#000" stroke-width="0.3"/>`);

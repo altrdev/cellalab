@@ -33,6 +33,8 @@ class UiState {
   showStrips = $state(false);
   /** Segna i punti di saldatura consigliati. */
   showSpots = $state(true);
+  /** Nel DXF delle lamelle include anche i riferimenti di saldatura (layer MARK e SPOTS); spento il file è solo da tagliare. */
+  dxfReferences = $state(false);
   /** Opacità del disegno delle lamelle nel 2D (0.2–1). */
   stripOpacity = $state(0.85);
   lamella = $state<LamellaSettings>(loadLamellaSettings());

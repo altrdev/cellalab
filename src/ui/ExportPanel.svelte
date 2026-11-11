@@ -50,7 +50,11 @@
       <button disabled={stripStatus === 'empty'} onclick={() => exportSvg(project, 'bottom')}>Dima sotto</button>
       <button disabled={stripStatus === 'empty'} onclick={() => exportCutList(project)}>Lista di taglio</button>
     </div>
-    <Help label="Che file sono">Il DXF è per laser, CNC o servizi di taglio e compensa lo spessore del taglio. La dima è un disegno in scala 1:1: stampala al 100% e ritaglia a mano. La lista di taglio riassume dimensioni e quantità.</Help>
+    <div class="opt">
+      <label class="inline"><input type="checkbox" bind:checked={ui.dxfReferences} /> Includi i riferimenti nel DXF</label>
+      <span class="hint">Aree di saldatura, punti ed etichette (layer MARK, SPOTS, TEXT): non vanno tagliati.</span>
+    </div>
+    <Help label="Che file sono">Il DXF è per laser, CNC o servizi di taglio e compensa lo spessore del taglio: ha solo il contorno da tagliare (layer CUT); con la casella sopra aggiunge anche le aree di saldatura (MARK), i punti (SPOTS) e le etichette sotto ogni lamella (TEXT), su layer a parte che non vanno tagliati. La dima è un disegno in scala 1:1: stampala al 100% e ritaglia a mano. La lista di taglio riassume dimensioni e quantità.</Help>
     {#if stripStatus === 'warning' || stripStatus === 'error'}
       <button type="button" class="goto" onclick={() => (ui.sideTab = 'strips')}>Vai alle lamelle →</button>
     {/if}
@@ -126,6 +130,25 @@
     font-size: 0.78rem;
     color: var(--muted);
     line-height: 1.4;
+  }
+  .opt {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  label.inline {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--fg);
+  }
+  .hint {
+    padding-left: 38px; /* sotto il testo, non sotto l'interruttore */
+    font-size: 0.74rem;
+    line-height: 1.35;
+    color: var(--muted);
   }
   .exp {
     display: flex;

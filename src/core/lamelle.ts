@@ -12,6 +12,7 @@ import {
   COOLING,
   conductionDeltaTK,
   minAreaPeakMm2,
+  minRadiusForSpots,
   minThicknessConductionMm,
   minThicknessThermalMm,
   spotCapacity,
@@ -51,9 +52,7 @@ export interface LamellaSettings {
   peakFactor: number;
   peakSeconds: number;
   peakDeltaTK: number;
-  /** Bordo oltre il contatto, mm. */
-  stripMarginMm: number;
-  /** Diametro d'appoggio sulla cella, mm; null = automatico. */
+  /** Diametro dell'area di saldatura sulla cella, mm; null = il bottone. */
   contactDiameterMm: number | null;
   /** Larghezza minima del collegamento, mm; null = automatica. */
   widthMm: number | null;
@@ -75,14 +74,12 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   peakFactor: 1.5,
   peakSeconds: 1,
   peakDeltaTK: 100,
-  stripMarginMm: 1,
   contactDiameterMm: null,
   widthMm: null,
 };
 
 /** Parametri di forma delle lamelle ricavati dalle impostazioni. */
 export const stripOptionsOf = (s: LamellaSettings): StripOptions => ({
-  marginMm: s.stripMarginMm,
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
 });
@@ -119,6 +116,8 @@ export interface StripReport {
   spotsCarryA: number;
   /** Punti che entrano sul contatto più piccolo. */
   spotCapacity: number;
+  /** Raggio dell'area di saldatura più piccola, mm. */
+  contactRadiusMm: number;
 }
 
 export interface LamellaReport {
@@ -258,7 +257,11 @@ export function analyzeLamelle(
     for (const g of s.groups) maxCellCurrent = Math.max(maxCellCurrent, currentA / (groupSize.get(g) ?? 1));
     const forCurrent = spotsNeeded(maxCellCurrent, welder.spotCurrentA, welder.minSpotsPerTerminal);
     let cap = Infinity;
-    for (const n of s.nodes) cap = Math.min(cap, spotCapacity(n.contactRadiusMm, welder.spotDiameterMm, welder.spotSpacingMm));
+    let contactR = Infinity;
+    for (const n of s.nodes) {
+      cap = Math.min(cap, spotCapacity(n.contactRadiusMm, welder.spotDiameterMm, welder.spotSpacingMm));
+      contactR = Math.min(contactR, n.contactRadiusMm);
+    }
     const capacity = Number.isFinite(cap) ? cap : 0;
     // La penna salda due punti per volta: in automatico si sale a coppie, salvo che il contatto ne tenga uno solo in meno.
     let chosen = settings.spotsPerTerminal ?? (forCurrent % 2 === 0 ? forCurrent : forCurrent + 1);
@@ -290,6 +293,7 @@ export function analyzeLamelle(
       spotsForCurrent: forCurrent,
       spotsCarryA: chosen * welder.spotCurrentA,
       spotCapacity: capacity,
+      contactRadiusMm: Number.isFinite(contactR) ? contactR : 0,
     };
   });
 
@@ -351,12 +355,20 @@ export function analyzeLamelle(
   for (const r of reports) {
     const where = `Lamella ${r.label} (${faceName(r.face)})`;
     if (r.spotCapacity < r.spotsNeeded) {
+      // dice perché: com'è l'area di saldatura e quanto serve per i punti voluti
+      const need = minRadiusForSpots(r.spotsNeeded, welder.spotDiameterMm, welder.spotSpacingMm);
+      const needR = Math.ceil(need * 10) / 10;
+      const how = Number.isFinite(need)
+        ? ` L'area di saldatura ha raggio ${fmt(r.contactRadiusMm, 1)} mm (Ø ${fmt(2 * r.contactRadiusMm, 1)} mm): ` +
+          `per ${r.spotsNeeded} punti da ${fmt(welder.spotDiameterMm, 0)} mm a passo ${fmt(welder.spotSpacingMm, 1)} mm ne servono almeno ${fmt(needR, 1)} ` +
+          `(Ø ${fmt(2 * needR, 1)} mm). Allarga l'area di saldatura o riduci la distanza tra i punti.`
+        : '';
       issues.push({
         severity: 'error',
         message: fixedSpots
-          ? `${where}: hai scelto ${r.spotsNeeded} punti per terminale ma sul contatto più piccolo ne entrano ${r.spotCapacity}.`
+          ? `${where}: hai scelto ${r.spotsNeeded} punti per terminale ma sul contatto più piccolo ne entrano ${r.spotCapacity}.${how}`
           : `${where}: servono ${r.spotsForCurrent} punti per terminale (${fmt(r.cellCurrentA, 1)} A per cella, ${fmt(welder.spotCurrentA, 0)} A a punto) ` +
-            `ma sul contatto più piccolo ne entrano ${r.spotCapacity}.`,
+            `ma sul contatto più piccolo ne entrano ${r.spotCapacity}.${how}`,
         stripIds: [r.stripId],
       });
     } else if (fixedSpots && r.spotsNeeded < r.spotsForCurrent) {

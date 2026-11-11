@@ -1,3 +1,4 @@
+import { ringWithArcs, type Circle } from './arcs';
 import { offsetRegion, regionRings } from './clip';
 import { spotPositions } from './sizing';
 import type { Face, Strip } from './strips';
@@ -34,6 +35,15 @@ const LAYERS: readonly [name: string, color: number][] = [
   ['TEXT', 7],
 ];
 
+/** Il DXF R12 è solo ASCII: le frecce e i segni meno tipografici delle etichette diventano caratteri semplici. */
+export const asciiLabel = (s: string) =>
+  s
+    .replace(/→/g, '->')
+    .replace(/[−–—]/g, '-')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^\x20-\x7e]/g, '?');
+
 const num = (n: number) => (Math.abs(n) < 1e-9 ? 0 : Math.round(n * 1e4) / 1e4).toString();
 
 class Writer {
@@ -44,6 +54,67 @@ class Writer {
   toString() {
     return this.lines.join('\n') + '\n';
   }
+}
+
+const LABEL_HEIGHT_MM = 2.5;
+/** Distanza tra il contorno di una lamella e la sua etichetta, mm. */
+const LABEL_GAP_MM = 2;
+
+interface Box {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+const overlaps = (a: Box, b: Box) => a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
+
+export interface LabelPlacement {
+  /** Bordo sinistro del testo. */
+  x: number;
+  /** Centro del testo in orizzontale (per chi lo allinea al centro). */
+  cx: number;
+  /** Linea di base. */
+  y: number;
+  width: number;
+  text: string;
+}
+
+/**
+ * Posizione delle etichette: sotto ogni lamella, fuori dal contorno (in un file di taglio un testo dentro il pezzo
+ * verrebbe inciso o tagliato, e su una dima copre i punti). Se lì c'è un'altra lamella o un'altra etichetta si scende
+ * finché c'è posto. Coordinate del disegno (y verso il basso); `padMm` è il margine di taglio attorno alle lamelle.
+ */
+export function labelPlacements(
+  strips: readonly Strip[],
+  padMm: number,
+  opts: { heightMm?: number; textOf?: (s: Strip) => string } = {},
+): LabelPlacement[] {
+  const height = opts.heightMm ?? LABEL_HEIGHT_MM;
+  const textOf = opts.textOf ?? ((s: Strip) => asciiLabel(`${s.label} ${s.face === 'top' ? 'sopra' : 'sotto'}`));
+  const boxOf = (s: Strip): Box => {
+    const xs = s.outline.map((p) => p.x);
+    const ys = s.outline.map((p) => p.y);
+    return { minX: Math.min(...xs) - padMm, maxX: Math.max(...xs) + padMm, minY: Math.min(...ys) - padMm, maxY: Math.max(...ys) + padMm };
+  };
+  const obstacles: Box[] = strips.map(boxOf);
+  const out: LabelPlacement[] = [];
+  const labelBox = (l: LabelPlacement): Box => ({ minX: l.x, maxX: l.x + l.width, minY: l.y - height, maxY: l.y });
+  strips.forEach((s, i) => {
+    const text = textOf(s);
+    const b = obstacles[i]!;
+    const width = [...text].length * height * 0.6;
+    const cx = (b.minX + b.maxX) / 2;
+    const x = cx - width / 2;
+    let top = b.maxY + LABEL_GAP_MM;
+    for (let guard = 0; guard < 200; guard++) {
+      const box: Box = { minX: x, maxX: x + width, minY: top, maxY: top + height };
+      // la propria lamella sta sopra: conta solo il resto
+      if (!obstacles.some((o, k) => k !== i && overlaps(o, box)) && !out.some((l) => overlaps(labelBox(l), box))) break;
+      top += height * 1.6;
+    }
+    out.push({ x, cx, y: top + height, width, text });
+  });
+  return out;
 }
 
 export function buildDxf(strips: readonly Strip[], options: DxfOptions): string {
@@ -76,7 +147,8 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
   w.pair(0, 'SECTION');
   w.pair(2, 'ENTITIES');
 
-  const polyline = (layer: string, pts: readonly { x: number; y: number }[]) => {
+  /** Polilinea chiusa; i vertici con `bulge` ≠ 0 aprono un arco verso il vertice successivo (gruppo 42). */
+  const polyline = (layer: string, pts: readonly { x: number; y: number; bulge?: number }[]) => {
     w.pair(0, 'POLYLINE');
     w.pair(8, layer);
     w.pair(66, 1);
@@ -86,6 +158,7 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
       w.pair(8, layer);
       w.pair(10, p.x);
       w.pair(20, Y(p.y));
+      if (p.bulge) w.pair(42, p.bulge);
     }
     w.pair(0, 'SEQEND');
     w.pair(8, layer);
@@ -103,11 +176,24 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
     w.pair(10, x);
     w.pair(20, Y(y));
     w.pair(40, height);
-    w.pair(1, value);
+    w.pair(1, asciiLabel(value));
   };
 
   for (const s of list) {
-    for (const ring of regionRings(offsetRegion(s, options.kerfMm / 2))) polyline('CUT', ring);
+    // I cerchi noti della lamella (appoggi e teste delle bande, ingranditi di metà taglio) diventano archi veri.
+    // Il bulge è calcolato con la y del DXF (verso l'alto), quindi anche i cerchi e i vertici si ribaltano.
+    const k = options.kerfMm / 2;
+    const circles: Circle[] = s.nodes.flatMap((n) => [
+      { cx: n.x, cy: Y(n.y), r: n.reachMm + k },
+      { cx: n.x, cy: Y(n.y), r: s.bandMm / 2 + k },
+    ]);
+    for (const ring of regionRings(offsetRegion(s, k))) {
+      const arcs = ringWithArcs(
+        ring.map((p) => ({ x: p.x, y: Y(p.y) })),
+        circles,
+      );
+      polyline('CUT', arcs.map((v) => ({ x: v.x, y: Y(v.y), bulge: v.bulge })));
+    }
 
     if (options.includeContacts) for (const n of s.nodes) circle('MARK', n.x, n.y, n.contactRadiusMm);
 
@@ -120,11 +206,10 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
       }
     }
 
-    if (options.includeLabels) {
-      const cx = s.outline.reduce((a, p) => a + p.x, 0) / s.outline.length;
-      const cy = s.outline.reduce((a, p) => a + p.y, 0) / s.outline.length;
-      text(cx, cy, 2.5, `${s.label} ${s.face === 'top' ? 'sopra' : 'sotto'}`);
-    }
+  }
+
+  if (options.includeLabels) {
+    for (const l of labelPlacements(list, options.kerfMm / 2)) text(l.x, l.y, LABEL_HEIGHT_MM, l.text);
   }
 
   w.pair(0, 'ENDSEC');

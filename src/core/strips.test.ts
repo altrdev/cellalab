@@ -111,3 +111,20 @@ describe('neckWidthMm', () => {
     expect(neckWidthMm(term)).toBeCloseTo(pad, 6);
   });
 });
+
+describe('contorni rotondi', () => {
+  it('un appoggio singolo è un cerchio fitto: lati corti e tutti i vertici sul raggio', () => {
+    const strips = buildStrips(pack(1, 1));
+    const s = strips.find((x) => x.nodes.length === 1)!;
+    const n = s.nodes[0]!;
+    expect(s.outline.length).toBeGreaterThanOrEqual(80);
+    let maxEdge = 0;
+    for (let i = 0; i < s.outline.length; i++) {
+      const p = s.outline[i]!;
+      const q = s.outline[(i + 1) % s.outline.length]!;
+      maxEdge = Math.max(maxEdge, Math.hypot(p.x - q.x, p.y - q.y));
+      expect(Math.hypot(p.x - n.x, p.y - n.y)).toBeCloseTo(n.reachMm, 2);
+    }
+    expect(maxEdge).toBeLessThanOrEqual(0.45);
+  });
+});

@@ -65,17 +65,19 @@ export interface Strip {
 }
 
 export interface StripOptions {
-  /** Bordo della lamella oltre l'area di contatto, mm (più bordo = angoli più tondi). */
+  /** Metallo che resta oltre l'area di saldatura, mm: i punti non vanno sul taglio (più bordo = angoli più tondi). */
   marginMm?: number;
-  /** Diametro dell'area di appoggio sulla cella, mm; assente = calcolato dal tipo di cella. */
+  /** Diametro dell'area di saldatura sulla cella, mm (il bordo si aggiunge fuori); assente = il bottone. */
   contactDiameterMm?: number | null;
   /** Larghezza delle bande tra le celle vicine, mm; assente = automatica (60% dell'appoggio). */
   widthMm?: number | null;
 }
 
 export const DEFAULT_STRIP_MARGIN_MM = 1;
-/** Punti per cerchio con cui si approssima il contorno. */
-const CIRCLE_SEGMENTS = 24;
+/** Lato massimo dei segmenti con cui si approssima un cerchio, mm: sotto 0,01 mm di scostamento dal cerchio vero. */
+const MAX_CHORD_MM = 0.4;
+/** Segmenti per un cerchio di raggio `r`: un lato lungo al massimo `MAX_CHORD_MM`, multiplo di 4 per toccare gli assi. */
+const circleSegments = (r: number) => Math.min(240, Math.max(48, Math.ceil((2 * Math.PI * r) / MAX_CHORD_MM / 4) * 4));
 
 /** Polo che una cella espone su una faccia. */
 export function poleOnFace(cell: Pick<PlacedCell, 'plusUp'>, face: Face): Pole {
@@ -111,13 +113,14 @@ export function buildStrips(project: Project, options: StripOptions = {}): Strip
     const type = findCellType(project, cell.typeId);
     if (!type) return null;
     const cellR = type.diameterMm / 2;
-    // Appoggio unico per tutte le celle (come si fa a mano): di default quanto il bottone + più il bordo.
+    // Area di saldatura unica per tutte le celle (come si fa a mano): di default il bottone, oppure il Ø scelto
+    // (con un limite perché appoggio e bordo restino dentro la cella). L'appoggio è l'area più il bordo.
     const forced = options.contactDiameterMm;
-    const reach =
+    const contact =
       forced != null && forced > 0
-        ? Math.min(Math.max(forced / 2, 1), cellR - 0.3)
-        : contactRadiusMm(type.diameterMm, '+') + margin;
-    const contact = Math.max(reach - margin, 0.5);
+        ? Math.max(Math.min(forced / 2, cellR - 0.3 - margin), 0.5)
+        : Math.max(contactRadiusMm(type.diameterMm, '+'), 0.5);
+    const reach = contact + margin;
     return {
       cellId: cell.id,
       group: cell.group as number,
@@ -180,14 +183,14 @@ export function buildStrips(project: Project, options: StripOptions = {}): Strip
       let bandMm = forced != null && forced > 0 ? Math.min(Math.max(forced, 1), cap) : Math.min(0.6 * padDiameter, cap);
       // I terminali raccolgono la corrente di più celle: la banda non è mai più stretta dell'appoggio.
       if (kind !== 'series') bandMm = Math.max(bandMm, Math.min(padDiameter, cap));
-      const polys = nodes.map((n) => circlePoints(n.x, n.y, n.reachMm, CIRCLE_SEGMENTS));
+      const polys = nodes.map((n) => circlePoints(n.x, n.y, n.reachMm, circleSegments(n.reachMm)));
       const edges = neighbourEdges(nodes);
       const bandLengthMm = edges.length
         ? Math.max(...edges.map(([a, b]) => Math.max(1, Math.hypot(a.x - b.x, a.y - b.y) - a.contactRadiusMm - b.contactRadiusMm)))
         : 2 * nodes[0]!.reachMm;
       for (const [a, b] of edges) {
         polys.push(
-          convexHull([...circlePoints(a.x, a.y, bandMm / 2, CIRCLE_SEGMENTS), ...circlePoints(b.x, b.y, bandMm / 2, CIRCLE_SEGMENTS)]),
+          convexHull([...circlePoints(a.x, a.y, bandMm / 2, circleSegments(bandMm / 2)), ...circlePoints(b.x, b.y, bandMm / 2, circleSegments(bandMm / 2))]),
         );
       }
       const region: Region = unionPolygons(polys);

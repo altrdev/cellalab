@@ -165,6 +165,14 @@ export function spotCapacity(radiusMm: number, spotDiameterMm: number, spacingMm
   return Math.max(...PHASES.map((ph) => latticePoints(usable, spacingMm, ph).length));
 }
 
+/** Raggio minimo del contatto (mm) in cui entrano `count` punti; Infinity se non bastano 40 mm. */
+export function minRadiusForSpots(count: number, spotDiameterMm: number, spacingMm: number): number {
+  for (let r = spotDiameterMm / 2; r <= 40; r += 0.02) {
+    if (spotCapacity(r, spotDiameterMm, spacingMm) >= count) return Math.round(r * 100) / 100;
+  }
+  return Infinity;
+}
+
 /**
  * Dove mettere `count` punti dentro il contatto: i più vicini al centro, a coppie opposte così da
  * restare bilanciati. Posizioni relative al centro della cella, mm. Vuoto se non ci stanno.
@@ -177,14 +185,18 @@ export function spotPositions(
 ): { x: number; y: number }[] {
   const usable = radiusMm - spotDiameterMm / 2;
   if (count <= 0 || usable < 0 || !(spacingMm > 0)) return [];
-  // pari: reticolo simmetrico senza punto al centro (coppie opposte); dispari: punto al centro
-  const phases: Phase[] = count % 2 === 0 ? [[0.5, 0], [0.5, 0.5], [0, 0]] : [[0, 0], [0.5, 0], [0.5, 0.5]];
+  // Si prova ogni fase del reticolo (punto al centro, due affiancati, quadrato) e si tiene la disposizione più
+  // compatta: così 4 punti sono un quadrato 2×2 e 6 un rettangolo 2×3, non un parallelogramma sfalsato.
+  const phases: Phase[] = count % 2 === 0 ? [[0.5, 0.5], [0.5, 0], [0, 0]] : [[0, 0], [0.5, 0], [0.5, 0.5]];
+  const key = (p: { x: number; y: number }) => `${Math.round(p.x * 1e6)},${Math.round(p.y * 1e6)}`;
+  let best: { x: number; y: number }[] | null = null;
+  let bestReach = Infinity;
   for (const phase of phases) {
     const pts = latticePoints(usable, spacingMm, phase).sort(
       (a, b) => a.x * a.x + a.y * a.y - (b.x * b.x + b.y * b.y) || a.y - b.y || a.x - b.x,
     );
     if (pts.length < count) continue;
-    const key = (p: { x: number; y: number }) => `${Math.round(p.x * 1e6)},${Math.round(p.y * 1e6)}`;
+    // si prendono i più vicini al centro, a coppie opposte così da restare bilanciati
     const used = new Set<string>();
     const out: { x: number; y: number }[] = [];
     for (const p of pts) {
@@ -198,7 +210,15 @@ export function spotPositions(
         out.push(opp);
       }
     }
-    if (out.length === count) return out.map((p) => ({ x: p.x + 0, y: p.y + 0 }));
+    if (out.length !== count) continue;
+    let reach = Math.max(...out.map((p) => Math.hypot(p.x, p.y)));
+    // con un numero pari il punto al centro rende la disposizione asimmetrica: solo se non c'è altro modo
+    if (count % 2 === 0 && phase[0] === 0 && phase[1] === 0) reach += 1000;
+    if (reach < bestReach - 1e-9) {
+      best = out;
+      bestReach = reach;
+    }
   }
+  if (best) return best.map((p) => ({ x: p.x + 0, y: p.y + 0 }));
   return [];
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   conductionDeltaTK,
   minAreaPeakMm2,
+  minRadiusForSpots,
   minThicknessConductionMm,
   minThicknessThermalMm,
   minWidthThermalMm,
@@ -119,6 +120,36 @@ describe('spotPositions', () => {
     }
   });
 
+  it('quattro punti: un quadrato 2×2, anche se il contatto è grande', () => {
+    for (const r of [3.77, 4.39, 5.4, 8]) {
+      const pts = spotPositions(r, 2, 3, 4);
+      expect(pts).toHaveLength(4);
+      for (const p of pts) {
+        expect(Math.abs(p.x)).toBeCloseTo(1.5, 6);
+        expect(Math.abs(p.y)).toBeCloseTo(1.5, 6);
+      }
+      expect(new Set(pts.map((p) => `${p.x},${p.y}`)).size).toBe(4);
+    }
+  });
+
+  it('sei punti: un rettangolo 2×3 (due file affiancate)', () => {
+    const pts = spotPositions(5.4, 2, 3, 6);
+    expect(pts).toHaveLength(6);
+    const xs = new Set(pts.map((p) => Math.round(p.x * 10)));
+    const ys = new Set(pts.map((p) => Math.round(p.y * 10)));
+    // due colonne e tre righe, oppure tre colonne e due righe
+    expect(xs.size * ys.size).toBe(6);
+  });
+
+  it('numero pari: la disposizione è simmetrica rispetto al centro', () => {
+    for (const [r, n] of [[3.77, 4], [4.39, 4], [5.4, 4], [4.39, 6], [5.4, 6], [6, 8]] as const) {
+      const pts = spotPositions(r, 2, 3, n);
+      expect(pts).toHaveLength(n);
+      const keys = new Set(pts.map((p) => `${Math.round(p.x * 100)},${Math.round(p.y * 100)}`));
+      for (const p of pts) expect(keys.has(`${Math.round(-p.x * 100) + 0},${Math.round(-p.y * 100) + 0}`)).toBe(true);
+    }
+  });
+
   it('se non ci stanno restituisce una lista vuota', () => {
     expect(spotPositions(2, 2, 3, 4)).toEqual([]);
     expect(spotPositions(8, 2, 3, 0)).toEqual([]);
@@ -174,5 +205,19 @@ describe('conduzione verso le celle', () => {
   it('corrente nulla: niente spessore; estremità oltre ΔT: comunque una risposta', () => {
     expect(minThicknessConductionMm(5.7, { ...band, currentA: 0, lengthMm: 12 })).toBe(0);
     expect(minThicknessConductionMm(5.7, { ...band, lengthMm: 12, endDeltaK: 100 })).toBeGreaterThan(0);
+  });
+});
+
+describe('raggio minimo per i punti', () => {
+  it('4 punti da 2 mm a passo 3 mm: servono circa 3,12 mm di raggio (quadrato 2×2)', () => {
+    const r = minRadiusForSpots(4, 2, 3);
+    expect(r).toBeGreaterThanOrEqual(3.1);
+    expect(r).toBeLessThan(3.2);
+    expect(spotCapacity(r, 2, 3)).toBeGreaterThanOrEqual(4);
+    expect(spotCapacity(r - 0.05, 2, 3)).toBeLessThan(4);
+  });
+  it('2 punti: 2,5 mm; con distanza minore ne servono meno', () => {
+    expect(minRadiusForSpots(2, 2, 3)).toBeCloseTo(2.5, 1);
+    expect(minRadiusForSpots(4, 2, 2.5)).toBeLessThan(minRadiusForSpots(4, 2, 3));
   });
 });

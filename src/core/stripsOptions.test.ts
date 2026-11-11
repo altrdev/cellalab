@@ -19,9 +19,17 @@ describe('forma delle lamelle', () => {
   it('più bordo = appoggio e lamella più grandi', () => {
     expect(series(buildStrips(p, { marginMm: 3 }))[0]!.areaMm2).toBeGreaterThan(series(base)[0]!.areaMm2);
   });
-  it("Ø d'appoggio forzato cambia l'appoggio (con limite sulla cella)", () => {
-    expect(buildStrips(p, { contactDiameterMm: 12 })[0]!.nodes[0]!.reachMm).toBeCloseTo(6);
-    expect(buildStrips(p, { contactDiameterMm: 100 })[0]!.nodes[0]!.reachMm).toBeCloseTo(21.4 / 2 - 0.3);
+  it("Ø dell'area di saldatura forzato: il bordo si aggiunge fuori (con limite sulla cella)", () => {
+    const n = buildStrips(p, { contactDiameterMm: 12 })[0]!.nodes[0]!;
+    expect(n.contactRadiusMm).toBeCloseTo(6);
+    expect(n.reachMm).toBeCloseTo(6 + 1);
+    // il bordo non toglie spazio ai punti: con più bordo l'area resta uguale e cresce solo l'appoggio
+    const wide = buildStrips(p, { contactDiameterMm: 12, marginMm: 4 })[0]!.nodes[0]!;
+    expect(wide.contactRadiusMm).toBeCloseTo(6);
+    expect(wide.reachMm).toBeCloseTo(6 + 4);
+    const big = buildStrips(p, { contactDiameterMm: 100 })[0]!.nodes[0]!;
+    expect(big.reachMm).toBeCloseTo(21.4 / 2 - 0.3);
+    expect(big.contactRadiusMm).toBeCloseTo(21.4 / 2 - 0.3 - 1);
   });
   it('le serie hanno finestre tra le bande; i terminali a due celle no', () => {
     // 3S2P: due gruppi da due celle per lamella in serie → anello (guide, traversini, diagonale)
