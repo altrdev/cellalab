@@ -1,5 +1,7 @@
 import { offsetRegion, regionRings } from './clip';
-import { t } from '../i18n';
+import { fmtNum, t } from '../i18n';
+import { getPrefs } from '../prefs';
+import { area, len, lenDigits, lenLabel, massSmall, toLen } from '../units';
 import { labelPlacements } from './dxf';
 import type { Pt } from './polygon';
 import type { LamellaReport } from './lamelle';
@@ -13,6 +15,8 @@ import type { Face, Strip } from './strips';
 
 const MARGIN_MM = 8;
 const SCALE_BAR_MM = 50;
+/** Con i pollici la barra di scala è lunga 2 in (50,8 mm): un numero tondo nell'unità scelta. */
+const scaleBarMm = () => (getPrefs().length === 'in' ? 50.8 : SCALE_BAR_MM);
 const LABEL_SIZE_MM = 3.5;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -45,7 +49,9 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
   const d = (poly: readonly Pt[]) => poly.map((p, i) => `${i ? 'L' : 'M'}${r3(p.x)} ${r3(p.y)}`).join(' ') + ' Z';
 
   const out: string[] = [];
-  out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${r3(w)}mm" height="${r3(h)}mm" viewBox="${r3(minX)} ${r3(minY)} ${r3(w)} ${r3(h)}">`);
+  // il disegno resta in mm (unità del viewBox); la dimensione stampata è dichiarata nell'unità scelta: scala reale
+  const unit = lenLabel();
+  out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${r3(toLen(w))}${unit}" height="${r3(toLen(h))}${unit}" viewBox="${r3(minX)} ${r3(minY)} ${r3(w)} ${r3(h)}">`);
   out.push(`<title>${esc(t('export.svg.title', { title: o.title ?? t('export.svg.defaultTitle'), face: t(o.face === 'top' ? 'face.top' : 'face.bottom') }))}</title>`);
   out.push('<g fill="none" stroke-linejoin="round" font-family="sans-serif">');
   list.forEach((s, i) => {
@@ -67,17 +73,20 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
     out.push(`<text x="${r3(l.cx)}" y="${r3(l.y)}" font-size="${LABEL_SIZE_MM}" fill="#000" stroke="none" text-anchor="middle">${esc(l.text)}</text>`);
   });
   const by = maxY - 6;
-  out.push(`<path d="M${r3(minX + MARGIN_MM)} ${r3(by)} h${SCALE_BAR_MM} m0 -1.5 v3 m-${SCALE_BAR_MM} 0 v-3" stroke="#000" stroke-width="0.3"/>`);
-  out.push(`<text x="${r3(minX + MARGIN_MM)}" y="${r3(by + 5)}" font-size="3" fill="#000" stroke="none">${esc(t('export.svg.scale', { n: SCALE_BAR_MM }))}</text>`);
+  out.push(`<path d="M${r3(minX + MARGIN_MM)} ${r3(by)} h${scaleBarMm()} m0 -1.5 v3 m-${scaleBarMm()} 0 v-3" stroke="#000" stroke-width="0.3"/>`);
+  out.push(`<text x="${r3(minX + MARGIN_MM)}" y="${r3(by + 5)}" font-size="3" fill="#000" stroke="none">${esc(t('export.svg.scale', { n: `${fmtNum(toLen(scaleBarMm()), 0)} ${unit}` }))}</text>`);
   out.push('</g></svg>');
   return out.join('\n') + '\n';
 }
 
 const fmt = (n: number | null, d = 2) => (n === null ? '' : n.toFixed(d));
+/** Lunghezza nell'unità scelta (decimali con il punto, come nel resto del CSV). */
+const lenCsv = (mm: number | null, d: number) => (mm === null ? '' : toLen(mm).toFixed(lenDigits(d)));
+const areaCsv = (mm2: number) => (getPrefs().length === 'in' ? (mm2 / 645.16).toFixed(3) : mm2.toFixed(0));
 
 /** Lista di taglio in CSV (separatore ';', decimali con il punto). */
 export function buildCutListCsv(strips: readonly Strip[], report: LamellaReport): string {
-  const rows = [t('export.csv.header')];
+  const rows = [t('export.csv.header', { a: getPrefs().length === 'in' ? 'in2' : 'mm2', l: lenLabel() })];
   for (const s of strips) {
     const r = report.strips.find((x) => x.stripId === s.id);
     rows.push(
@@ -85,10 +94,10 @@ export function buildCutListCsv(strips: readonly Strip[], report: LamellaReport)
         t(s.face === 'top' ? 'face.top' : 'face.bottom'),
         s.label,
         s.nodes.length,
-        fmt(s.areaMm2, 0),
-        fmt(r?.neckMm ?? null, 1),
+        areaCsv(s.areaMm2),
+        lenCsv(r?.neckMm ?? null, 1),
         fmt(r?.neckCurrentA ?? null, 1),
-        fmt(r?.requiredMm ?? null),
+        lenCsv(r?.requiredMm ?? null, 2),
         r?.spotsNeeded ?? '',
       ].join(';'),
     );
@@ -101,8 +110,8 @@ export function buildCutSummary(report: LamellaReport, projectName: string): str
   const th = report.thicknessMm;
   const thickness =
     th === null
-      ? t('export.summary.thicknessNone', { required: fmt(report.requiredMm) })
-      : t('export.summary.thicknessValue', { thickness: fmt(th), layers: report.layers });
+      ? t('export.summary.thicknessNone', { required: len(report.requiredMm, 2) })
+      : t('export.summary.thicknessValue', { thickness: len(th, 2), layers: report.layers });
   const lines = [
     t('export.summary.title', { name: projectName }),
     t('export.summary.material', { material: report.material.name }),
@@ -110,8 +119,8 @@ export function buildCutSummary(report: LamellaReport, projectName: string): str
     t('export.summary.current', { current: fmt(report.currentA, 0) }),
     t('export.summary.parts', {
       count: report.strips.length,
-      area: fmt(report.totalAreaCm2, 1),
-      mass: report.massG !== null ? ' - ' + fmt(report.massG, 0) + ' g' : '',
+      area: area(report.totalAreaCm2, 1),
+      mass: report.massG !== null ? ' - ' + massSmall(report.massG, 0) : '',
     }),
     t('export.summary.tools', { welder: report.welder.name, cutter: report.cutter.name }),
     '',

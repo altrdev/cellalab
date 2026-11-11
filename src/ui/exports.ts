@@ -1,4 +1,5 @@
 import { t } from '../i18n';
+import { getPrefs } from '../prefs';
 import { buildDxf } from '../core/dxf';
 import { buildCutListCsv, buildCutSummary, buildSvg } from '../core/lamelleExport';
 import type { Project } from '../core/types';
@@ -40,6 +41,7 @@ export function exportDxf(project: Project, face: 'top' | 'bottom') {
     spotsPerTerminal: ui.dxfReferences ? spots : undefined,
     spotDiameterMm: report.welder.spotDiameterMm,
     spotSpacingMm: report.welder.spotSpacingMm,
+    unit: getPrefs().length,
   });
   save(dxf, `${slug(project.name)}-${t('file.busbars')}-${faceName(face)}.dxf`, 'application/dxf');
 }

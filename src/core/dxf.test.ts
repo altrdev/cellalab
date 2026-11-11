@@ -218,3 +218,46 @@ describe('etichette', () => {
     expect(dxf).toContain('P-');
   });
 });
+
+describe('unità del DXF', () => {
+  const header = (dxf: string, name: string) => {
+    const p = pairs(dxf);
+    const i = p.findIndex(([c, v]) => c === '9' && v === name);
+    return Number(p[i + 1]![1]);
+  };
+
+  it('in mm: unità 4 e sistema metrico', () => {
+    const dxf = buildDxf(strips, base);
+    expect(header(dxf, '$INSUNITS')).toBe(4);
+    expect(header(dxf, '$MEASUREMENT')).toBe(1);
+  });
+
+  it('in pollici: coordinate divise per 25,4, unità 1 e sistema imperiale', () => {
+    const s = strips[0]!;
+    const mm = outlinePoints(buildDxf([s], base));
+    const inch = outlinePoints(buildDxf([s], { ...base, unit: 'in' }));
+    const width = (v: { x: number }[]) => Math.max(...v.map((p) => p.x)) - Math.min(...v.map((p) => p.x));
+    expect(width(inch)).toBeCloseTo(width(mm) / 25.4, 3);
+    const dxf = buildDxf([s], { ...base, unit: 'in' });
+    expect(header(dxf, '$INSUNITS')).toBe(1);
+    expect(header(dxf, '$MEASUREMENT')).toBe(0);
+  });
+
+  it('cerchi e testi si scalano insieme al disegno', () => {
+    const mm = buildDxf(strips, { ...base, includeContacts: true, includeLabels: true });
+    const inch = buildDxf(strips, { ...base, includeContacts: true, includeLabels: true, unit: 'in' });
+    const radii = (dxf: string) => {
+      const p = pairs(dxf);
+      return p.flatMap(([c], i) => (c === '0' && p[i]![1] === 'CIRCLE' ? [Number(p.slice(i).find(([cc]) => cc === '40')![1])] : []));
+    };
+    const a = radii(mm);
+    const b = radii(inch);
+    expect(a.length).toBeGreaterThan(0);
+    a.forEach((r, i) => expect(b[i]).toBeCloseTo(r / 25.4, 3));
+    const heights = (dxf: string) => {
+      const p = pairs(dxf);
+      return p.flatMap(([c, v], i) => (c === '0' && v === 'TEXT' ? [Number(p.slice(i).find(([cc]) => cc === '40')![1])] : []));
+    };
+    expect(heights(inch)[0]).toBeCloseTo(heights(mm)[0]! / 25.4, 3);
+  });
+});

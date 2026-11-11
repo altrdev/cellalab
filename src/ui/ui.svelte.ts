@@ -1,5 +1,6 @@
 import { boundsOfCells } from '../core/geometry';
 import { loadLocale, saveLocale, setLocale, type Locale } from '../i18n';
+import { getPrefs, setPrefs, type Prefs } from '../prefs';
 import type { HolderSettings } from '../core/holder';
 import type { LamellaSettings } from '../core/lamelle';
 import type { LatticeKind } from '../core/lattice';
@@ -24,6 +25,20 @@ function initialLocale(): Locale {
 class UiState {
   /** Lingua dell'interfaccia; cambiandola App.svelte rimonta tutto. */
   locale = $state<Locale>(initialLocale());
+  /** Popup delle impostazioni aperto: sta qui perché cambiando una scelta l'interfaccia si rimonta. */
+  settingsOpen = $state(false);
+  /** Unità e valuta (si ricordano nel browser); cambiandole App.svelte rimonta tutto. */
+  prefs = $state<Prefs>({ ...getPrefs() });
+  setPref(patch: Partial<Prefs>) {
+    // i passi di aggancio dipendono dall'unità: cambiandola si torna all'aggancio a slot
+    if (patch.length && patch.length !== getPrefs().length) this.snap = 'slot';
+    setPrefs(patch);
+    this.prefs = { ...getPrefs() };
+  }
+  /** Cambia con la lingua e con le preferenze: chiave con cui App.svelte rimonta l'interfaccia. */
+  get viewKey() {
+    return this.locale + JSON.stringify(this.prefs);
+  }
   setLanguage(l: Locale) {
     if (l === this.locale) return;
     setLocale(l);

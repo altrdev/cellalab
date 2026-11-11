@@ -5,7 +5,8 @@ import { circlePolygon, closeRegions, differenceRegions, offsetRegions, regionAr
 import type { Rect } from './geometry';
 import type { Pt } from './polygon';
 import type { Project } from './types';
-import { fmtNum, t } from '../i18n';
+import { t } from '../i18n';
+import { len, lenLabel, lenNum, temp } from '../units';
 
 /**
  * Portacelle monolitico a due piastre (sopra e sotto). Ogni piastra è un "cappuccio":
@@ -339,7 +340,7 @@ export function analyzeHolder(project: Project, model: HolderModel): HolderRepor
     } else if (minWall < MIN_PRINT_WALL_MM) {
       issues.push({
         level: 'warning',
-        text: t('holder.issue.thinWall', { wall: fmtNum(minWall, 2), min: fmtNum(MIN_PRINT_WALL_MM, 1) }),
+        text: t('holder.issue.thinWall', { wall: len(minWall, 2), min: len(MIN_PRINT_WALL_MM, 1) }),
       });
     }
   }
@@ -348,21 +349,21 @@ export function analyzeHolder(project: Project, model: HolderModel): HolderRepor
   if (!fitsBed(widthMm, depthMm)) {
     issues.push({
       level: 'warning',
-      text: t('holder.issue.bed', { w: widthMm.toFixed(0), d: depthMm.toFixed(0), bx: s.bedXMm, by: s.bedYMm }),
+      text: t('holder.issue.bed', { w: lenNum(widthMm, 0), d: lenNum(depthMm, 0), bx: lenNum(s.bedXMm, 0), by: lenNum(s.bedYMm, 0), u: lenLabel() }),
     });
   }
   if (model.lipMm < s.lipMm - 1e-9) {
-    issues.push({ level: 'info', text: t('holder.issue.lip', { lip: fmtNum(model.lipMm, 1) }) });
+    issues.push({ level: 'info', text: t('holder.issue.lip', { lip: len(model.lipMm, 1) }) });
   }
   if (model.chamferMm < s.chamferMm - 1e-9) {
-    issues.push({ level: 'info', text: t('holder.issue.chamfer', { chamfer: fmtNum(model.chamferMm, 2) }) });
+    issues.push({ level: 'info', text: t('holder.issue.chamfer', { chamfer: len(model.chamferMm, 2) }) });
   }
   if (!s.lockCells) {
     issues.push({ level: 'info', text: t('holder.issue.noFloor') });
   }
   issues.push({
     level: 'info',
-    text: t('holder.issue.material'),
+    text: t('holder.issue.material', { temp: temp(60, 0) }),
   });
 
   return {

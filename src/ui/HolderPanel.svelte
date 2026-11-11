@@ -1,7 +1,9 @@
 <script lang="ts">
   import { fmtNum, t } from '../i18n';
+  import { len, lenLabel, lenNum, massSmall } from '../units';
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
+  import UnitInput from './UnitInput.svelte';
   import { DEFAULT_HOLDER_SETTINGS } from '../core/holder';
   import { history } from '../state';
   import { clampHolder, holderOf } from './holder';
@@ -23,9 +25,12 @@
     const v = (e.currentTarget as HTMLInputElement).valueAsNumber;
     if (Number.isFinite(v)) ui.holder[key] = clampHolder(key, v);
   }
+  function setNumV(key: NumKey, v: number | null) {
+    if (v !== null) ui.holder[key] = clampHolder(key, v);
+  }
   const reset = () => Object.assign(ui.holder, DEFAULT_HOLDER_SETTINGS);
   const noteLock = $derived(
-    model && model.openingDiameterMm !== null ? t('hold.noteLock', { d: fmt(model.openingDiameterMm), f: fmt(model.floorMm) }) : t('hold.noteOpen'),
+    model && model.openingDiameterMm !== null ? t('hold.noteLock', { d: len(model.openingDiameterMm, 1), f: len(model.floorMm, 1) }) : t('hold.noteOpen'),
   );
 
   /** Colori tipici dei filamenti per stampa 3D. */
@@ -48,9 +53,9 @@
   {:else}
     <div class="result {status}">
       <div class="rhead"><Icon name="box" size={15} /> {t('hold.title')} <span class="badge {status}">{status === 'ok' ? t('hold.badge.ok') : status === 'warning' ? t('hold.badge.warning') : t('hold.badge.error')}</span></div>
-      <div class="big">{t('hold.plates', { w: fmt(report.widthMm, 0), d: fmt(report.depthMm, 0) })}</div>
+      <div class="big">{t('hold.plates', { w: lenNum(report.widthMm, 0), d: lenNum(report.depthMm, 0), u: lenLabel() })}</div>
       <div class="small">
-        {t('hold.summary', { h: fmt(report.totalHeightMm), g: fmt(grams, 0) })}
+        {t('hold.summary', { h: len(report.totalHeightMm, 1), g: massSmall(grams, 0) })}
       </div>
     </div>
 
@@ -102,13 +107,13 @@
     <h3><Icon name="ruler" /> {t('hold.shape')}</h3>
   <div class="row">
     <label>{t('hold.wall')}
-      <input type="number" min="0.8" max="6" step="0.1" value={ui.holder.wallMm} onchange={(e) => setNum('wallMm', e)} />
+      <UnitInput kind="len" min={0.8} max={6} step={0.1} value={ui.holder.wallMm} onchange={(v) => setNumV('wallMm', v)} />
     </label>
     <label>{t('hold.clearance')}
-      <input type="number" min="0" max="1" step="0.05" value={ui.holder.clearanceMm} onchange={(e) => setNum('clearanceMm', e)} />
+      <UnitInput kind="len" min={0} max={1} step={0.05} value={ui.holder.clearanceMm} onchange={(v) => setNumV('clearanceMm', v)} />
     </label>
   </div>
-  <Help label={t('hold.clearanceLabel')}>{t('hold.clearanceHelp')}</Help>
+  <Help label={t('hold.clearanceLabel')}>{t('hold.clearanceHelp', { a: len(0.1, 1), b: len(0.2, 1), c: len(0.3, 1) })}</Help>
 
   <div class="field">
     <span class="lbl">{t('hold.geometry')}</span>
@@ -120,10 +125,10 @@
 
   <div class="row">
     <label>{t('hold.fillet')}
-      <input type="number" min="0" max="10" step="0.5" disabled={ui.holder.shape === 'rounded'} value={ui.holder.filletMm} onchange={(e) => setNum('filletMm', e)} />
+      <UnitInput kind="len" min={0} max={10} step={0.5} disabled={ui.holder.shape === 'rounded'} value={ui.holder.filletMm} onchange={(v) => setNumV('filletMm', v)} />
     </label>
     <label>{t('hold.chamfer')}
-      <input type="number" min="0" max="2" step="0.1" value={ui.holder.chamferMm} onchange={(e) => setNum('chamferMm', e)} />
+      <UnitInput kind="len" min={0} max={2} step={0.1} value={ui.holder.chamferMm} onchange={(v) => setNumV('chamferMm', v)} />
     </label>
   </div>
   <Help label={t('hold.what')}>
@@ -143,22 +148,22 @@
     <summary>{t('hold.advanced')}</summary>
     <div class="row">
       <label>{t('hold.floor')}
-        <input type="number" min="0.6" max="4" step="0.2" disabled={!ui.holder.lockCells} value={ui.holder.floorMm} onchange={(e) => setNum('floorMm', e)} />
+        <UnitInput kind="len" min={0.6} max={4} step={0.2} disabled={!ui.holder.lockCells} value={ui.holder.floorMm} onchange={(v) => setNumV('floorMm', v)} />
       </label>
       <label>{t('hold.lip')}
-        <input type="number" min="2" max="30" step="1" value={ui.holder.lipMm} onchange={(e) => setNum('lipMm', e)} />
+        <UnitInput kind="len" min={2} max={30} step={1} value={ui.holder.lipMm} onchange={(v) => setNumV('lipMm', v)} />
       </label>
     </div>
     <label>{t('hold.ledge')}
-      <input type="number" min="0.5" max="4" step="0.25" disabled={!ui.holder.lockCells} value={ui.holder.ledgeMm} onchange={(e) => setNum('ledgeMm', e)} />
+      <UnitInput kind="len" min={0.5} max={4} step={0.25} disabled={!ui.holder.lockCells} value={ui.holder.ledgeMm} onchange={(v) => setNumV('ledgeMm', v)} />
     </label>
     <Help label={t('hold.explain')}>{t('hold.floorHelp')}</Help>
     <div class="row">
       <label>{t('hold.bedX')}
-        <input type="number" min="50" max="1000" step="10" value={ui.holder.bedXMm} onchange={(e) => setNum('bedXMm', e)} />
+        <UnitInput kind="len" min={50} max={1000} step={10} value={ui.holder.bedXMm} onchange={(v) => setNumV('bedXMm', v)} />
       </label>
       <label>{t('hold.bedY')}
-        <input type="number" min="50" max="1000" step="10" value={ui.holder.bedYMm} onchange={(e) => setNum('bedYMm', e)} />
+        <UnitInput kind="len" min={50} max={1000} step={10} value={ui.holder.bedYMm} onchange={(v) => setNumV('bedYMm', v)} />
       </label>
     </div>
     <div class="exp"><button onclick={reset}>{t('hold.defaults')}</button></div>

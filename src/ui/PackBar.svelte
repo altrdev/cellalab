@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t, tn } from '../i18n';
+  import { lenLabel, lenNum, mass, money } from '../units';
   import { computeStats } from '../core/stats';
   import { history } from '../state';
   import { packExtent } from './holder';
@@ -11,12 +12,12 @@
   const num = (v: number | null, digits = 1, unit = '') => (v === null ? '—' : `${v.toFixed(digits)}${unit}`);
   const extent = $derived(packExtent($history.present, ui.holder, ui.showHolder));
   const size = $derived(
-    extent ? `${extent.widthMm.toFixed(1)}×${extent.depthMm.toFixed(1)}×${extent.heightMm.toFixed(1)} mm` : '—',
+    extent ? `${lenNum(extent.widthMm)}×${lenNum(extent.depthMm)}×${lenNum(extent.heightMm)} ${lenLabel()}` : '—',
   );
-  const weight = $derived(empty ? '—' : `${(stats.weightG / 1000).toFixed(2)} kg`);
-  const cost = $derived(stats.costEur === null ? '—' : `${stats.costEur.toFixed(2)} €`);
+  const weight = $derived(empty ? '—' : mass(stats.weightG, 2));
+  const cost = $derived(stats.costEur === null ? '—' : money(stats.costEur, 2));
   const perWh = $derived(
-    stats.costEur === null || !stats.energyWh ? null : `${(stats.costEur / stats.energyWh).toFixed(2)} €/Wh`,
+    stats.costEur === null || !stats.energyWh ? null : `${money(stats.costEur / stats.energyWh, 2)}/Wh`,
   );
   const voltage = $derived(stats.nominalV === null ? '—' : `${stats.nominalV.toFixed(1)} V`);
   const voltageRange = $derived(

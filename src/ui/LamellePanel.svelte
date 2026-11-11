@@ -1,7 +1,9 @@
 <script lang="ts">
   import { fmtNum, t } from '../i18n';
+  import { area, len, lenLabel, lenNum, massSmall, tempDelta } from '../units';
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
+  import UnitInput from './UnitInput.svelte';
   import { rangeFill } from './rangeFill';
   import { COOLING, type CoolingId } from '../core/sizing';
   import { CUTTER_PROFILES, WELDER_PROFILES } from '../core/profiles';
@@ -22,9 +24,9 @@
   }
 
   const PRESETS = [
-    { k: 15, label: t('lam.preset.careful'), hint: t('lam.preset.carefulHint') },
-    { k: 25, label: t('lam.preset.normal'), hint: t('lam.preset.normalHint') },
-    { k: 40, label: t('lam.preset.pushed'), hint: t('lam.preset.pushedHint') },
+    { k: 15, label: t('lam.preset.careful'), hint: t('lam.preset.carefulHint', { d: tempDelta(15) }) },
+    { k: 25, label: t('lam.preset.normal'), hint: t('lam.preset.normalHint', { d: tempDelta(25) }) },
+    { k: 40, label: t('lam.preset.pushed'), hint: t('lam.preset.pushedHint', { d: tempDelta(40) }) },
   ] as const;
   const COOLING_TEXT: Record<CoolingId, string> = {
     free: t('lam.cool.free'),
@@ -39,9 +41,9 @@
     const name = r.material.name.replace(/\s*\(.*\)$/, '');
     if (r.status === 'empty') return '';
     if (r.thicknessMm === null) {
-      return t('lam.verdict.none', { name: name.toLowerCase(), required: fmt(r.requiredMm) });
+      return t('lam.verdict.none', { name: name.toLowerCase(), required: len(r.requiredMm, 2) });
     }
-    const spess = `${fmt(r.thicknessMm)} mm${r.layers > 1 ? t('lam.verdict.layers', { n: r.layers }) : ''}`;
+    const spess = `${len(r.thicknessMm, 2)}${r.layers > 1 ? t('lam.verdict.layers', { n: r.layers }) : ''}`;
     if (r.status === 'error') return t('lam.verdict.error', { name, spec: spess });
     if (r.status === 'warning') return t('lam.verdict.warning', { name, spec: spess, current: fmt(r.currentA, 0) });
     return t('lam.verdict.ok', { name, spec: spess, current: fmt(r.currentA, 0) });
@@ -56,7 +58,7 @@
       <div class="rhead"><Icon name="layers" size={15} /> {t('lam.title')} <span class="badge {report.status}">{report.status === 'ok' ? t('lam.badge.ok') : report.status === 'warning' ? t('lam.badge.warning') : t('lam.badge.error')}</span></div>
       <div class="big">{verdict}</div>
       <div class="small">
-        {t('lam.area', { area: fmt(report.totalAreaCm2, 1) })}{report.massG !== null ? ` · ${fmt(report.massG, 0)} g` : ''}
+        {t('lam.area', { area: area(report.totalAreaCm2, 1) })}{report.massG !== null ? ` · ${massSmall(report.massG, 0)}` : ''}
       </div>
     </div>
   {/if}
@@ -77,17 +79,19 @@
         onchange={(e) => (ui.lamella.thicknessMm = e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value))}
       >
         <option value="auto">{t('lam.thicknessAuto')}</option>
-        {#each material.thicknessesMm as th (th)}<option value={String(th)}>{fmt(th)} mm</option>{/each}
+        {#each material.thicknessesMm as th (th)}<option value={String(th)}>{len(th, 2)}</option>{/each}
       </select>
     </label>
     <label>{t('lam.linkWidth')}
-      <input
-        type="number"
-        min="1"
-        step="0.5"
-        placeholder={report.strips[0] ? fmt(report.strips[0].neckMm, 1) : 'auto'}
-        value={ui.lamella.widthMm ?? ''}
-        onchange={(e) => (ui.lamella.widthMm = e.currentTarget.value === '' ? null : num(e, 1, 60))}
+      <UnitInput
+        kind="len"
+        min={1}
+        max={60}
+        step={0.5}
+        nullable
+        placeholder={report.strips[0] ? report.strips[0].neckMm : 'auto'}
+        value={ui.lamella.widthMm}
+        onchange={(v) => (ui.lamella.widthMm = v)}
       />
     </label>
   </div>
@@ -96,7 +100,7 @@
   <section class="sec">
     <h3><Icon name="ruler" /> {t('lam.shape')}</h3>
   <label>
-    <span class="top"><span>{t('lam.widen')}</span><b>{ui.lamella.widthMm ? `${fmt(ui.lamella.widthMm, 1)} mm` : 'auto'}</b></span>
+    <span class="top"><span>{t('lam.widen')}</span><b>{ui.lamella.widthMm ? len(ui.lamella.widthMm, 1) : 'auto'}</b></span>
     <input
       use:rangeFill={ui.lamella.widthMm}
       type="range"
@@ -110,16 +114,9 @@
   <Help label={t('lam.what')}>{t('lam.widenHelp')}</Help>
 
   <label>{t('lam.weldArea')}
-    <input
-      type="number"
-      min="1"
-      step="0.5"
-      placeholder="auto"
-      value={ui.lamella.contactDiameterMm ?? ''}
-      onchange={(e) => (ui.lamella.contactDiameterMm = e.currentTarget.value === '' ? null : num(e, 1, 30))}
-    />
+    <UnitInput kind="len" min={1} max={30} step={0.5} nullable placeholder="auto" value={ui.lamella.contactDiameterMm} onchange={(v) => (ui.lamella.contactDiameterMm = v)} />
   </label>
-  <Help label={t('lam.what')}>{t('lam.weldAreaHelp')}</Help>
+  <Help label={t('lam.what')}>{t('lam.weldAreaHelp', { edge: len(1, 0) })}</Help>
 
   <label>{t('lam.spotsPer')}
     <select
@@ -165,15 +162,15 @@
             {#each report.strips as s (s.stripId)}
               <tr>
                 <td>{s.face === 'top' ? '↑' : '↓'} {s.label}</td>
-                <td>{fmt(s.neckMm, 1)}</td>
+                <td>{lenNum(s.neckMm, 1)}</td>
                 <td>{fmt(s.neckCurrentA, 0)}</td>
-                <td>{fmt(s.requiredMm)}</td>
+                <td>{lenNum(s.requiredMm, 2)}</td>
                 <td class:low={s.spotCapacity < s.spotsNeeded || s.spotsCarryA < s.cellCurrentA} title={t('lam.spotsTitle', { n: s.spotsNeeded, carry: fmt(s.spotsCarryA, 0), cell: fmt(s.cellCurrentA, 1) })}>{s.spotsNeeded}/{s.spotCapacity} <small>({fmt(s.spotsCarryA, 0)} A)</small></td>
               </tr>
             {/each}
           </tbody>
         </table>
-        <Help label={t('lam.tableHelpLabel')}>{t('lam.tableHelp')}</Help>
+        <Help label={t('lam.tableHelpLabel')}>{t('lam.tableHelp', { u: lenLabel() })}</Help>
       {/if}
     </details>
   {/if}
@@ -200,14 +197,7 @@
         />
       </label>
       <label>{t('lam.spotSpacing')}
-        <input
-          type="number"
-          min="1"
-          step="0.5"
-          placeholder={fmt(report.welder.spotSpacingMm, 1)}
-          value={ui.lamella.spotSpacingMm ?? ''}
-          onchange={(e) => (ui.lamella.spotSpacingMm = e.currentTarget.value === '' ? null : num(e, 1, 20))}
-        />
+        <UnitInput kind="len" min={1} max={20} step={0.5} nullable placeholder={report.welder.spotSpacingMm} value={ui.lamella.spotSpacingMm} onchange={(v) => (ui.lamella.spotSpacingMm = v)} />
       </label>
     </div>
     <Help label={t('lam.explain')}>{t('lam.spotsNote')}</Help>
@@ -236,7 +226,7 @@
         {/each}
       </div>
       <span class="hint">
-        {#if isPreset}{t('lam.steady', { hint: PRESETS.find((p) => p.k === ui.lamella.deltaTK)?.hint ?? '' })}{:else}{t('lam.custom', { delta: ui.lamella.deltaTK })}{/if}
+        {#if isPreset}{t('lam.steady', { hint: PRESETS.find((p) => p.k === ui.lamella.deltaTK)?.hint ?? '' })}{:else}{t('lam.custom', { delta: tempDelta(ui.lamella.deltaTK) })}{/if}
       </span>
     </div>
 
@@ -247,10 +237,10 @@
 
     <div class="row">
       <label>{t('lam.ambient')}
-        <input type="number" step="1" value={ui.lamella.ambientC} onchange={(e) => (ui.lamella.ambientC = num(e, -20, 60) ?? 25)} />
+        <UnitInput kind="tempAbs" min={-20} max={60} step={1} value={ui.lamella.ambientC} onchange={(v) => (ui.lamella.ambientC = v ?? 25)} />
       </label>
       <label>{t('lam.cellRise')}
-        <input type="number" step="1" min="0" max="40" value={ui.lamella.cellRiseK} onchange={(e) => (ui.lamella.cellRiseK = num(e, 0, 40) ?? 15)} />
+        <UnitInput kind="tempDelta" min={0} max={40} step={1} value={ui.lamella.cellRiseK} onchange={(v) => (ui.lamella.cellRiseK = v ?? 15)} />
       </label>
     </div>
     <Help label={t('lam.cellRiseLabel')}>{t('lam.cellRiseHelp')}</Help>

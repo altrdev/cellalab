@@ -8,9 +8,9 @@ afterEach(() => setLocale('it'));
 describe('i18n', () => {
   it('parte in italiano e cambia lingua', () => {
     expect(getLocale()).toBe('it');
-    expect(t('lang.label')).toBe('Lingua');
+    expect(t('settings.language')).toBe('Lingua');
     setLocale('en');
-    expect(t('lang.label')).toBe('Language');
+    expect(t('settings.language')).toBe('Language');
   });
 
   it('i numeri usano il separatore della lingua', () => {

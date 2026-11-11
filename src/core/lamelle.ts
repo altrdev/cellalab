@@ -22,6 +22,7 @@ import {
 } from './sizing';
 import { neckWidthMm, type Strip, type StripOptions } from './strips';
 import type { Project } from './types';
+import { len, tempDelta } from '../units';
 
 /**
  * Analisi delle lamelle: spessore necessario, verifiche sulla saldatrice e sul taglio, alternative.
@@ -308,11 +309,11 @@ export function analyzeLamelle(
       message: t('lamelle.issue.noThickness', {
         material: material.name,
         layers: tn('lamelle.layers', layers),
-        required: fmt(requiredMm),
+        required: len(requiredMm, 2),
         current: fmt(currentA, 0),
         strip: critical.label,
         face: faceName(critical.face),
-        neck: fmt(critical.neckMm, 1),
+        neck: len(critical.neckMm, 1),
       }),
       stripIds: [critical.stripId],
     });
@@ -322,11 +323,11 @@ export function analyzeLamelle(
     issues.push({
       severity: 'error',
       message: t('lamelle.issue.tooThin', {
-        thickness: fmt(totalThicknessMm!),
+        thickness: len(totalThicknessMm!, 2),
         current: fmt(currentA, 0),
-        required: fmt(requiredMm),
+        required: len(requiredMm, 2),
         why: hot.length
-          ? t('lamelle.issue.tooThinHot', { rise: fmt(Math.max(...hot.map((r) => r.deltaTK ?? 0)), 0), allowed: settings.deltaTK })
+          ? t('lamelle.issue.tooThinHot', { rise: tempDelta(Math.max(...hot.map((r) => r.deltaTK ?? 0)), 0), allowed: tempDelta(settings.deltaTK, 0) })
           : t('lamelle.issue.tooThinPeak'),
       }),
       stripIds: hot.length ? hot.map((r) => r.stripId) : [critical.stripId],
@@ -345,7 +346,7 @@ export function analyzeLamelle(
     thicknessProblem = true;
     issues.push({
       severity: 'warning',
-      message: t('lamelle.issue.welderThickness', { total: fmt(totalThicknessMm), max: fmt(welder.maxThicknessMm), welder: welder.name }),
+      message: t('lamelle.issue.welderThickness', { total: len(totalThicknessMm, 2), max: len(welder.maxThicknessMm, 2), welder: welder.name }),
       stripIds: [],
     });
   }
@@ -371,13 +372,13 @@ export function analyzeLamelle(
       const needR = Math.ceil(need * 10) / 10;
       const how = Number.isFinite(need)
         ? t('lamelle.issue.spotsHow', {
-            radius: fmt(r.contactRadiusMm, 1),
-            diameter: fmt(2 * r.contactRadiusMm, 1),
+            radius: len(r.contactRadiusMm, 1),
+            diameter: len(2 * r.contactRadiusMm, 1),
             count: r.spotsNeeded,
-            spot: fmt(welder.spotDiameterMm, 0),
-            pitch: fmt(welder.spotSpacingMm, 1),
-            need: fmt(needR, 1),
-            needDiameter: fmt(2 * needR, 1),
+            spot: len(welder.spotDiameterMm, 0),
+            pitch: len(welder.spotSpacingMm, 1),
+            need: len(needR, 1),
+            needDiameter: len(2 * needR, 1),
           })
         : '';
       issues.push({
@@ -432,7 +433,7 @@ export function analyzeLamelle(
         } else if (d < cutter.minGapMm) {
           issues.push({
             severity: 'warning',
-            message: t('lamelle.issue.gap', { names, gap: fmt(d, 1), min: fmt(cutter.minGapMm, 1), cutter: cutter.name }),
+            message: t('lamelle.issue.gap', { names, gap: len(d, 1), min: len(cutter.minGapMm, 1), cutter: cutter.name }),
             stripIds: pair,
           });
         }
@@ -445,7 +446,7 @@ export function analyzeLamelle(
     for (let l = Math.max(2, layers + 1); l <= welder.maxLayers; l++) {
       const th = smallestThickness(material, l, requiredMm);
       if (th !== null && th * l <= welder.maxThicknessMm + 1e-9) {
-        alternatives.push(t('lamelle.alt.layers', { layers: l, material: material.name, thickness: fmt(th) }));
+        alternatives.push(t('lamelle.alt.layers', { layers: l, material: material.name, thickness: len(th, 2) }));
         break;
       }
     }
@@ -455,11 +456,11 @@ export function analyzeLamelle(
       const th = smallestThickness(m, 1, need);
       if (th !== null && th <= welder.maxThicknessMm + 1e-9) {
         const note = m.weldability === 'poor' ? t('lamelle.alt.noteWeldPoor') : m.weldability === 'fair' ? t('lamelle.alt.noteWeldFair') : '';
-        alternatives.push(t('lamelle.alt.material', { material: m.name, thickness: fmt(th), note }));
+        alternatives.push(t('lamelle.alt.material', { material: m.name, thickness: len(th, 2), note }));
       }
     }
     alternatives.push(t('lamelle.alt.twoLevel'));
-    alternatives.push(t('lamelle.alt.lowerCurrent', { delta: settings.deltaTK }));
+    alternatives.push(t('lamelle.alt.lowerCurrent', { delta: tempDelta(settings.deltaTK, 0) }));
   }
 
   const totalAreaMm2 = strips.reduce((a, s) => a + s.areaMm2, 0);

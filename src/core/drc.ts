@@ -1,4 +1,5 @@
 import { t, tn } from '../i18n';
+import { len } from '../units';
 import { findCellType } from './catalog';
 import { computeStats } from './stats';
 import type { PlacedCell, Project } from './types';
@@ -116,7 +117,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     issues.push({
       code: 'too-close',
       severity: 'warning',
-      message: tn('drc.tooClose', closePairs, { gap: minGap }),
+      message: tn('drc.tooClose', closePairs, { gap: len(minGap, 1) }),
       cellIds: [...closeIds],
     });
   }

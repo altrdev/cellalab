@@ -27,6 +27,8 @@ export interface DxfOptions {
   spotsPerTerminal?: ReadonlyMap<string, number>;
   spotDiameterMm?: number;
   spotSpacingMm?: number;
+  /** Unità in cui si scrivono le coordinate (il calcolo resta in mm): 'in' divide per 25,4 e lo dichiara nell'intestazione. */
+  unit?: 'mm' | 'in';
 }
 
 const LAYERS: readonly [name: string, color: number][] = [
@@ -123,11 +125,19 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
   const list = strips.filter((s) => options.face === 'all' || s.face === options.face);
   // y verso l'alto
   const Y = (y: number) => -y;
+  // il disegno si calcola in mm; in uscita si scala nell'unità scelta
+  const inches = options.unit === 'in';
+  const f = inches ? 1 / 25.4 : 1;
 
   w.pair(0, 'SECTION');
   w.pair(2, 'HEADER');
   w.pair(9, '$ACADVER');
   w.pair(1, 'AC1009');
+  // unità del disegno (1 = pollici, 4 = millimetri) e sistema di misura (0 = imperiale, 1 = metrico)
+  w.pair(9, '$INSUNITS');
+  w.pair(70, inches ? 1 : 4);
+  w.pair(9, '$MEASUREMENT');
+  w.pair(70, inches ? 0 : 1);
   w.pair(0, 'ENDSEC');
 
   w.pair(0, 'SECTION');
@@ -157,8 +167,8 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
     for (const p of pts) {
       w.pair(0, 'VERTEX');
       w.pair(8, layer);
-      w.pair(10, p.x);
-      w.pair(20, Y(p.y));
+      w.pair(10, p.x * f);
+      w.pair(20, Y(p.y) * f);
       if (p.bulge) w.pair(42, p.bulge);
     }
     w.pair(0, 'SEQEND');
@@ -167,16 +177,16 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
   const circle = (layer: string, x: number, y: number, r: number) => {
     w.pair(0, 'CIRCLE');
     w.pair(8, layer);
-    w.pair(10, x);
-    w.pair(20, Y(y));
-    w.pair(40, r);
+    w.pair(10, x * f);
+    w.pair(20, Y(y) * f);
+    w.pair(40, r * f);
   };
   const text = (x: number, y: number, height: number, value: string) => {
     w.pair(0, 'TEXT');
     w.pair(8, 'TEXT');
-    w.pair(10, x);
-    w.pair(20, Y(y));
-    w.pair(40, height);
+    w.pair(10, x * f);
+    w.pair(20, Y(y) * f);
+    w.pair(40, height * f);
     w.pair(1, asciiLabel(value));
   };
 

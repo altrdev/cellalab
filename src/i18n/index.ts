@@ -1,3 +1,4 @@
+import { CURRENCIES, getPrefs } from '../prefs';
 import { en } from './en';
 import { it } from './it';
 
@@ -44,9 +45,20 @@ export function setLocale(l: Locale): void {
 const fill = (text: string, params?: Params) =>
   params ? text.replace(/\{(\w+)\}/g, (m, k: string) => (k in params ? String(params[k]) : m)) : text;
 
+/** Le etichette dei campi portano l'unità tra parentesi, scritta in metrico: «(mm)», «(°C)», «(g)», «(€/cella)». */
+function unitize(text: string): string {
+  const p = getPrefs();
+  if (!text.includes('(')) return text;
+  return text
+    .replace('(mm)', p.length === 'in' ? '(in)' : '(mm)')
+    .replace('(°C)', p.temp === 'F' ? '(°F)' : '(°C)')
+    .replace('(g)', p.weight === 'imperial' ? '(oz)' : '(g)')
+    .replace(/\(€\//, `(${CURRENCIES[p.currency].symbol}/`);
+}
+
 /** Testo nella lingua corrente; se manca (non dovrebbe) ripiega sull'italiano. */
 export function t(key: MsgKey, params?: Params): string {
-  return fill(dictionaries[current][key] ?? it[key] ?? key, params);
+  return unitize(fill(dictionaries[current][key] ?? it[key] ?? key, params));
 }
 
 /** Plurale: usa `base_one` per 1 e `base_other` altrimenti; `{n}` è disponibile nel testo. */
@@ -86,3 +98,6 @@ export function saveLocale(l: Locale): void {
     /* storage non disponibile: la scelta vale per questa sessione */
   }
 }
+
+/** Cambia quando cambia la lingua o una preferenza: chiave per le cache di risultati che contengono testo formattato. */
+export const renderKey = (): string => current + JSON.stringify(getPrefs());

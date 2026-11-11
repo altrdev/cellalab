@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n';
+  import { len } from '../units';
   import { rangeFill } from './rangeFill';
   import { onMount } from 'svelte';
   import { history } from '../state';
@@ -65,7 +66,7 @@
     <label class="slider">
       {t('preview.explosion')}
       <input use:rangeFill={explosion} type="range" min="0" max="60" step="1" bind:value={explosion} />
-      <span>{explosion} mm</span>
+      <span>{len(explosion, 0)}</span>
     </label>
     <label class="check"><input type="checkbox" bind:checked={showCells} /> {t('preview.cells')}</label>
     <label class="check" title={t('preview.holderTitle')}><input type="checkbox" bind:checked={ui.showHolder} /> Holder</label>

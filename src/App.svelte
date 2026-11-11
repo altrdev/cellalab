@@ -116,7 +116,7 @@
 
 <svelte:window {onkeydown} {onkeyup} onblur={() => (ui.spaceDown = false)} />
 
-{#key ui.locale}
+{#key ui.viewKey}
 <div class="app">
   <aside><Sidebar /></aside>
   <main class="m-{ui.viewMode}" bind:this={mainEl}>

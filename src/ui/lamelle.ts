@@ -1,4 +1,4 @@
-import { getLocale } from '../i18n';
+import { renderKey } from '../i18n';
 import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf, type LamellaReport, type LamellaSettings } from '../core/lamelle';
 import type { Pt } from '../core/polygon';
 import { COOLING, spotPositions } from '../core/sizing';
@@ -24,7 +24,7 @@ export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
 let last: { project: Project; key: string; report: LamellaReport } | null = null;
 
 export function reportOf(project: Project, settings: LamellaSettings): LamellaReport {
-  const key = getLocale() + JSON.stringify(settings); // i messaggi del rapporto sono nella lingua corrente
+  const key = renderKey() + JSON.stringify(settings); // i messaggi del rapporto dipendono da lingua e unità
   if (last && last.project === project && last.key === key) return last.report;
   const packCurrentA = computeStats(project).maxCurrentA ?? 0;
   const report = analyzeLamelle(project, stripsOf(project, settings), settings, packCurrentA);

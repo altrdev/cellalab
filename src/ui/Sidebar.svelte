@@ -1,7 +1,9 @@
 <script lang="ts">
   import { t, tn } from '../i18n';
+  import { lenLabel, lenNum, money } from '../units';
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
+  import UnitInput from './UnitInput.svelte';
   import { computeStats } from '../core/stats';
   import { nextFreeGroup, suggestGroups, type GroupStrategy } from '../core/autogroup';
   import { BUILTIN_CELL_TYPES, findCellType } from '../core/catalog';
@@ -30,7 +32,7 @@
   import HolderPanel from './HolderPanel.svelte';
   import { holderOf, sanitizeHolderSettings } from './holder';
   import LamellePanel from './LamellePanel.svelte';
-  import LangSwitch from './LangSwitch.svelte';
+  import SettingsMenu from './SettingsMenu.svelte';
   import { reportOf, sanitizeLamellaSettings } from './lamelle';
   import { ui } from './ui.svelte';
 
@@ -265,8 +267,8 @@
   }
 
   const typeSummary = (t: CellType) =>
-    `${t.diameterMm}×${t.heightMm} mm · ${t.capacityAh} Ah · ${t.maxDischargeA} A` +
-    (t.priceEur !== undefined ? ` · ${t.priceEur.toFixed(2)} €` : '');
+    `${lenNum(t.diameterMm)}×${lenNum(t.heightMm)} ${lenLabel()} · ${t.capacityAh} Ah · ${t.maxDischargeA} A` +
+    (t.priceEur !== undefined ? ` · ${money(t.priceEur, 2)}` : '');
 
   function clearAll() {
     history.commit((p) => clearPack(p));
@@ -325,7 +327,7 @@
   <header>
     <div class="brand">
       <h1>CellaLab</h1>
-      <LangSwitch />
+      <SettingsMenu />
     </div>
     <input
       class="name"
@@ -359,17 +361,16 @@
       </label>
     </div>
     <div class="row">
-      <label>{t('side.gap')}<input type="number" min="0" max="20" step="0.1" bind:value={ui.gapMm} /></label>
+      <label>{t('side.gap')}<UnitInput kind="len" min={0} max={20} step={0.1} value={ui.gapMm} onchange={(v) => (ui.gapMm = v ?? 0)} /></label>
       <label title={t('side.pitchTitle')}>{t('side.pitch')}
-        <input
-          type="number"
+        <UnitInput
+          kind="len"
           min={dia}
           max={dia + 20}
-          step="0.1"
+          step={0.1}
           value={Math.round((dia + ui.gapMm) * 100) / 100}
-          onchange={(e) => {
-            const v = e.currentTarget.valueAsNumber;
-            if (Number.isFinite(v)) ui.gapMm = Math.max(0, Math.round((v - dia) * 100) / 100);
+          onchange={(v) => {
+            if (v !== null) ui.gapMm = Math.max(0, Math.round((v - dia) * 100) / 100);
           }}
         />
       </label>
@@ -448,8 +449,8 @@
           </select>
         </label>
         <div class="row">
-          <label>{t('side.draft.diameter')}<input type="number" step="0.1" bind:value={draft.diameterMm} /></label>
-          <label>{t('side.draft.height')}<input type="number" step="0.1" bind:value={draft.heightMm} /></label>
+          <label>{t('side.draft.diameter')}<UnitInput kind="len" step={0.1} value={draft.diameterMm} onchange={(v) => { if (draft && v !== null) draft.diameterMm = v; }} /></label>
+          <label>{t('side.draft.height')}<UnitInput kind="len" step={0.1} value={draft.heightMm} onchange={(v) => { if (draft && v !== null) draft.heightMm = v; }} /></label>
         </div>
         <div class="row">
           <label>V min<input type="number" step="0.05" bind:value={draft.minV} /></label>
@@ -461,8 +462,8 @@
           <label>{t('side.draft.discharge')}<input type="number" step="0.5" bind:value={draft.maxDischargeA} /></label>
         </div>
         <div class="row">
-          <label>{t('side.draft.weight')}<input type="number" step="0.5" bind:value={draft.weightG} /></label>
-          <label>{t('side.draft.price')}<input type="number" step="0.01" min="0" placeholder={t('side.draft.optional')} bind:value={draft.priceEur} /></label>
+          <label>{t('side.draft.weight')}<UnitInput kind="mass" step={0.5} value={draft.weightG} onchange={(v) => { if (draft && v !== null) draft.weightG = v; }} /></label>
+          <label>{t('side.draft.price')}<UnitInput kind="money" step={0.01} min={0} nullable placeholder={t('side.draft.optional')} value={draft.priceEur} onchange={(v) => { if (draft) draft.priceEur = v ?? undefined; }} /></label>
         </div>
         {#if draftErrors.length > 0}
           <ul class="errs">{#each draftErrors as err (err)}<li>{err}</li>{/each}</ul>

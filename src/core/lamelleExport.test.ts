@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { generateGrid } from './layout';
 import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS } from './lamelle';
 import { buildCutListCsv, buildCutSummary, buildSvg } from './lamelleExport';
+import { resetPrefsForTests, setPrefs } from '../prefs';
 import { replaceCells } from './ops';
 import { createProject } from './project';
 import { buildStrips } from './strips';
@@ -42,5 +43,45 @@ describe('esportazione lamelle', () => {
     const csv = buildCutListCsv(strips, rep).trim().split('\n');
     expect(csv.length).toBe(strips.length + 1);
     expect(buildCutSummary(rep, 'Prova')).toContain('Prova');
+  });
+});
+
+describe('esportazioni in pollici', () => {
+  const p = pack();
+  const strips = buildStrips(p);
+  afterEach(() => resetPrefsForTests());
+
+  it('SVG: dimensione dichiarata in pollici, disegno uguale, barra di scala da 2 in', () => {
+    const mm = buildSvg(strips, { face: 'top', kerfMm: 0, includeContacts: false });
+    setPrefs({ length: 'in' });
+    const inch = buildSvg(strips, { face: 'top', kerfMm: 0, includeContacts: false });
+    const w = (svg: string, unit: string) => Number(svg.match(new RegExp(`width="([\\d.]+)${unit}"`))![1]);
+    expect(w(inch, 'in')).toBeCloseTo(w(mm, 'mm') / 25.4, 2);
+    // lo stesso viewBox: la forma non cambia, solo l'unità dichiarata
+    expect(inch.match(/viewBox="[^"]*"/)![0]).toBe(mm.match(/viewBox="[^"]*"/)![0]);
+    expect(inch).toContain('2 in');
+    expect(inch).not.toContain('50 mm');
+  });
+
+  it('CSV: intestazione e valori nell\'unità scelta', () => {
+    const rep = analyzeLamelle(p, strips, DEFAULT_LAMELLA_SETTINGS, 10);
+    const mm = buildCutListCsv(strips, rep).trim().split('\n');
+    setPrefs({ length: 'in' });
+    const inch = buildCutListCsv(strips, rep).trim().split('\n');
+    expect(mm[0]).toContain('area_mm2;neck_mm'.replace('neck_mm', 'collo_mm'));
+    expect(inch[0]).toContain('area_in2;collo_in');
+    const col = (line: string, i: number) => Number(line.split(';')[i]);
+    // collo_mm è la colonna 4: il valore in pollici è quello in mm diviso 25,4
+    expect(col(inch[1]!, 4)).toBeCloseTo(col(mm[1]!, 4) / 25.4, 2);
+  });
+
+  it('riepilogo: spessore, area e peso nelle unità scelte', () => {
+    const rep = analyzeLamelle(p, strips, DEFAULT_LAMELLA_SETTINGS, 10);
+    setPrefs({ length: 'in', weight: 'imperial' });
+    const text = buildCutSummary(rep, 'Prova');
+    expect(text).toMatch(/Spessore: [\d,]+ in x/);
+    expect(text).toMatch(/area [\d,]+ in²/);
+    expect(text).toMatch(/[\d,]+ oz/);
+    expect(text).not.toMatch(/\bmm\b|cm2| g\b/);
   });
 });

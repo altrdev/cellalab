@@ -2,6 +2,7 @@
   import { t } from '../i18n';
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
+  import UnitInput from './UnitInput.svelte';
   import { history } from '../state';
   import { exportCutList, exportDxf, exportStl, exportSvg, exportToleranceTest } from './exports';
   import { DEFAULT_TEST_CLEARANCES_MM } from '../core/holder';
@@ -76,7 +77,7 @@
       <span class="lbl">{t('exp.testTitle')}</span>
       <div class="gaps">
         {#each testClearances as _, i (i)}
-          <input type="number" min="0" max="1" step="0.05" bind:value={testClearances[i]} aria-label={t('exp.pocketClearance', { n: i + 1 })} />
+<UnitInput kind="len" min={0} max={1} step={0.05} value={testClearances[i]} label={t('exp.pocketClearance', { n: i + 1 })} onchange={(v) => { if (v !== null) testClearances[i] = v; }} />
         {/each}
       </div>
       <div class="exp">
@@ -176,7 +177,7 @@
     gap: 6px;
     align-items: center;
   }
-  .gaps input {
+  .gaps :global(input) {
     flex: 1;
     min-width: 0;
   }

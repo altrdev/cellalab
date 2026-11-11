@@ -1,10 +1,13 @@
 <script lang="ts">
   import { t } from '../i18n';
+  import { len } from '../units';
   import { history } from '../state';
   import { deleteSelected, fitView, flipSelected, toggleAddTool, toggleSeriesTool } from './actions';
   import Icon from './Icon.svelte';
   import { ui } from './ui.svelte';
 
+  /** Passi di aggancio in mm: 0,5 / 1 / 5 mm, oppure 0,01 / 0,05 / 0,25 in con i pollici. */
+  const snapSteps = ui.prefs.length === 'in' ? [0.254, 1.27, 6.35] : [0.5, 1, 5];
   let menuOpen = $state(false);
   const hasSelection = $derived(ui.selected.size > 0);
 </script>
@@ -54,9 +57,7 @@
             >
               <option value="slot">{t('toolbar.snapSlot')}</option>
               <option value="0">{t('toolbar.snapFree')}</option>
-              <option value="0.5">{t('toolbar.snapHalf')}</option>
-              <option value="1">1 mm</option>
-              <option value="5">5 mm</option>
+              {#each snapSteps as v (v)}<option value={String(v)}>{len(v, Number.isInteger(v) ? 0 : 1)}</option>{/each}
             </select>
           </label>
           <p class="hint"><kbd>{t('toolbar.kbdWheel')}</kbd> {t('toolbar.kbdZoom')} · <kbd>{t('toolbar.kbdSpace')}</kbd>{t('toolbar.kbdPan')} · <kbd>{t('toolbar.kbdShift')}</kbd> {t('toolbar.kbdAdd')}</p>

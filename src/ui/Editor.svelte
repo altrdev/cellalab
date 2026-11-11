@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n';
+  import { len } from '../units';
   import { onMount } from 'svelte';
   import { findCellType } from '../core/catalog';
   import { cellsInRect, normalizeRect, snapTo, type Rect } from '../core/geometry';
@@ -401,14 +402,14 @@
         <line x1={bounds.minX} x2={bounds.maxX} y1={bounds.minY - off} y2={bounds.minY - off} />
         <line x1={bounds.minX} x2={bounds.minX} y1={bounds.minY - 2 * k} y2={bounds.minY - off - tick} />
         <line x1={bounds.maxX} x2={bounds.maxX} y1={bounds.minY - 2 * k} y2={bounds.minY - off - tick} />
-        <text x={(bounds.minX + bounds.maxX) / 2} y={bounds.minY - off - 8 * k}>{w.toFixed(1)} mm</text>
+        <text x={(bounds.minX + bounds.maxX) / 2} y={bounds.minY - off - 8 * k}>{len(w, 1)}</text>
         <!-- profondità -->
         <line x1={bounds.minX - off} x2={bounds.minX - off} y1={bounds.minY} y2={bounds.maxY} />
         <line x1={bounds.minX - 2 * k} x2={bounds.minX - off - tick} y1={bounds.minY} y2={bounds.minY} />
         <line x1={bounds.minX - 2 * k} x2={bounds.minX - off - tick} y1={bounds.maxY} y2={bounds.maxY} />
-        <text transform="translate({bounds.minX - off - 8 * k} {(bounds.minY + bounds.maxY) / 2}) rotate(-90)">{d.toFixed(1)} mm</text>
+        <text transform="translate({bounds.minX - off - 8 * k} {(bounds.minY + bounds.maxY) / 2}) rotate(-90)">{len(d, 1)}</text>
         <!-- altezza (asse verticale delle celle, non visibile da sopra) -->
-        <text class="h" x={bounds.maxX} y={bounds.maxY + 14 * k}>{t(bounds.withHolder ? 'editor.heightPack' : 'editor.heightCells', { height: bounds.heightMm.toFixed(1) })}</text>
+        <text class="h" x={bounds.maxX} y={bounds.maxY + 14 * k}>{t(bounds.withHolder ? 'editor.heightPack' : 'editor.heightCells', { height: len(bounds.heightMm, 1) })}</text>
       </g>
     {/if}
 

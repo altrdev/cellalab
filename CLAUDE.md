@@ -28,6 +28,7 @@ Before finishing a change: tests and `npm run check` must pass; for UI work look
 ## Architecture
 
 - `src/core`: pure logic, no DOM, fully unit-tested: model (`types.ts`, `project.ts`, `ops.ts`, `history.ts`), lattice/layout (`lattice.ts`, `layout.ts`), calculations (`stats.ts`, `sizing.ts`), checks (`drc.ts`), busbars (`strips.ts`, `lamelle.ts`, `lamelleExport.ts`, `dxf.ts`), holder (`holder.ts`), geometry helpers (`clip.ts`, `polygon.ts`, `geometry.ts`), catalog (`catalog.ts`, `celltype.ts`, `materials.ts`, `profiles.ts`), `stl.ts`.
+- `src/prefs.ts` + `src/units.ts`: display preferences (length mm/in, temperature °C/°F, weight g·kg / oz·lb, currency with a manual rate from euros) and the conversions/formatters (`len`, `lenNum`, `tempDelta`, `massSmall`, `money`, …). The project data stays in mm, °C, g and euros.
 - `src/i18n`: `it.ts` (source language, defines the keys) and `en.ts` (typed on the Italian keys), `t()` / `tn()` / `fmtNum()` in `index.ts`.
 - `src/ui`: Svelte components and UI state. `ui.svelte.ts` is the shared UI state (selection, tool, view mode, settings); the project itself lives in the undo/redo store `history` (`src/state.ts`). `Editor.svelte` (2D SVG), `Preview3D.svelte` + `scene3d.ts` (three.js, lazy-loaded), `Sidebar.svelte` with tabs Pacco / Lamelle / Portacelle / Esporta, `PackBar.svelte` (data strip), `Toolbar.svelte`.
 - Keep logic in `core`; the UI only wires state and rendering.
@@ -62,3 +63,10 @@ The holder STL has never been tested in a real slicer; the 3D view was only test
 - `t()` also works in `core` (messages, checks, export text): the language is a module variable, `'it'` outside the browser, so unit tests run in Italian. Data tables (materials, welders, cutters, catalogue names, cooling) expose `name` / `note` as getters that call `t()`.
 - Language: saved choice (`localStorage` `cellalab:lang`), else the browser language (`it*` → Italian, anything else → English). The IT/EN switch is next to the title; `App.svelte` re-mounts the UI on change (`{#key ui.locale}`), so caches keyed on settings need no language in the key.
 - Do not name a variable `t` in a file that uses `t()` (it shadows the function).
+
+## Units and currency
+
+- Preferences live in the settings popup (gear next to the title): language, length, temperature, weight, currency + rate. They change only how values are shown and typed; saving, calculations and the STL are always mm / °C / g / euro.
+- Dictionary texts have **no fixed units**: callers pass values already formatted with their unit (`len(mm)`, `tempDelta(k)`, `massSmall(g)`, `money(eur)`, `area(cm2)`). Only field labels keep a metric token, `(mm)` `(°C)` `(g)` `(€/…)`, which `t()` swaps for the chosen unit. A test fails if a text hard-codes `mm`, `°C`, `K`, `cm²`, `kg` or `€` (a few exceptions are listed there).
+- Number fields in a non-metric unit use `UnitInput.svelte` (props in internal units); the 2D editor, messages, cut list, summary and exports follow the preferences. DXF is written in the chosen unit with `$INSUNITS`; the SVG template declares its size in that unit; the STL stays in mm (the format has no units).
+- `App.svelte` re-mounts the UI when language or preferences change (`ui.viewKey`); caches of text-bearing results key on `renderKey()`.
