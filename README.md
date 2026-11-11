@@ -40,15 +40,23 @@ npm run build    # production build in dist/
 
 A hobby project under development.
 
-- The holder STL has **not yet been tested with a real slicer**: always check the preview in your slicer before printing.
-- Thermal sizing of the busbars is a steady-state estimate: it ignores heat flow into the cells and spot-weld resistance.
+- The holder STL opens and slices cleanly in Bambu Studio, but no holder has been **printed yet**: always check the preview in your slicer before printing. Large plates split into glued pieces have not been tried on a real print.
+- Thermal sizing of the busbars is a steady-state estimate (fin model, ends held at a set temperature rise on the cells): it ignores spot-weld and contact resistance and has not been checked against a real pack.
+- DXF in inches and the inch SVG template have never been opened in a real CAD or laser program.
 - Busbars are single-layer with one thickness.
 - Cell prices and currents are indicative (from nkon.nl, November 2026) and must be checked against the datasheet.
 - The 3D view has been tested with software rendering, not on a real GPU.
 
 ## Safety
 
-A lithium cell pack can catch fire or explode if badly designed or built. CellaLab is a design aid, **not a certification**: its results are estimates. Use a suitable BMS, fuses and protection, know the limits of your cells, and build at your own risk.
+A lithium cell pack can catch fire or explode if badly designed or built. CellaLab is a design aid, **not a certification**: its results are estimates, provided as is, with no warranty (see the [licence](LICENSE)). You are responsible for what you build.
+
+- Check every value against the **datasheet** of your cells, BMS and welder; prices and currents in the catalogue are only indicative.
+- Use a BMS suited to the cells and the current, fuses or other overcurrent protection, and proper cell-level protection where needed.
+- Do not trust the busbar and spot-weld sizing alone: test a real pack under load, watching temperatures, before relying on it.
+- Never mix cells of different type, age or charge state; keep the pack away from heat and flammable material while charging and testing.
+- Handle bare cells with care: a short circuit with a tool or a loose strip can cause burns or fire. Work with insulated tools and cover exposed terminals.
+- If you are not sure, ask someone experienced before building.
 
 ## Structure
 

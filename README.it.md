@@ -40,15 +40,23 @@ npm run build    # versione di produzione in dist/
 
 Progetto hobby in sviluppo.
 
-- L'STL del portacelle **non è ancora stato provato con uno slicer reale**: controlla sempre l'anteprima nello slicer prima di stampare.
-- Il dimensionamento termico delle lamelle è una stima a regime stazionario: ignora il calore verso le celle e la resistenza dei punti di saldatura.
+- L'STL del portacelle si apre e viene affettato senza errori in Bambu Studio, ma nessun portacelle è stato ancora **stampato**: controlla sempre l'anteprima nello slicer prima di stampare. Le piastre grandi divise in pezzi incollati non sono state provate su una stampa reale.
+- Il dimensionamento termico delle lamelle è una stima a regime stazionario (modello ad aletta, estremi alla temperatura di salita fissata sulle celle): ignora la resistenza dei punti di saldatura e dei contatti e non è stato confrontato con un pacco reale.
+- Il DXF in pollici e il modello SVG in pollici non sono mai stati aperti in un vero programma CAD o laser.
 - Le lamelle sono a un solo livello e di spessore unico.
 - Prezzi e correnti delle celle sono indicativi (da nkon.nl, novembre 2026) e vanno verificati sulla scheda tecnica.
 - Il 3D è stato provato con rendering software, non su GPU reale.
 
 ## Sicurezza
 
-Un pacco di celle al litio può incendiarsi o esplodere se progettato o costruito male. CellaLab è un aiuto al progetto, **non una certificazione**: i risultati sono stime. Usa un BMS adatto, fusibili e protezioni, conosci i limiti delle tue celle e costruisci sotto la tua responsabilità.
+Un pacco di celle al litio può incendiarsi o esplodere se progettato o costruito male. CellaLab è un aiuto al progetto, **non una certificazione**: i risultati sono stime, fornite così come sono e senza garanzie (vedi la [licenza](LICENSE)). Sei tu il responsabile di ciò che costruisci.
+
+- Verifica ogni valore sulla **scheda tecnica** di celle, BMS e saldatrice; prezzi e correnti del catalogo sono solo indicativi.
+- Usa un BMS adatto alle celle e alla corrente, fusibili o altre protezioni da sovracorrente e, dove serve, protezioni a livello di cella.
+- Non fidarti solo del dimensionamento di lamelle e punti di saldatura: prova un pacco reale sotto carico, controllando le temperature, prima di usarlo.
+- Non mescolare mai celle di tipo, età o stato di carica diversi; tieni il pacco lontano da fonti di calore e materiali infiammabili durante carica e prove.
+- Maneggia le celle nude con cura: un cortocircuito con un utensile o una lamella libera può causare ustioni o incendio. Usa utensili isolati e copri i terminali scoperti.
+- Se hai dubbi, chiedi a una persona esperta prima di costruire.
 
 ## Struttura
 
