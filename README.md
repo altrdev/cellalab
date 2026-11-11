@@ -12,7 +12,7 @@ English · [🇮🇹 Italiano](README.it.md)
 - **Checks:** overlapping cells, minimum spacing for the holder, unbalanced groups, polarity, limit above what the cells can handle.
 - **3D preview** (three.js): drawing and 3D side by side, exploded view, isometric/top/front/side views.
 - **Busbar strips:** generated from the pack topology and sized on material, thickness and current (nickel, copper, etc.), with suggested weld spots. Export a **DXF** for laser/CNC (with kerf compensation), a 1:1 **SVG** template and a cut list.
-- **3D-printable holder:** two custom plates with cell pockets, a floor that retains the cells, fillets and a smooth sloped chamfer. Export an **STL** in print orientation.
+- **3D-printable holder:** two custom plates with cell pockets, a floor that retains the cells, fillets and a smooth sloped chamfer. Export an **STL** in print orientation. Plates bigger than your print bed are split into pieces to glue (cuts run through the wall between cells), with one STL per piece and a ZIP of all of them.
 - **Project:** automatic saving in the browser; save and open `.cellalab.json` files (they include the busbar and holder settings).
 
 The interface is available in English and Italian (it follows the browser language) and can show lengths in mm or inches, temperatures in °C or °F, weights in g/kg or oz/lb and prices in €, $ or £: open the settings with the gear next to the title. Files for cutting follow the length unit (DXF, SVG template); the STL is always in mm.

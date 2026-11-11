@@ -4,7 +4,7 @@
   import Icon from './Icon.svelte';
   import UnitInput from './UnitInput.svelte';
   import { history } from '../state';
-  import { exportCutList, exportDxf, exportStl, exportSvg, exportToleranceTest } from './exports';
+  import { exportCutList, exportDxf, exportHolderPiece, exportHolderZip, exportStl, exportSvg, exportToleranceTest } from './exports';
   import { DEFAULT_TEST_CLEARANCES_MM } from '../core/holder';
   import { holderOf } from './holder';
   import { reportOf } from './lamelle';
@@ -17,6 +17,8 @@
 
   const stripStatus = $derived(empty ? 'empty' : reportOf(project, ui.lamella).status);
   const holderReport = $derived(holderOf(project, ui.holder).report);
+  /** Piastra troppo grande per il piano: pezzi da stampare e incollare. */
+  const split = $derived(holderOf(project, ui.holder).split);
   const holderStatus = $derived(
     !holderReport ? 'empty' : holderReport.issues.some((i) => i.level === 'error') ? 'error' : holderReport.issues.some((i) => i.level === 'warning') ? 'warning' : 'ok',
   );
@@ -65,10 +67,25 @@
   <section class="sec">
     <h3><Icon name="box" /> {t('exp.holder')} <span class="pill {holderStatus}">{holderStatus === 'ok' ? t('exp.badge.ok') : holderStatus === 'warning' ? t('exp.badge.warning') : holderStatus === 'error' ? t('exp.badge.error') : ''}</span></h3>
     <p class="status {holderStatus}">{text[holderStatus]}</p>
-    <div class="exp">
-      <button disabled={holderStatus === 'empty'} onclick={() => exportStl(project, 'top')} title={t('exp.stlTopTitle')}>{t('exp.stlTop')}</button>
-      <button disabled={holderStatus === 'empty'} onclick={() => exportStl(project, 'bottom')} title={t('exp.stlBottomTitle')}>{t('exp.stlBottom')}</button>
-    </div>
+    {#if split}
+      <p class="note">{t('exp.splitInfo', { n: split.pieces.length })}</p>
+      <div class="pieces">
+        {#each split.pieces as piece (piece.id)}
+          <div class="piece">
+            <b>{piece.id}</b>
+            <button onclick={() => exportHolderPiece(project, piece.id, 'top')} title={t('exp.pieceTopTitle', { id: piece.id })}>{t('exp.pieceTop')}</button>
+            <button onclick={() => exportHolderPiece(project, piece.id, 'bottom')} title={t('exp.pieceBottomTitle', { id: piece.id })}>{t('exp.pieceBottom')}</button>
+          </div>
+        {/each}
+      </div>
+      <div class="exp"><button onclick={() => exportHolderZip(project)}>{t('exp.zipAll')}</button></div>
+      <Help label={t('exp.glueLabel')}>{t('exp.glueHelp')}</Help>
+    {:else}
+      <div class="exp">
+        <button disabled={holderStatus === 'empty'} onclick={() => exportStl(project, 'top')} title={t('exp.stlTopTitle')}>{t('exp.stlTop')}</button>
+        <button disabled={holderStatus === 'empty'} onclick={() => exportStl(project, 'bottom')} title={t('exp.stlBottomTitle')}>{t('exp.stlBottom')}</button>
+      </div>
+    {/if}
     <Help label={t('exp.printLabel')}>{t('exp.printHelp')}</Help>
     {#if holderStatus === 'warning' || holderStatus === 'error'}
       <button type="button" class="goto" onclick={() => (ui.sideTab = 'holder')}>{t('exp.gotoHolder')}</button>
@@ -151,6 +168,24 @@
     font-size: 0.74rem;
     line-height: 1.35;
     color: var(--muted);
+  }
+  .pieces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .piece {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 0.8rem;
+  }
+  .piece button {
+    padding: 2px 8px;
+    font-size: 0.76rem;
   }
   .exp {
     display: flex;

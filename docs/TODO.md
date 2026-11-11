@@ -6,11 +6,12 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 
 - [x] Holder STL opened in Bambu Studio (tolerance piece and a real holder): no open edges, slices fine. Still to do: actually print one, and try PrusaSlicer / Cura if convenient.
 - [ ] Check the 3D view on a real GPU.
+- [ ] DXF in inches (`$INSUNITS`) and the inch SVG template: written but never opened in a real CAD / laser program; ask someone who works in inches to check the scale.
 
 ## Holder (phase 4 follow-ups)
 
 - [x] Tolerance test piece (Esporta tab, `buildToleranceTest`): low plate with pockets at 0.1 / 0.2 / 0.3 mm (editable). Clearance engraved under each pocket in 1/100 mm (7-segment digits, `core/engrave.ts`). Not yet printed: check that the 5 mm / 0.8 mm digits are legible.
-- [ ] Split big plates into pieces with joints when they exceed the print bed (today only a warning above 220×220 mm). The owner said "wait" on this one: ask before starting.
+- [x] Split big plates into pieces (`core/holderSplit.ts`): cuts follow the power-diagram boundary between cells (never through a pocket), flat faces to glue, one STL per piece + ZIP, dashed seams and labels in the 2D view. Open: alignment pins / dovetails, staggering the top and bottom seams, showing the pieces in the 3D view, checking the glue seams on a real print.
 - [ ] Cooling and cable windows in the walls.
 - [ ] Modular holder: one tile per cell with interlocks (lattice layouts only).
 - [ ] Optional: 3MF export (STEP was rejected).

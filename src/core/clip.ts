@@ -153,6 +153,29 @@ export function differenceRegions(subject: Region | readonly Region[], cuts: rea
   return splitAll(out);
 }
 
+/** Parte di `subject` che sta dentro ai poligoni `clips` (la loro unione). Può dare più forme. */
+export function intersectRegions(subject: Region | readonly Region[], clips: readonly (readonly Pt[])[]): Region[] {
+  const c = new Clipper();
+  for (const r of Array.isArray(subject) ? (subject as readonly Region[]) : [subject as Region]) c.AddPaths(toPaths(r), PolyType.ptSubject, true);
+  let any = false;
+  for (const poly of clips) {
+    if (poly.length >= 3) {
+      c.AddPaths([oriented(toPath(poly), true)], PolyType.ptClip, true);
+      any = true;
+    }
+  }
+  if (!any) return [];
+  const out = new ClipperLib.Paths();
+  c.Execute(ClipType.ctIntersection, out, PolyFillType.pftNonZero, PolyFillType.pftNonZero);
+  return splitAll(out);
+}
+
+/** Vero se il punto sta nel materiale di una delle forme (dentro al contorno e fuori dai buchi). */
+export function pointInRegions(p: Pt, regions: readonly Region[]): boolean {
+  const q = { X: Math.round(p.x * S), Y: Math.round(p.y * S) };
+  return regions.some((r) => Clipper.PointInPolygon(q, toPath(r.outline)) !== 0 && !r.holes.some((h) => Clipper.PointInPolygon(q, toPath(h)) !== 0));
+}
+
 /** Unione di poligoni che può dare più forme separate (gruppi di celle lontani tra loro). */
 export function unionAll(polys: readonly (readonly Pt[])[]): Region[] {
   const c = new Clipper();

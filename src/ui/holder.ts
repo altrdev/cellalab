@@ -3,19 +3,22 @@ import type { Region } from '../core/clip';
 import { findCellType } from '../core/catalog';
 import { boundsOfCells, type Rect } from '../core/geometry';
 import { analyzeHolder, buildHolder, DEFAULT_HOLDER_SETTINGS, type HolderModel, type HolderReport, type HolderSettings } from '../core/holder';
+import { splitHolder, type HolderSplit } from '../core/holderSplit';
 import type { Pt } from '../core/polygon';
 import type { Project } from '../core/types';
 
 /** Portacelle condiviso da editor, 3D e pannello, con una piccola cache. */
 
-let last: { project: Project; key: string; model: HolderModel | null; report: HolderReport | null } | null = null;
+let last: { project: Project; key: string; model: HolderModel | null; report: HolderReport | null; split: HolderSplit | null } | null = null;
 
-export function holderOf(project: Project, settings: HolderSettings): { model: HolderModel | null; report: HolderReport | null } {
+/** `split` c'è solo se la piastra è più grande del piano di stampa e va divisa in pezzi da incollare. */
+export function holderOf(project: Project, settings: HolderSettings): { model: HolderModel | null; report: HolderReport | null; split: HolderSplit | null } {
   const key = renderKey() + JSON.stringify(settings); // i messaggi del rapporto dipendono da lingua e unità
   if (last && last.project === project && last.key === key) return last;
   const model = buildHolder(project, settings, true);
-  const report = model ? analyzeHolder(project, model) : null;
-  last = { project, key, model, report };
+  const split = model ? splitHolder(project, settings) : null;
+  const report = model ? analyzeHolder(project, model, split) : null;
+  last = { project, key, model, report, split };
   return last;
 }
 
@@ -44,6 +47,10 @@ export function packExtent(project: Project, settings: HolderSettings, withHolde
 
 const ring = (pts: readonly Pt[]) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ') + ' Z';
 /** Percorso SVG di un insieme di forme (da disegnare con fill-rule evenodd). */
+/** Segmenti delle linee di taglio come tracciato SVG. */
+export const seamsPath = (seams: readonly (readonly [Pt, Pt])[]) =>
+  seams.map(([a, b]) => `M${a.x.toFixed(2)} ${a.y.toFixed(2)}L${b.x.toFixed(2)} ${b.y.toFixed(2)}`).join(' ');
+
 export const regionsPath = (regions: readonly Region[]) => regions.flatMap((r) => [r.outline, ...r.holes]).map(ring).join(' ');
 
 // ---- Impostazioni del portacelle: ricordate nel browser e scritte anche nel file del progetto

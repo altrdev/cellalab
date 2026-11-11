@@ -4,6 +4,7 @@ import { convexHull } from './polygon';
 import { circlePolygon, closeRegions, differenceRegions, offsetRegions, regionArea, unionAll, type Region } from './clip';
 import type { Rect } from './geometry';
 import type { Pt } from './polygon';
+import type { HolderSplit } from './holderSplit';
 import type { Project } from './types';
 import { t } from '../i18n';
 import { len, lenLabel, lenNum, temp } from '../units';
@@ -116,6 +117,8 @@ export interface HolderReport {
   minWallBetweenMm: number | null;
   /** Volume di plastica di una piastra, mm³. */
   volumeMm3: number;
+  /** Pezzi in cui si divide ogni piastra (1 se entra nel piano). */
+  pieces: number;
   issues: HolderIssue[];
 }
 
@@ -310,7 +313,11 @@ function rampVolume(model: HolderModel): number {
   return model.ramp.contours.reduce((v, c) => v + Math.abs(area(c.a) - area(c.b)), 0) * model.chamferMm;
 }
 
-export function analyzeHolder(project: Project, model: HolderModel): HolderReport {
+/** Entra nel piano di stampa, anche ruotando di 90°. */
+export const fitsBed = (w: number, d: number, s: Pick<HolderSettings, 'bedXMm' | 'bedYMm'>) =>
+  (w <= s.bedXMm && d <= s.bedYMm) || (w <= s.bedYMm && d <= s.bedXMm);
+
+export function analyzeHolder(project: Project, model: HolderModel, split: HolderSplit | null = null): HolderReport {
   const s = model.settings;
   const widthMm = model.bounds.maxX - model.bounds.minX;
   const depthMm = model.bounds.maxY - model.bounds.minY;
@@ -345,12 +352,15 @@ export function analyzeHolder(project: Project, model: HolderModel): HolderRepor
     }
   }
 
-  const fitsBed = (w: number, d: number) => (w <= s.bedXMm && d <= s.bedYMm) || (w <= s.bedYMm && d <= s.bedXMm);
-  if (!fitsBed(widthMm, depthMm)) {
-    issues.push({
-      level: 'warning',
-      text: t('holder.issue.bed', { w: lenNum(widthMm, 0), d: lenNum(depthMm, 0), bx: lenNum(s.bedXMm, 0), by: lenNum(s.bedYMm, 0), u: lenLabel() }),
-    });
+  const bedArgs = { w: lenNum(widthMm, 0), d: lenNum(depthMm, 0), bx: lenNum(s.bedXMm, 0), by: lenNum(s.bedYMm, 0), u: lenLabel() };
+  if (split) {
+    // troppo grande per il piano: divisa in pezzi (e, se qualcuno non entra nemmeno così, avviso)
+    issues.push({ level: 'info', text: t('holder.issue.split', { ...bedArgs, n: split.pieces.length, ids: split.pieces.map((p) => p.id).join(', ') }) });
+    if (!split.allFit) {
+      issues.push({ level: 'warning', text: t('holder.issue.pieceBed', { ids: split.pieces.filter((p) => !p.fits).map((p) => p.id).join(', ') }) });
+    }
+  } else if (!fitsBed(widthMm, depthMm, s)) {
+    issues.push({ level: 'warning', text: t('holder.issue.bed', bedArgs) });
   }
   if (model.lipMm < s.lipMm - 1e-9) {
     issues.push({ level: 'info', text: t('holder.issue.lip', { lip: len(model.lipMm, 1) }) });
@@ -372,6 +382,7 @@ export function analyzeHolder(project: Project, model: HolderModel): HolderRepor
     totalHeightMm: model.cellHeightMm + 2 * model.floorMm,
     minWallBetweenMm: minWall,
     volumeMm3: model.layers.reduce((v, l) => v + regionsArea(l.regions) * (l.z1 - l.z0), 0) + rampVolume(model),
+    pieces: split?.pieces.length ?? 1,
     issues,
   };
 }

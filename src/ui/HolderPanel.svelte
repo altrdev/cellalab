@@ -53,7 +53,7 @@
   {:else}
     <div class="result {status}">
       <div class="rhead"><Icon name="box" size={15} /> {t('hold.title')} <span class="badge {status}">{status === 'ok' ? t('hold.badge.ok') : status === 'warning' ? t('hold.badge.warning') : t('hold.badge.error')}</span></div>
-      <div class="big">{t('hold.plates', { w: lenNum(report.widthMm, 0), d: lenNum(report.depthMm, 0), u: lenLabel() })}</div>
+      <div class="big">{t(report.pieces > 1 ? 'hold.platesSplit' : 'hold.plates', { w: lenNum(report.widthMm, 0), d: lenNum(report.depthMm, 0), u: lenLabel(), n: report.pieces })}</div>
       <div class="small">
         {t('hold.summary', { h: len(report.totalHeightMm, 1), g: massSmall(grams, 0) })}
       </div>

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildHolder, buildToleranceTest, DEFAULT_HOLDER_SETTINGS } from '../core/holder';
+import { splitHolder } from '../core/holderSplit';
 import { generateGrid } from '../core/layout';
 import { replaceCells } from '../core/ops';
 import { createProject } from '../core/project';
-import { holderHalfGeometries } from './holderMesh';
+import { holderHalfGeometries, holderStl } from './holderMesh';
 
 const project = (series = 2, parallel = 2) =>
   replaceCells(createProject(), generateGrid({ typeId: '21700-5000-10a', diameterMm: 21.4, series, parallel, kind: 'hex', gapMm: 1.5 }));
@@ -69,5 +70,54 @@ describe('pezzo test tolleranze', () => {
     const model = buildToleranceTest({ customCellTypes: [] }, '18650-3000-10a', clearances)!;
     expect(unbalancedEdges(model, 'bottom')).toBe(0);
     expect(unbalancedEdges(model, 'top')).toBe(0);
+  });
+});
+
+describe('pezzi di un portacelle diviso', () => {
+  const p = replaceCells(createProject(), generateGrid({ typeId: '21700-5000-10a', diameterMm: 21.4, series: 4, parallel: 3, kind: 'hex', gapMm: 1.5 }));
+  const settings = { ...DEFAULT_HOLDER_SETTINGS, bedXMm: 70, bedYMm: 70 };
+  const split = splitHolder(p, settings)!;
+
+  /** Dimensioni (x, y, z) di un STL binario. */
+  function dims(stl: Uint8Array) {
+    const v = new DataView(stl.buffer, stl.byteOffset, stl.byteLength);
+    const n = v.getUint32(80, true);
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < n; i++) {
+      for (let k = 0; k < 3; k++) {
+        for (let a = 0; a < 3; a++) {
+          const x = v.getFloat32(84 + i * 50 + 12 + k * 12 + a * 4, true);
+          min[a] = Math.min(min[a]!, x);
+          max[a] = Math.max(max[a]!, x);
+        }
+      }
+    }
+    return { size: max.map((m, a) => m - min[a]!), min, triangles: n };
+  }
+
+  it('l\'STL di un pezzo ha le misure del pezzo, a partire da (0, 0, 0)', () => {
+    for (const piece of split.pieces) {
+      for (const half of ['top', 'bottom'] as const) {
+        const d = dims(holderStl(piece.model, half));
+        expect(d.triangles).toBeGreaterThan(100);
+        expect(d.size[0]).toBeCloseTo(piece.widthMm, 1);
+        expect(d.size[1]).toBeCloseTo(piece.depthMm, 1);
+        expect(d.min[0]).toBeCloseTo(0, 3);
+        expect(d.min[1]).toBeCloseTo(0, 3);
+        expect(d.size[2]).toBeCloseTo(piece.model.totalMm, 1);
+      }
+    }
+  });
+
+  it('con rotate le dimensioni in x e y si scambiano', () => {
+    const piece = split.pieces[0]!;
+    const a = dims(holderStl(piece.model, 'bottom'));
+    const b = dims(holderStl(piece.model, 'bottom', true));
+    expect(b.size[0]).toBeCloseTo(a.size[1]!, 3);
+    expect(b.size[1]).toBeCloseTo(a.size[0]!, 3);
+    expect(b.size[2]).toBeCloseTo(a.size[2]!, 3);
+    expect(b.min[0]).toBeCloseTo(0, 3);
+    expect(b.min[1]).toBeCloseTo(0, 3);
   });
 });

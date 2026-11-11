@@ -135,9 +135,9 @@ export function holderHalfGeometries(model: HolderModel, half: HolderHalf): THRE
 
 /**
  * STL di una piastra, nella posizione di stampa: fondo piatto sul piano (Z = 0), pareti verso l'alto,
- * angolo minimo in (0, 0). Le due piastre sono una lo specchio dell'altra.
+ * angolo minimo in (0, 0). Le due piastre sono una lo specchio dell'altra; con `rotate` il pezzo è girato di 90° (per un piano più stretto).
  */
-export function holderStl(model: HolderModel, half: HolderHalf): Uint8Array {
+export function holderStl(model: HolderModel, half: HolderHalf, rotate = false): Uint8Array {
   const f = model.floorMm;
   const H = model.cellHeightMm;
   const geos = holderHalfGeometries(model, half);
@@ -153,6 +153,14 @@ export function holderStl(model: HolderModel, half: HolderHalf): Uint8Array {
       else out.push(X, Z, H + f - Y);
     }
     g.dispose();
+  }
+  // rotazione di 90° (x, y) → (y, −x): non specchia, i triangoli restano rivolti verso l'esterno
+  if (rotate) {
+    for (let i = 0; i < out.length; i += 3) {
+      const x = out[i]!;
+      out[i] = out[i + 1]!;
+      out[i + 1] = -x;
+    }
   }
   let minX = Infinity;
   let minY = Infinity;

@@ -5,6 +5,7 @@ import { buildCutListCsv, buildCutSummary, buildSvg } from '../core/lamelleExpor
 import type { Project } from '../core/types';
 import { buildToleranceTest } from '../core/holder';
 import { holderOf } from './holder';
+import { zipStore } from '../core/zip';
 import { holderStl, type HolderHalf } from './holderMesh';
 import { reportOf, stripsOf } from './lamelle';
 import { ui } from './ui.svelte';
@@ -79,4 +80,23 @@ export function exportToleranceTest(project: Project, clearancesMm: readonly num
   const model = buildToleranceTest(project, typeId, clearancesMm, ui.holder);
   if (!model) return;
   save(holderStl(model, 'bottom') as BlobPart, `${t('file.toleranceTest')}-${clearancesMm.map((c) => c.toFixed(2)).join('-')}.stl`, 'model/stl');
+}
+
+const stlName = (project: Project, id: string, half: HolderHalf) => `${slug(project.name)}-${t('file.holder')}-${id}-${faceName(half)}.stl`;
+
+/** STL di un pezzo del portacelle diviso (già girato se entra nel piano solo così). */
+export function exportHolderPiece(project: Project, pieceId: string, half: HolderHalf) {
+  const piece = holderOf(project, ui.holder).split?.pieces.find((p) => p.id === pieceId);
+  if (!piece) return;
+  save(holderStl(piece.model, half, piece.rotated) as BlobPart, stlName(project, piece.id, half), 'model/stl');
+}
+
+/** Tutti i pezzi, sopra e sotto, in un solo ZIP. */
+export function exportHolderZip(project: Project) {
+  const split = holderOf(project, ui.holder).split;
+  if (!split) return;
+  const entries = split.pieces.flatMap((piece) =>
+    (['top', 'bottom'] as const).map((half) => ({ name: stlName(project, piece.id, half), data: holderStl(piece.model, half, piece.rotated) })),
+  );
+  save(zipStore(entries) as BlobPart, `${slug(project.name)}-${t('file.holder')}.zip`, 'application/zip');
 }

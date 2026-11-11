@@ -8,7 +8,7 @@
   import { addCell, moveCells, paintGroup } from '../core/ops';
   import { drc, history } from '../state';
   import { groupColor } from './colors';
-  import { holderOf, packExtent, regionsPath } from './holder';
+  import { holderOf, packExtent, regionsPath, seamsPath } from './holder';
   import { pathOf, reportOf, spotMarks, stripsOf } from './lamelle';
   import { ui } from './ui.svelte';
 
@@ -25,6 +25,10 @@
   /** Lamelle della faccia visibile, con l'esito dell'analisi per evidenziare quelle con problemi. */
   const holderModel = $derived(
     ui.showHolder && (ui.face === 'top' ? ui.holderView.showTop : ui.holderView.showBottom) ? holderOf(project, ui.holder).model : null,
+  );
+  /** Piastra troppo grande per il piano: le linee di taglio e le sigle dei pezzi. */
+  const holderSplit = $derived(
+    ui.showHolder && (ui.face === 'top' ? ui.holderView.showTop : ui.holderView.showBottom) ? holderOf(project, ui.holder).split : null,
   );
   const strips = $derived(ui.showStrips ? stripsOf(project, ui.lamella).filter((s) => s.face === ui.face) : []);
   const stripReport = $derived(ui.showStrips ? reportOf(project, ui.lamella) : null);
@@ -336,6 +340,9 @@
     {#if ui.showHolder && holderModel}
       <path class="holder" style:--holder-fill={ui.holderView.color} d={regionsPath(holderModel.wall)} fill-rule="evenodd" pointer-events="none" />
     {/if}
+    {#if holderSplit}
+      <path class="seam" d={seamsPath(holderSplit.seams)} pointer-events="none" />
+    {/if}
 
     {#each project.cells as c (c.id)}
       {@const r = radii.get(c.typeId) ?? 9}
@@ -370,6 +377,14 @@
         {/if}
       </g>
     {/each}
+
+    {#if holderSplit}
+      <g class="pieces" pointer-events="none" font-size={12 * k} style:--halo="{3 * k}px">
+        {#each holderSplit.pieces as piece (piece.id)}
+          <text x={piece.model.bounds.minX} y={piece.model.bounds.minY - 4 * k}>{piece.id}</text>
+        {/each}
+      </g>
+    {/if}
 
     {#if ui.showStrips}
       <g class="strips" pointer-events="none" style:--strip-op={ui.stripOpacity} style:--halo="{2.5 * k}px" style:--strip-fill={stripReport?.material.colorHex ?? '#b0b6bd'}>
@@ -534,6 +549,21 @@
   .face-tag.bottom {
     border-color: var(--accent);
     color: var(--accent);
+  }
+  .seam {
+    fill: none;
+    stroke: var(--warn, #e8a33b);
+    stroke-width: 2px;
+    stroke-dasharray: 7 5;
+    vector-effect: non-scaling-stroke;
+  }
+  .pieces text {
+    fill: var(--warn, #e8a33b);
+    font-weight: 700;
+    paint-order: stroke;
+    stroke: var(--bg, #111);
+    stroke-width: var(--halo, 2px);
+    stroke-linejoin: round;
   }
   .holder {
     fill: var(--holder-fill, #353b41);
