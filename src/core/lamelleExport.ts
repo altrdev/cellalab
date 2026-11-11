@@ -56,6 +56,10 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
   out.push('<g fill="none" stroke-linejoin="round" font-family="sans-serif">');
   list.forEach((s, i) => {
     out.push(`<path d="${(rings[i] as Pt[][]).map(d).join(' ')}" fill-rule="evenodd" stroke="#d00" stroke-width="0.2"/>`);
+    if (s.tab) {
+      const [a, b] = s.tab.bend;
+      out.push(`<path d="M${r3(a.x)} ${r3(a.y)} L${r3(b.x)} ${r3(b.y)}" stroke="#06c" stroke-width="0.15" stroke-dasharray="1.5 0.8"/>`);
+    }
     if (o.includeContacts) {
       for (const n of s.nodes) {
         out.push(`<circle cx="${r3(n.x)}" cy="${r3(n.y)}" r="${r3(n.contactRadiusMm)}" stroke="#06c" stroke-width="0.15" stroke-dasharray="1 0.8"/>`);

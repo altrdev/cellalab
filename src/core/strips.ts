@@ -48,6 +48,8 @@ export interface StripTab {
   holeX: number;
   holeY: number;
   holeDiameterMm: number;
+  /** Linea di piega consigliata (al bordo della cella, prima del foro), da segnare e non da tagliare. */
+  bend: [Pt, Pt];
   /** Cosa intralcia la linguetta: un'altra lamella della stessa faccia o una cella; null = libera. */
   blockedBy: 'strip' | 'cell' | null;
 }
@@ -288,7 +290,10 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions): void {
     s.outline = region.outline;
     s.holes = holes;
     s.areaMm2 = regionArea({ outline: s.outline, holes });
-    s.tab = { side: o.side, rect, holeX: hc.x, holeY: hc.y, holeDiameterMm: hole >= 0.5 ? hole : 0, blockedBy: null };
+    const holeAlong = node.reachMm + lengthMm / 2;
+    const bendAlong = Math.max(node.reachMm, Math.min(node.cellRadiusMm + 0.5, holeAlong - Math.max(hole, 0) / 2 - 1));
+    const bend: [Pt, Pt] = [at(bendAlong, -w / 2), at(bendAlong, w / 2)];
+    s.tab = { side: o.side, rect, holeX: hc.x, holeY: hc.y, holeDiameterMm: hole >= 0.5 ? hole : 0, bend, blockedBy: null };
   }
   // Intralci: celle dell'altra parte e lamelle della stessa faccia (con le loro linguette).
   for (const s of strips) {

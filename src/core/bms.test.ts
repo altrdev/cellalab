@@ -5,6 +5,8 @@ import { generateGrid } from './layout';
 import { addCustomBms, removeCustomBms, replaceCells, setBms, setCurrentLimit } from './ops';
 import { createProject, parseProject, serializeProject } from './project';
 import { computeStats } from './stats';
+import { buildDxf } from './dxf';
+import { buildSvg } from './lamelleExport';
 import { buildStrips } from './strips';
 import type { Project } from './types';
 
@@ -136,5 +138,25 @@ describe('linguette di presa', () => {
     const p = withBms(pack(4, 2));
     const strips = buildStrips(p, { tabs: { ...tabs, side: 'left', lengthMm: 40 } });
     expect(strips.some((s) => s.tab?.blockedBy)).toBe(true);
+  });
+});
+
+describe('linea di piega della linguetta', () => {
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2 } as const;
+  const strips = buildStrips(setBms(pack(4, 2), 'bms-4s-30a-li-ion'), { tabs });
+
+  it('sta sulla linguetta, tra la cella e il foro', () => {
+    for (const s of strips.filter((x) => x.tab)) {
+      const [a, b] = s.tab!.bend;
+      expect(a.y).toBeCloseTo(b.y, 6);
+      expect(a.y).toBeGreaterThan(s.tab!.holeY); // y verso il basso: la piega è più vicina alla cella del foro
+      expect(Math.abs(a.x - b.x)).toBeCloseTo(6, 6);
+    }
+  });
+
+  it('finisce in SVG e DXF', () => {
+    expect(buildSvg(strips, { face: 'top', kerfMm: 0, includeContacts: false })).toContain('stroke-dasharray="1.5 0.8"');
+    const dxf = buildDxf(strips, { face: 'all', kerfMm: 0, includeContacts: false, includeLabels: false });
+    expect(dxf).toMatch(/\n0\r?\nLINE\r?\n/);
   });
 });

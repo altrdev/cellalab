@@ -10,7 +10,7 @@ import type { Face, Strip } from './strips';
  *
  * Layer:
  *  - CUT   contorno di taglio, compensato di metà kerf verso l'esterno;
- *  - MARK  aree di contatto delle celle (da usare come riferimento, non da tagliare);
+ *  - MARK  aree di contatto delle celle e linee di piega delle linguette (riferimenti, non da tagliare);
  *  - SPOTS punti di saldatura consigliati;
  *  - TEXT  etichette.
  */
@@ -181,6 +181,14 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
     w.pair(20, Y(y) * f);
     w.pair(40, r * f);
   };
+  const line = (layer: string, a: { x: number; y: number }, b: { x: number; y: number }) => {
+    w.pair(0, 'LINE');
+    w.pair(8, layer);
+    w.pair(10, a.x * f);
+    w.pair(20, Y(a.y) * f);
+    w.pair(11, b.x * f);
+    w.pair(21, Y(b.y) * f);
+  };
   const text = (x: number, y: number, height: number, value: string) => {
     w.pair(0, 'TEXT');
     w.pair(8, 'TEXT');
@@ -206,6 +214,7 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
       polyline('CUT', arcs.map((v) => ({ x: v.x, y: Y(v.y), bulge: v.bulge })));
     }
 
+    if (s.tab) line('MARK', s.tab.bend[0], s.tab.bend[1]);
     if (options.includeContacts) for (const n of s.nodes) circle('MARK', n.x, n.y, n.contactRadiusMm);
 
     const spots = options.spotsPerTerminal?.get(s.id);
