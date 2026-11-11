@@ -25,6 +25,8 @@ TypeScript 7 is not supported by svelte-check yet: stay on TypeScript 6. Do not 
 
 CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run check`, `npm test` and `npm run build` on every push to `main` and on pull requests.
 
+Branding lives in `public/` (`favicon.svg` is the source of the logo: three cells seen from above on the accent colour; PNG favicon, `apple-touch-icon.png` and the 1200×630 share card `og-image.png` were rendered from it). `index.html` has the share meta tags; the `og:url` / `og:image` URLs assume the Pages address `https://altrdev.github.io/cellalab/`, so update them if the site moves or gets a custom domain.
+
 Releases: bump `version` in `package.json` (shown small next to the title), commit, then `git tag vX.Y.Z && git push --tags`. `.github/workflows/release.yml` checks that the tag matches `package.json`, runs check/test/build, creates the GitHub release with the built app zipped, and deploys `dist/` to GitHub Pages (Pages source must be set to "GitHub Actions"). `vite.config.ts` uses `base: './'` so the app works under a sub-path.
 
 Before finishing a change: tests and `npm run check` must pass; for UI work look at it in a browser (Playwright is handy for screenshots).
