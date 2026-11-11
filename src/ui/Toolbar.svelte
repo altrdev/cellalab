@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n';
   import { history } from '../state';
   import { deleteSelected, fitView, flipSelected, toggleAddTool, toggleSeriesTool } from './actions';
   import Icon from './Icon.svelte';
@@ -12,38 +13,38 @@
 
 <div class="wrap">
   <div class="toolbar">
-    <span class="grp" role="group" aria-label="Cronologia">
-      <button class="t" onclick={() => history.undo()} disabled={!$history.canUndo} title="Annulla (Ctrl+Z)" aria-label="Annulla"><Icon name="undo" /></button>
-      <button class="t" onclick={() => history.redo()} disabled={!$history.canRedo} title="Ripristina (Ctrl+Y)" aria-label="Ripristina"><Icon name="redo" /></button>
+    <span class="grp" role="group" aria-label={t('toolbar.history')}>
+      <button class="t" onclick={() => history.undo()} disabled={!$history.canUndo} title={t('toolbar.undoTitle')} aria-label={t('toolbar.undo')}><Icon name="undo" /></button>
+      <button class="t" onclick={() => history.redo()} disabled={!$history.canRedo} title={t('toolbar.redoTitle')} aria-label={t('toolbar.redo')}><Icon name="redo" /></button>
     </span>
 
-    <span class="grp" role="group" aria-label="Strumenti">
-      <button class="t" onclick={toggleAddTool} class:on={ui.tool === 'add'} aria-pressed={ui.tool === 'add'} title="Aggiungi celle (A)"><Icon name="plus" /><span class="lbl">Aggiungi</span></button>
-      <button class="t" onclick={toggleSeriesTool} class:on={ui.tool === 'series'} aria-pressed={ui.tool === 'series'} title="Serie a pennello (S)"><Icon name="brush" /><span class="lbl">Serie</span></button>
-      <button class="t" onclick={flipSelected} disabled={!hasSelection} title="Inverti polarità delle selezionate (P)"><Icon name="swap" /><span class="lbl">Polarità</span></button>
-      <button class="t" onclick={deleteSelected} disabled={!hasSelection} title="Elimina le selezionate (Canc / F)"><Icon name="trash" /><span class="lbl">Elimina</span></button>
+    <span class="grp" role="group" aria-label={t('toolbar.tools')}>
+      <button class="t" onclick={toggleAddTool} class:on={ui.tool === 'add'} aria-pressed={ui.tool === 'add'} title={t('toolbar.addTitle')}><Icon name="plus" /><span class="lbl">{t('toolbar.add')}</span></button>
+      <button class="t" onclick={toggleSeriesTool} class:on={ui.tool === 'series'} aria-pressed={ui.tool === 'series'} title={t('toolbar.seriesTitle')}><Icon name="brush" /><span class="lbl">{t('toolbar.series')}</span></button>
+      <button class="t" onclick={flipSelected} disabled={!hasSelection} title={t('toolbar.flipTitle')}><Icon name="swap" /><span class="lbl">{t('toolbar.flip')}</span></button>
+      <button class="t" onclick={deleteSelected} disabled={!hasSelection} title={t('toolbar.deleteTitle')}><Icon name="trash" /><span class="lbl">{t('toolbar.delete')}</span></button>
     </span>
 
-    <span class="grp" role="group" aria-label="Faccia del pacco">
-      <button class="t" class:on={ui.face === 'top'} aria-pressed={ui.face === 'top'} onclick={() => (ui.face = 'top')} title="Vista dal lato dei poli rivolti in alto (V)">Sopra</button>
-      <button class="t" class:on={ui.face === 'bottom'} aria-pressed={ui.face === 'bottom'} onclick={() => (ui.face = 'bottom')} title="Vista dal lato opposto (V)">Sotto</button>
+    <span class="grp" role="group" aria-label={t('toolbar.face')}>
+      <button class="t" class:on={ui.face === 'top'} aria-pressed={ui.face === 'top'} onclick={() => (ui.face = 'top')} title={t('toolbar.topTitle')}>{t('toolbar.top')}</button>
+      <button class="t" class:on={ui.face === 'bottom'} aria-pressed={ui.face === 'bottom'} onclick={() => (ui.face = 'bottom')} title={t('toolbar.bottomTitle')}>{t('toolbar.bottom')}</button>
     </span>
 
-    <span class="grp" role="group" aria-label="Livelli visibili">
-      <button class="t" class:on={ui.showStrips} aria-pressed={ui.showStrips} onclick={() => (ui.showStrips = !ui.showStrips)} title="Mostra le lamelle di questa faccia (L)"><Icon name={ui.showStrips ? 'eye' : 'eyeoff'} /><span class="lbl">Lamelle</span></button>
-      <button class="t" class:on={ui.showHolder} aria-pressed={ui.showHolder} onclick={() => (ui.showHolder = !ui.showHolder)} title="Mostra la sagoma del portacelle"><Icon name={ui.showHolder ? 'eye' : 'eyeoff'} /><span class="lbl">Holder</span></button>
+    <span class="grp" role="group" aria-label={t('toolbar.layers')}>
+      <button class="t" class:on={ui.showStrips} aria-pressed={ui.showStrips} onclick={() => (ui.showStrips = !ui.showStrips)} title={t('toolbar.stripsTitle')}><Icon name={ui.showStrips ? 'eye' : 'eyeoff'} /><span class="lbl">{t('toolbar.strips')}</span></button>
+      <button class="t" class:on={ui.showHolder} aria-pressed={ui.showHolder} onclick={() => (ui.showHolder = !ui.showHolder)} title={t('toolbar.holderTitle')}><Icon name={ui.showHolder ? 'eye' : 'eyeoff'} /><span class="lbl">Holder</span></button>
     </span>
 
-    <span class="grp" role="group" aria-label="Vista del disegno">
-      <button class="t" onclick={fitView} title="Inquadra tutto (H)" aria-label="Adatta"><Icon name="fit" /></button>
+    <span class="grp" role="group" aria-label={t('toolbar.drawingView')}>
+      <button class="t" onclick={fitView} title={t('toolbar.fitTitle')} aria-label={t('toolbar.fit')}><Icon name="fit" /></button>
   <span class="menu">
-      <button class="t" class:on={menuOpen} onclick={() => (menuOpen = !menuOpen)} aria-expanded={menuOpen} title="Griglia, quote, aggancio"><Icon name="sliders" /><span class="lbl">Vista</span></button>
+      <button class="t" class:on={menuOpen} onclick={() => (menuOpen = !menuOpen)} aria-expanded={menuOpen} title={t('toolbar.viewTitle')}><Icon name="sliders" /><span class="lbl">{t('toolbar.view')}</span></button>
       {#if menuOpen}
-        <div class="pop" role="dialog" aria-label="Opzioni di vista">
-          <label class="check"><input type="checkbox" bind:checked={ui.showGrid} /> Griglia</label>
-          <label class="check"><input type="checkbox" bind:checked={ui.showDims} /> Quote</label>
+        <div class="pop" role="dialog" aria-label={t('toolbar.viewOptions')}>
+          <label class="check"><input type="checkbox" bind:checked={ui.showGrid} /> {t('toolbar.grid')}</label>
+          <label class="check"><input type="checkbox" bind:checked={ui.showDims} /> {t('toolbar.dims')}</label>
           <label class="check snap">
-            Aggancio
+            {t('toolbar.snap')}
             <select
               value={String(ui.snap)}
               onchange={(e) => {
@@ -51,24 +52,24 @@
                 ui.snap = v === 'slot' ? 'slot' : Number(v);
               }}
             >
-              <option value="slot">a slot (griglia celle)</option>
-              <option value="0">libero</option>
-              <option value="0.5">0,5 mm</option>
+              <option value="slot">{t('toolbar.snapSlot')}</option>
+              <option value="0">{t('toolbar.snapFree')}</option>
+              <option value="0.5">{t('toolbar.snapHalf')}</option>
               <option value="1">1 mm</option>
               <option value="5">5 mm</option>
             </select>
           </label>
-          <p class="hint"><kbd>Rotella</kbd> zoom · <kbd>Spazio</kbd>+trascina sposta · <kbd>Maiusc</kbd> aggiunge alla selezione</p>
+          <p class="hint"><kbd>{t('toolbar.kbdWheel')}</kbd> {t('toolbar.kbdZoom')} · <kbd>{t('toolbar.kbdSpace')}</kbd>{t('toolbar.kbdPan')} · <kbd>{t('toolbar.kbdShift')}</kbd> {t('toolbar.kbdAdd')}</p>
         </div>
       {/if}
     </span>
     </span>
 
     <span class="grow"></span>
-    <span class="grp" role="group" aria-label="Cosa mostrare (3 per cambiare)">
-      <button class="t" class:on={ui.viewMode === 'draw'} aria-pressed={ui.viewMode === 'draw'} onclick={() => (ui.viewMode = 'draw')} title="Solo disegno (3)"><Icon name="draw" /><span class="lbl2">Disegno</span></button>
-      <button class="t" class:on={ui.viewMode === 'split'} aria-pressed={ui.viewMode === 'split'} onclick={() => (ui.viewMode = 'split')} title="Disegno e 3D affiancati (3)"><Icon name="split" /><span class="lbl2">Affiancati</span></button>
-      <button class="t" class:on={ui.viewMode === '3d'} aria-pressed={ui.viewMode === '3d'} onclick={() => (ui.viewMode = '3d')} title="Solo 3D (3)"><Icon name="box" /><span class="lbl2">3D</span></button>
+    <span class="grp" role="group" aria-label={t('toolbar.showWhat')}>
+      <button class="t" class:on={ui.viewMode === 'draw'} aria-pressed={ui.viewMode === 'draw'} onclick={() => (ui.viewMode = 'draw')} title={t('toolbar.drawOnlyTitle')}><Icon name="draw" /><span class="lbl2">{t('toolbar.draw')}</span></button>
+      <button class="t" class:on={ui.viewMode === 'split'} aria-pressed={ui.viewMode === 'split'} onclick={() => (ui.viewMode = 'split')} title={t('toolbar.splitTitle')}><Icon name="split" /><span class="lbl2">{t('toolbar.split')}</span></button>
+      <button class="t" class:on={ui.viewMode === '3d'} aria-pressed={ui.viewMode === '3d'} onclick={() => (ui.viewMode = '3d')} title={t('toolbar.only3dTitle')}><Icon name="box" /><span class="lbl2">3D</span></button>
     </span>
   </div>
 </div>

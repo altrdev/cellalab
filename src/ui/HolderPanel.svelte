@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fmtNum, t } from '../i18n';
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
   import { DEFAULT_HOLDER_SETTINGS } from '../core/holder';
@@ -10,7 +11,7 @@
   const built = $derived(holderOf(project, ui.holder));
   const model = $derived(built.model);
   const report = $derived(built.report);
-  const fmt = (n: number | null, d = 1) => (n === null ? '—' : n.toFixed(d).replace('.', ','));
+  const fmt = (n: number | null, d = 1) => (n === null ? '—' : fmtNum(n, d));
   const status = $derived(
     !report ? 'empty' : report.issues.some((i) => i.level === 'error') ? 'error' : report.issues.some((i) => i.level === 'warning') ? 'warning' : 'ok',
   );
@@ -24,58 +25,58 @@
   }
   const reset = () => Object.assign(ui.holder, DEFAULT_HOLDER_SETTINGS);
   const noteLock = $derived(
-    model && model.openingDiameterMm !== null ? `Foro Ø ${fmt(model.openingDiameterMm)} mm · fondo ${fmt(model.floorMm)} mm` : 'Le pareti sono aperte da parte a parte.',
+    model && model.openingDiameterMm !== null ? t('hold.noteLock', { d: fmt(model.openingDiameterMm), f: fmt(model.floorMm) }) : t('hold.noteOpen'),
   );
 
   /** Colori tipici dei filamenti per stampa 3D. */
   const COLORS = [
-    { name: 'Grafite', hex: '#353b41' },
-    { name: 'Nero', hex: '#111214' },
-    { name: 'Grigio', hex: '#8a9099' },
-    { name: 'Bianco', hex: '#e8e8e4' },
-    { name: 'Rosso', hex: '#d64541' },
-    { name: 'Arancione', hex: '#e8872b' },
-    { name: 'Giallo', hex: '#e8c32b' },
-    { name: 'Verde', hex: '#3fa66b' },
-    { name: 'Blu', hex: '#3a7bd5' },
+    { name: t('hold.color.graphite'), hex: '#353b41' },
+    { name: t('hold.color.black'), hex: '#111214' },
+    { name: t('hold.color.grey'), hex: '#8a9099' },
+    { name: t('hold.color.white'), hex: '#e8e8e4' },
+    { name: t('hold.color.red'), hex: '#d64541' },
+    { name: t('hold.color.orange'), hex: '#e8872b' },
+    { name: t('hold.color.yellow'), hex: '#e8c32b' },
+    { name: t('hold.color.green'), hex: '#3fa66b' },
+    { name: t('hold.color.blue'), hex: '#3a7bd5' },
   ];
 </script>
 
 <div class="stack">
   {#if !report || !model}
-    <section class="sec"><h3><Icon name="box" /> Portacelle</h3><p class="note">Aggiungi delle celle per vedere il portacelle.</p></section>
+    <section class="sec"><h3><Icon name="box" /> {t('hold.title')}</h3><p class="note">{t('hold.empty')}</p></section>
   {:else}
     <div class="result {status}">
-      <div class="rhead"><Icon name="box" size={15} /> Portacelle <span class="badge {status}">{status === 'ok' ? 'ok' : status === 'warning' ? 'attenzione' : 'problemi'}</span></div>
-      <div class="big">Due piastre da {fmt(report.widthMm, 0)} × {fmt(report.depthMm, 0)} mm</div>
+      <div class="rhead"><Icon name="box" size={15} /> {t('hold.title')} <span class="badge {status}">{status === 'ok' ? t('hold.badge.ok') : status === 'warning' ? t('hold.badge.warning') : t('hold.badge.error')}</span></div>
+      <div class="big">{t('hold.plates', { w: fmt(report.widthMm, 0), d: fmt(report.depthMm, 0) })}</div>
       <div class="small">
-        Pacco finito alto {fmt(report.totalHeightMm)} mm. Circa {fmt(grams, 0)} g di plastica l'una (al massimo, riempimento pieno).
+        {t('hold.summary', { h: fmt(report.totalHeightMm), g: fmt(grams, 0) })}
       </div>
     </div>
 
 
     <section class="sec">
-      <h3><Icon name="lock" /> Avvisi di stampa</h3>
+      <h3><Icon name="lock" /> {t('hold.warnings')}</h3>
     <ul class="issues">
       {#each report.issues as issue (issue.text)}
         <li class={issue.level}><span class="dot"></span><span>{issue.text}</span></li>
       {/each}
     </ul>
 
-    <button type="button" class="gotoexp" onclick={() => (ui.sideTab = 'file')}><Icon name="download" /> Esporta i file STL →</button>
+    <button type="button" class="gotoexp" onclick={() => (ui.sideTab = 'file')}><Icon name="download" /> {t('hold.gotoExport')}</button>
     </section>
   {/if}
 
   <section class="sec">
-    <h3><Icon name="eye" /> Visualizzazione</h3>
+    <h3><Icon name="eye" /> {t('hold.display')}</h3>
   <div class="toggles">
-    <label class="inline"><input type="checkbox" bind:checked={ui.showHolder} /> Mostra holder</label>
-    <label class="inline"><input type="checkbox" bind:checked={ui.holderView.showTop} /> Superiore</label>
-    <label class="inline"><input type="checkbox" bind:checked={ui.holderView.showBottom} /> Inferiore</label>
+    <label class="inline"><input type="checkbox" bind:checked={ui.showHolder} /> {t('hold.showHolder')}</label>
+    <label class="inline"><input type="checkbox" bind:checked={ui.holderView.showTop} /> {t('hold.upper')}</label>
+    <label class="inline"><input type="checkbox" bind:checked={ui.holderView.showBottom} /> {t('hold.lower')}</label>
   </div>
   <div class="field">
-    <span class="lbl">Colore</span>
-    <div class="swatches" role="radiogroup" aria-label="Colore del portacelle">
+    <span class="lbl">{t('hold.colour')}</span>
+    <div class="swatches" role="radiogroup" aria-label={t('hold.colourOf')}>
       {#each COLORS as c (c.hex)}
         <button
           type="button"
@@ -89,8 +90,8 @@
           onclick={() => (ui.holderView.color = c.hex)}
         ></button>
       {/each}
-      <label class="sw custom" class:on={!COLORS.some((c) => c.hex === ui.holderView.color.toLowerCase())} title="Colore a scelta">
-        <input type="color" aria-label="Colore a scelta" bind:value={ui.holderView.color} />
+      <label class="sw custom" class:on={!COLORS.some((c) => c.hex === ui.holderView.color.toLowerCase())} title={t('hold.colourCustom')}>
+        <input type="color" aria-label={t('hold.colourCustom')} bind:value={ui.holderView.color} />
       </label>
     </div>
   </div>
@@ -98,69 +99,69 @@
   </section>
 
   <section class="sec">
-    <h3><Icon name="ruler" /> Forma</h3>
+    <h3><Icon name="ruler" /> {t('hold.shape')}</h3>
   <div class="row">
-    <label>Parete attorno (mm)
+    <label>{t('hold.wall')}
       <input type="number" min="0.8" max="6" step="0.1" value={ui.holder.wallMm} onchange={(e) => setNum('wallMm', e)} />
     </label>
-    <label>Gioco cella (mm)
+    <label>{t('hold.clearance')}
       <input type="number" min="0" max="1" step="0.05" value={ui.holder.clearanceMm} onchange={(e) => setNum('clearanceMm', e)} />
     </label>
   </div>
-  <Help label="Cos'è il gioco">Il gioco è lo spazio per lato tra cella e tasca: 0,1 per una stampante precisa, 0,2–0,3 se la tua stampa viene "grassa".</Help>
+  <Help label={t('hold.clearanceLabel')}>{t('hold.clearanceHelp')}</Help>
 
   <div class="field">
-    <span class="lbl">Geometria</span>
+    <span class="lbl">{t('hold.geometry')}</span>
     <div class="seg2">
-      <button class:on={ui.holder.shape === 'rounded'} onclick={() => (ui.holder.shape = 'rounded')} title="Contorno convesso con gli angoli tondi">Arrotondato</button>
-      <button class:on={ui.holder.shape === 'profile'} onclick={() => (ui.holder.shape = 'profile')} title="La sagoma segue le celle">Profilo cella</button>
+      <button class:on={ui.holder.shape === 'rounded'} onclick={() => (ui.holder.shape = 'rounded')} title={t('hold.roundedTitle')}>{t('hold.rounded')}</button>
+      <button class:on={ui.holder.shape === 'profile'} onclick={() => (ui.holder.shape = 'profile')} title={t('hold.profileTitle')}>{t('hold.profile')}</button>
     </div>
   </div>
 
   <div class="row">
-    <label>Raccordo angoli concavi (mm)
+    <label>{t('hold.fillet')}
       <input type="number" min="0" max="10" step="0.5" disabled={ui.holder.shape === 'rounded'} value={ui.holder.filletMm} onchange={(e) => setNum('filletMm', e)} />
     </label>
-    <label>Smusso bordo esterno (mm)
+    <label>{t('hold.chamfer')}
       <input type="number" min="0" max="2" step="0.1" value={ui.holder.chamferMm} onchange={(e) => setNum('chamferMm', e)} />
     </label>
   </div>
-  <Help label="Cosa fa">
-    {#if ui.holder.shape === 'rounded'}Il contorno avvolge tutte le celle con gli angoli tondi, senza incavi.{:else}Il raccordo rende liscia la sagoma negli incavi tra le celle e chiude le fessure troppo strette per essere stampate.{/if}
+  <Help label={t('hold.what')}>
+    {#if ui.holder.shape === 'rounded'}{t('hold.roundedHelp')}{:else}{t('hold.profileHelp')}{/if}
   </Help>
 
   </section>
 
   <section class="sec">
-    <h3><Icon name="lock" /> Fissaggio celle</h3>
-  <label class="inline"><input type="checkbox" bind:checked={ui.holder.lockCells} /> Blocca celle sul lato poli</label>
-  <Help label="Cosa cambia">{noteLock}</Help>
+    <h3><Icon name="lock" /> {t('hold.lockSection')}</h3>
+  <label class="inline"><input type="checkbox" bind:checked={ui.holder.lockCells} /> {t('hold.lock')}</label>
+  <Help label={t('hold.lockLabel')}>{noteLock}</Help>
 
   </section>
 
   <details class="adv">
-    <summary>Avanzate</summary>
+    <summary>{t('hold.advanced')}</summary>
     <div class="row">
-      <label>Spessore fondo (mm)
+      <label>{t('hold.floor')}
         <input type="number" min="0.6" max="4" step="0.2" disabled={!ui.holder.lockCells} value={ui.holder.floorMm} onchange={(e) => setNum('floorMm', e)} />
       </label>
-      <label>Altezza pareti (mm)
+      <label>{t('hold.lip')}
         <input type="number" min="2" max="30" step="1" value={ui.holder.lipMm} onchange={(e) => setNum('lipMm', e)} />
       </label>
     </div>
-    <label>Bordo che trattiene la cella (mm)
+    <label>{t('hold.ledge')}
       <input type="number" min="0.5" max="4" step="0.25" disabled={!ui.holder.lockCells} value={ui.holder.ledgeMm} onchange={(e) => setNum('ledgeMm', e)} />
     </label>
-    <Help label="Spiegazione">Il fondo copre il bordo del polo e lascia un foro per saldare. Le lamelle poggiano sul fondo.</Help>
+    <Help label={t('hold.explain')}>{t('hold.floorHelp')}</Help>
     <div class="row">
-      <label>Piano di stampa X (mm)
+      <label>{t('hold.bedX')}
         <input type="number" min="50" max="1000" step="10" value={ui.holder.bedXMm} onchange={(e) => setNum('bedXMm', e)} />
       </label>
-      <label>Piano di stampa Y (mm)
+      <label>{t('hold.bedY')}
         <input type="number" min="50" max="1000" step="10" value={ui.holder.bedYMm} onchange={(e) => setNum('bedYMm', e)} />
       </label>
     </div>
-    <div class="exp"><button onclick={reset}>Valori predefiniti</button></div>
+    <div class="exp"><button onclick={reset}>{t('hold.defaults')}</button></div>
   </details>
 </div>
 

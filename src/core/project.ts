@@ -1,5 +1,6 @@
 import { findCellType } from './catalog';
 import type { CellType, Chemistry, PackGenerator, PlacedCell, Project } from './types';
+import { t } from '../i18n';
 
 export class ProjectParseError extends Error {
   constructor(message: string) {
@@ -8,7 +9,7 @@ export class ProjectParseError extends Error {
   }
 }
 
-export function createProject(name = 'Nuovo pacco'): Project {
+export function createProject(name = t('project.defaultName')): Project {
   return { version: 1, name, customCellTypes: [], cells: [] };
 }
 
@@ -50,23 +51,23 @@ function isObj(v: unknown): v is Obj {
 }
 function str(o: Obj, key: string, where: string): string {
   const v = o[key];
-  if (typeof v !== 'string' || v === '') throw new ProjectParseError(`${where}: "${key}" deve essere un testo`);
+  if (typeof v !== 'string' || v === '') throw new ProjectParseError(t('project.err.text', { where, key }));
   return v;
 }
 function num(o: Obj, key: string, where: string, { positive = false } = {}): number {
   const v = o[key];
   if (typeof v !== 'number' || !Number.isFinite(v) || (positive && v <= 0)) {
-    throw new ProjectParseError(`${where}: "${key}" deve essere un numero${positive ? ' positivo' : ''}`);
+    throw new ProjectParseError(t(positive ? 'project.err.numberPositive' : 'project.err.number', { where, key }));
   }
   return v;
 }
 
 function parseCellType(raw: unknown, index: number): CellType {
   const where = `customCellTypes[${index}]`;
-  if (!isObj(raw)) throw new ProjectParseError(`${where}: oggetto atteso`);
+  if (!isObj(raw)) throw new ProjectParseError(t('project.err.object', { where }));
   const chemistry = raw.chemistry;
   if (chemistry !== 'li-ion' && chemistry !== 'lifepo4') {
-    throw new ProjectParseError(`${where}: chimica non valida`);
+    throw new ProjectParseError(t('project.err.chemistry', { where }));
   }
   const type: CellType = {
     id: str(raw, 'id', where),
@@ -88,11 +89,11 @@ function parseCellType(raw: unknown, index: number): CellType {
 
 function parseCell(raw: unknown, index: number): PlacedCell {
   const where = `cells[${index}]`;
-  if (!isObj(raw)) throw new ProjectParseError(`${where}: oggetto atteso`);
-  if (typeof raw.plusUp !== 'boolean') throw new ProjectParseError(`${where}: "plusUp" deve essere vero/falso`);
+  if (!isObj(raw)) throw new ProjectParseError(t('project.err.object', { where }));
+  if (typeof raw.plusUp !== 'boolean') throw new ProjectParseError(t('project.err.plusUp', { where }));
   const g = raw.group;
   if (g !== null && (typeof g !== 'number' || !Number.isInteger(g) || g < 0)) {
-    throw new ProjectParseError(`${where}: "group" deve essere un intero >= 0 oppure null`);
+    throw new ProjectParseError(t('project.err.group', { where }));
   }
   return {
     id: str(raw, 'id', where),
@@ -123,13 +124,13 @@ export function parseProject(json: string): Project {
   try {
     raw = JSON.parse(json);
   } catch {
-    throw new ProjectParseError('Il file non è un JSON valido');
+    throw new ProjectParseError(t('project.err.json'));
   }
-  if (!isObj(raw)) throw new ProjectParseError('Radice del progetto non valida');
-  if (raw.version !== 1) throw new ProjectParseError(`Versione del progetto non supportata: ${String(raw.version)}`);
-  if (typeof raw.name !== 'string') throw new ProjectParseError('"name" deve essere un testo');
-  if (!Array.isArray(raw.customCellTypes)) throw new ProjectParseError('"customCellTypes" deve essere una lista');
-  if (!Array.isArray(raw.cells)) throw new ProjectParseError('"cells" deve essere una lista');
+  if (!isObj(raw)) throw new ProjectParseError(t('project.err.root'));
+  if (raw.version !== 1) throw new ProjectParseError(t('project.err.version', { version: String(raw.version) }));
+  if (typeof raw.name !== 'string') throw new ProjectParseError(t('project.err.name'));
+  if (!Array.isArray(raw.customCellTypes)) throw new ProjectParseError(t('project.err.cellTypes'));
+  if (!Array.isArray(raw.cells)) throw new ProjectParseError(t('project.err.cells'));
 
   const customCellTypes = raw.customCellTypes.map(parseCellType);
   const cells = raw.cells.map(parseCell);
@@ -142,10 +143,10 @@ export function parseProject(json: string): Project {
 
   const seen = new Set<string>();
   for (const cell of cells) {
-    if (seen.has(cell.id)) throw new ProjectParseError(`Id cella duplicato: ${cell.id}`);
+    if (seen.has(cell.id)) throw new ProjectParseError(t('project.err.dupId', { id: cell.id }));
     seen.add(cell.id);
     if (!findCellType(project, cell.typeId)) {
-      throw new ProjectParseError(`Tipo di cella sconosciuto: ${cell.typeId}`);
+      throw new ProjectParseError(t('project.err.unknownType', { id: cell.typeId }));
     }
   }
   return project;

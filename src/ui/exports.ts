@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { buildDxf } from '../core/dxf';
 import { buildCutListCsv, buildCutSummary, buildSvg } from '../core/lamelleExport';
 import type { Project } from '../core/types';
@@ -15,7 +16,7 @@ const slug = (s: string) =>
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-zA-Z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-    .toLowerCase() || 'pacco';
+    .toLowerCase() || t('file.defaultName');
 
 function save(content: BlobPart, name: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -26,7 +27,7 @@ function save(content: BlobPart, name: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-const faceName = (face: 'top' | 'bottom') => (face === 'top' ? 'sopra' : 'sotto');
+const faceName = (face: 'top' | 'bottom') => t(face === 'top' ? 'face.top' : 'face.bottom');
 
 export function exportDxf(project: Project, face: 'top' | 'bottom') {
   const report = reportOf(project, ui.lamella);
@@ -40,7 +41,7 @@ export function exportDxf(project: Project, face: 'top' | 'bottom') {
     spotDiameterMm: report.welder.spotDiameterMm,
     spotSpacingMm: report.welder.spotSpacingMm,
   });
-  save(dxf, `${slug(project.name)}-lamelle-${faceName(face)}.dxf`, 'application/dxf');
+  save(dxf, `${slug(project.name)}-${t('file.busbars')}-${faceName(face)}.dxf`, 'application/dxf');
 }
 
 export function exportSvg(project: Project, face: 'top' | 'bottom') {
@@ -55,19 +56,19 @@ export function exportSvg(project: Project, face: 'top' | 'bottom') {
     spotSpacingMm: report.welder.spotSpacingMm,
     title: project.name,
   });
-  save(svg, `${slug(project.name)}-dima-${faceName(face)}.svg`, 'image/svg+xml');
+  save(svg, `${slug(project.name)}-${t('file.template')}-${faceName(face)}.svg`, 'image/svg+xml');
 }
 
 export function exportCutList(project: Project) {
   const report = reportOf(project, ui.lamella);
   const text = buildCutSummary(report, project.name) + '\n' + buildCutListCsv(stripsOf(project, ui.lamella), report);
-  save(text, `${slug(project.name)}-lista-taglio.txt`, 'text/plain');
+  save(text, `${slug(project.name)}-${t('file.cutList')}.txt`, 'text/plain');
 }
 
 export function exportStl(project: Project, half: HolderHalf) {
   const model = holderOf(project, ui.holder).model;
   if (!model) return;
-  save(holderStl(model, half) as BlobPart, `${slug(project.name)}-portacelle-${faceName(half)}.stl`, 'model/stl');
+  save(holderStl(model, half) as BlobPart, `${slug(project.name)}-${t('file.holder')}-${faceName(half)}.stl`, 'model/stl');
 }
 
 /** Piastra di prova con tasche a giochi diversi, per tarare la stampante; usa il tipo di cella del progetto. */
@@ -75,5 +76,5 @@ export function exportToleranceTest(project: Project, clearancesMm: readonly num
   const typeId = project.cells[0]?.typeId ?? '18650-3000-10a';
   const model = buildToleranceTest(project, typeId, clearancesMm, ui.holder);
   if (!model) return;
-  save(holderStl(model, 'bottom') as BlobPart, `pezzo-test-tolleranze-${clearancesMm.map((c) => c.toFixed(2)).join('-')}.stl`, 'model/stl');
+  save(holderStl(model, 'bottom') as BlobPart, `${t('file.toleranceTest')}-${clearancesMm.map((c) => c.toFixed(2)).join('-')}.stl`, 'model/stl');
 }

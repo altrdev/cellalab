@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n';
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
   import { history } from '../state';
@@ -23,65 +24,65 @@
   const testValid = $derived(testClearances.every((c) => Number.isFinite(c) && c >= 0 && c <= 1));
 
   const text: Record<string, string> = {
-    empty: 'Aggiungi delle celle per poter esportare.',
-    ok: 'Pronto per l\'esportazione.',
-    warning: 'Ci sono avvisi: controllali prima di tagliare o stampare.',
-    error: 'Ci sono problemi: risolvili prima di tagliare o stampare.',
+    empty: t('exp.status.empty'),
+    ok: t('exp.status.ok'),
+    warning: t('exp.status.warning'),
+    error: t('exp.status.error'),
   };
 </script>
 
 <div class="stack">
   <section class="sec">
-    <h3><Icon name="file" /> Progetto</h3>
+    <h3><Icon name="file" /> {t('exp.project')}</h3>
     <div class="row">
-      <button onclick={onSave}>Salva JSON</button>
-      <label class="button">Apri…<input type="file" accept=".json,application/json" onchange={onOpen} hidden /></label>
+      <button onclick={onSave}>{t('exp.saveJson')}</button>
+      <label class="button">{t('exp.open')}<input type="file" accept=".json,application/json" onchange={onOpen} hidden /></label>
     </div>
-    <p class="note">Il progetto si salva anche da solo in questo browser.</p>
+    <p class="note">{t('exp.autosave')}</p>
   </section>
 
   <section class="sec">
-    <h3><Icon name="layers" /> Lamelle <span class="pill {stripStatus}">{stripStatus === 'ok' ? 'ok' : stripStatus === 'warning' ? 'attenzione' : stripStatus === 'error' ? 'problemi' : ''}</span></h3>
+    <h3><Icon name="layers" /> {t('exp.strips')} <span class="pill {stripStatus}">{stripStatus === 'ok' ? t('exp.badge.ok') : stripStatus === 'warning' ? t('exp.badge.warning') : stripStatus === 'error' ? t('exp.badge.error') : ''}</span></h3>
     <p class="status {stripStatus}">{text[stripStatus]}</p>
     <div class="exp">
-      <button disabled={stripStatus === 'empty'} onclick={() => exportDxf(project, 'top')} title="Per laser, CNC o servizio di taglio (compensa il taglio)">DXF sopra</button>
-      <button disabled={stripStatus === 'empty'} onclick={() => exportDxf(project, 'bottom')}>DXF sotto</button>
-      <button disabled={stripStatus === 'empty'} onclick={() => exportSvg(project, 'top')} title="In scala 1:1: stampa al 100% e ritaglia">Dima sopra</button>
-      <button disabled={stripStatus === 'empty'} onclick={() => exportSvg(project, 'bottom')}>Dima sotto</button>
-      <button disabled={stripStatus === 'empty'} onclick={() => exportCutList(project)}>Lista di taglio</button>
+      <button disabled={stripStatus === 'empty'} onclick={() => exportDxf(project, 'top')} title={t('exp.dxfTitle')}>{t('exp.dxfTop')}</button>
+      <button disabled={stripStatus === 'empty'} onclick={() => exportDxf(project, 'bottom')}>{t('exp.dxfBottom')}</button>
+      <button disabled={stripStatus === 'empty'} onclick={() => exportSvg(project, 'top')} title={t('exp.templateTitle')}>{t('exp.templateTop')}</button>
+      <button disabled={stripStatus === 'empty'} onclick={() => exportSvg(project, 'bottom')}>{t('exp.templateBottom')}</button>
+      <button disabled={stripStatus === 'empty'} onclick={() => exportCutList(project)}>{t('exp.cutList')}</button>
     </div>
     <div class="opt">
-      <label class="inline"><input type="checkbox" bind:checked={ui.dxfReferences} /> Includi i riferimenti nel DXF</label>
-      <span class="hint">Aree di saldatura, punti ed etichette (layer MARK, SPOTS, TEXT): non vanno tagliati.</span>
+      <label class="inline"><input type="checkbox" bind:checked={ui.dxfReferences} /> {t('exp.refs')}</label>
+      <span class="hint">{t('exp.refsHint')}</span>
     </div>
-    <Help label="Che file sono">Il DXF è per laser, CNC o servizi di taglio e compensa lo spessore del taglio: ha solo il contorno da tagliare (layer CUT); con la casella sopra aggiunge anche le aree di saldatura (MARK), i punti (SPOTS) e le etichette sotto ogni lamella (TEXT), su layer a parte che non vanno tagliati. La dima è un disegno in scala 1:1: stampala al 100% e ritaglia a mano. La lista di taglio riassume dimensioni e quantità.</Help>
+    <Help label={t('exp.filesLabel')}>{t('exp.filesHelp')}</Help>
     {#if stripStatus === 'warning' || stripStatus === 'error'}
-      <button type="button" class="goto" onclick={() => (ui.sideTab = 'strips')}>Vai alle lamelle →</button>
+      <button type="button" class="goto" onclick={() => (ui.sideTab = 'strips')}>{t('exp.gotoStrips')}</button>
     {/if}
   </section>
 
   <section class="sec">
-    <h3><Icon name="box" /> Portacelle <span class="pill {holderStatus}">{holderStatus === 'ok' ? 'ok' : holderStatus === 'warning' ? 'attenzione' : holderStatus === 'error' ? 'problemi' : ''}</span></h3>
+    <h3><Icon name="box" /> {t('exp.holder')} <span class="pill {holderStatus}">{holderStatus === 'ok' ? t('exp.badge.ok') : holderStatus === 'warning' ? t('exp.badge.warning') : holderStatus === 'error' ? t('exp.badge.error') : ''}</span></h3>
     <p class="status {holderStatus}">{text[holderStatus]}</p>
     <div class="exp">
-      <button disabled={holderStatus === 'empty'} onclick={() => exportStl(project, 'top')} title="Piastra del lato sopra, già girata per la stampa">STL piastra sopra</button>
-      <button disabled={holderStatus === 'empty'} onclick={() => exportStl(project, 'bottom')} title="Piastra del lato sotto">STL piastra sotto</button>
+      <button disabled={holderStatus === 'empty'} onclick={() => exportStl(project, 'top')} title={t('exp.stlTopTitle')}>{t('exp.stlTop')}</button>
+      <button disabled={holderStatus === 'empty'} onclick={() => exportStl(project, 'bottom')} title={t('exp.stlBottomTitle')}>{t('exp.stlBottom')}</button>
     </div>
-    <Help label="Come si stampa">Stampa ogni piastra col fondo piatto sul piano. Sono una lo specchio dell'altra: non scambiarle.</Help>
+    <Help label={t('exp.printLabel')}>{t('exp.printHelp')}</Help>
     {#if holderStatus === 'warning' || holderStatus === 'error'}
-      <button type="button" class="goto" onclick={() => (ui.sideTab = 'holder')}>Vai al portacelle →</button>
+      <button type="button" class="goto" onclick={() => (ui.sideTab = 'holder')}>{t('exp.gotoHolder')}</button>
     {/if}
     <div class="test">
-      <span class="lbl">Pezzo test tolleranze · gioco (mm)</span>
+      <span class="lbl">{t('exp.testTitle')}</span>
       <div class="gaps">
         {#each testClearances as _, i (i)}
-          <input type="number" min="0" max="1" step="0.05" bind:value={testClearances[i]} aria-label="Gioco tasca {i + 1}" />
+          <input type="number" min="0" max="1" step="0.05" bind:value={testClearances[i]} aria-label={t('exp.pocketClearance', { n: i + 1 })} />
         {/each}
       </div>
       <div class="exp">
-        <button disabled={!testValid} onclick={() => exportToleranceTest(project, testClearances)} title="Piastra bassa con una tasca per gioco, dalla più stretta (sinistra) alla più larga">STL pezzo test</button>
+        <button disabled={!testValid} onclick={() => exportToleranceTest(project, testClearances)} title={t('exp.testBtnTitle')}>{t('exp.testBtn')}</button>
       </div>
-      <Help label="A cosa serve">Stampa il pezzo test con le impostazioni del portacelle e prova una cella in ogni tasca: scegli quella che entra senza forzare e senza ballare, poi imposta quel gioco. Le tasche vanno dalla più stretta (sinistra) alla più larga (destra); sotto ognuna c'è il gioco inciso in centesimi di mm (10 = 0,10 mm).</Help>
+      <Help label={t('exp.testHelpLabel')}>{t('exp.testHelp')}</Help>
     </div>
   </section>
 </div>

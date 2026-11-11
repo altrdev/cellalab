@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { ringWithArcs, type Circle } from './arcs';
 import { offsetRegion, regionRings } from './clip';
 import { spotPositions } from './sizing';
@@ -90,7 +91,7 @@ export function labelPlacements(
   opts: { heightMm?: number; textOf?: (s: Strip) => string } = {},
 ): LabelPlacement[] {
   const height = opts.heightMm ?? LABEL_HEIGHT_MM;
-  const textOf = opts.textOf ?? ((s: Strip) => asciiLabel(`${s.label} ${s.face === 'top' ? 'sopra' : 'sotto'}`));
+  const textOf = opts.textOf ?? ((s: Strip) => asciiLabel(`${s.label} ${t(s.face === 'top' ? 'face.top' : 'face.bottom')}`));
   const boxOf = (s: Strip): Box => {
     const xs = s.outline.map((p) => p.x);
     const ys = s.outline.map((p) => p.y);

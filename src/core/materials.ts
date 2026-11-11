@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 /**
  * Catalogo dei materiali per le lamelle (strisce che collegano i poli delle celle).
  *
@@ -33,7 +35,9 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
   {
     id: 'nichel-puro',
     colorHex: '#c4c7ca',
-    name: 'Nichel puro (Ni 99,6%)',
+    get name() {
+      return t('material.nichel-puro.name');
+    },
     resistivityOhmM: 9.5e-8,
     densityKgM3: 8890,
     specificHeatJKgK: 456,
@@ -41,12 +45,16 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     conductivityWmK: 90,
     weldability: 'good',
     thicknessesMm: [0.1, 0.15, 0.2, 0.3],
-    note: 'Il riferimento per le saldature a punti: si salda facilmente e non si ossida. Resistivo: per correnti alte servono più strati o rame.',
+    get note() {
+      return t('material.nichel-puro.note');
+    },
   },
   {
     id: 'acciaio-nichelato',
     colorHex: '#8f959b',
-    name: 'Acciaio nichelato',
+    get name() {
+      return t('material.acciaio-nichelato.name');
+    },
     resistivityOhmM: 1.5e-7,
     densityKgM3: 7850,
     specificHeatJKgK: 490,
@@ -54,12 +62,16 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     conductivityWmK: 50,
     weldability: 'good',
     thicknessesMm: [0.1, 0.15, 0.2],
-    note: 'Economico e facile da saldare, ma più resistivo del nichel puro (circa +60%): scalda di più a pari corrente.',
+    get note() {
+      return t('material.acciaio-nichelato.note');
+    },
   },
   {
     id: 'rame-nichelato',
     colorHex: '#c9b8a6',
-    name: 'Rame nichelato',
+    get name() {
+      return t('material.rame-nichelato.name');
+    },
     resistivityOhmM: 1.75e-8,
     densityKgM3: 8960,
     specificHeatJKgK: 385,
@@ -67,12 +79,16 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     conductivityWmK: 380,
     weldability: 'fair',
     thicknessesMm: [0.1, 0.15, 0.2, 0.3],
-    note: 'Conduce molto meglio del nichel, ma richiede più energia per la saldatura a punti: serve una saldatrice potente.',
+    get note() {
+      return t('material.rame-nichelato.note');
+    },
   },
   {
     id: 'rame',
     colorHex: '#c97b45',
-    name: 'Rame (Cu-ETP)',
+    get name() {
+      return t('material.rame.name');
+    },
     resistivityOhmM: 1.72e-8,
     densityKgM3: 8960,
     specificHeatJKgK: 385,
@@ -80,12 +96,16 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     conductivityWmK: 390,
     weldability: 'poor',
     thicknessesMm: [0.1, 0.2, 0.3, 0.5, 1.0],
-    note: 'Ottimo conduttore, ma con una saldatrice a punti hobby di norma non si salda (riflette e disperde il calore): si usa saldato a stagno o con linguette di nichel.',
+    get note() {
+      return t('material.rame.note');
+    },
   },
   {
     id: 'ottone',
     colorHex: '#cfae4d',
-    name: 'Ottone (CuZn37)',
+    get name() {
+      return t('material.ottone.name');
+    },
     resistivityOhmM: 6.6e-8,
     densityKgM3: 8500,
     specificHeatJKgK: 380,
@@ -93,12 +113,16 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     conductivityWmK: 120,
     weldability: 'poor',
     thicknessesMm: [0.1, 0.2, 0.3, 0.5],
-    note: 'Si salda male a punti; di solito si salda a stagno.',
+    get note() {
+      return t('material.ottone.note');
+    },
   },
   {
     id: 'alluminio',
     colorHex: '#d3d7da',
-    name: 'Alluminio (1050)',
+    get name() {
+      return t('material.alluminio.name');
+    },
     resistivityOhmM: 2.82e-8,
     densityKgM3: 2700,
     specificHeatJKgK: 900,
@@ -106,7 +130,9 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
     conductivityWmK: 225,
     weldability: 'poor',
     thicknessesMm: [0.2, 0.3, 0.5, 1.0],
-    note: 'Non si salda a punti in modo affidabile: richiede ultrasuoni o bonding. Poco adatto a un laboratorio domestico.',
+    get note() {
+      return t('material.alluminio.note');
+    },
   },
 ];
 

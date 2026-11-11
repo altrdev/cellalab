@@ -1,5 +1,6 @@
 import { slotIndexOf, slotPosition } from './lattice';
 import type { CellType, PackGenerator, PlacedCell, Project } from './types';
+import { t } from '../i18n';
 
 /** Operazioni pure sul progetto: ricevono un Project e ne restituiscono uno nuovo. */
 
@@ -115,7 +116,7 @@ export function setGroup(project: Project, ids: Iterable<string>, group: number 
 
 export function addCustomCellType(project: Project, type: CellType): Project {
   if (project.customCellTypes.some((t) => t.id === type.id)) {
-    throw new Error(`Esiste già un tipo di cella con id "${type.id}"`);
+    throw new Error(t('ops.err.dupType', { id: type.id }));
   }
   return { ...project, customCellTypes: [...project.customCellTypes, type] };
 }
@@ -171,7 +172,7 @@ export function alternateGroupPolarity(project: Project, ids?: Iterable<string>)
 /** Sostituisce un tipo di cella personalizzato (stesso id). */
 export function updateCustomCellType(project: Project, type: CellType): Project {
   if (!project.customCellTypes.some((t) => t.id === type.id)) {
-    throw new Error(`Tipo di cella personalizzato non trovato: "${type.id}"`);
+    throw new Error(t('ops.err.noCustom', { id: type.id }));
   }
   return { ...project, customCellTypes: project.customCellTypes.map((t) => (t.id === type.id ? type : t)) };
 }
@@ -180,7 +181,7 @@ export function updateCustomCellType(project: Project, type: CellType): Project 
 export function removeCustomCellType(project: Project, id: string): Project {
   if (!project.customCellTypes.some((t) => t.id === id)) return project;
   const used = project.cells.filter((c) => c.typeId === id).length;
-  if (used > 0) throw new Error(`Il tipo è usato da ${used} celle: eliminale prima o cambia il loro tipo.`);
+  if (used > 0) throw new Error(t('ops.err.used', { n: used }));
   return { ...project, customCellTypes: project.customCellTypes.filter((t) => t.id !== id) };
 }
 

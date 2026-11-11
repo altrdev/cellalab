@@ -6,7 +6,7 @@ Planned work and open items: [docs/TODO.md](docs/TODO.md). Original specificatio
 
 ## Working with the owner
 
-- Reply in the language the user writes in (usually Italian, sometimes English). The **app UI strings are Italian** and stay Italian.
+- Reply in the language the user writes in (usually Italian, sometimes English). The app UI is **bilingual (Italian / English)**; see "Translations" below.
 - Commit messages in English. Keep the Claude attribution trailers the harness asks for.
 - Hobby project: one topic at a time, discuss options and decide together before large changes. Give an opinion when asked; do not start big refactors unasked.
 - The owner is an experienced developer; be concise and concrete.
@@ -28,6 +28,7 @@ Before finishing a change: tests and `npm run check` must pass; for UI work look
 ## Architecture
 
 - `src/core`: pure logic, no DOM, fully unit-tested: model (`types.ts`, `project.ts`, `ops.ts`, `history.ts`), lattice/layout (`lattice.ts`, `layout.ts`), calculations (`stats.ts`, `sizing.ts`), checks (`drc.ts`), busbars (`strips.ts`, `lamelle.ts`, `lamelleExport.ts`, `dxf.ts`), holder (`holder.ts`), geometry helpers (`clip.ts`, `polygon.ts`, `geometry.ts`), catalog (`catalog.ts`, `celltype.ts`, `materials.ts`, `profiles.ts`), `stl.ts`.
+- `src/i18n`: `it.ts` (source language, defines the keys) and `en.ts` (typed on the Italian keys), `t()` / `tn()` / `fmtNum()` in `index.ts`.
 - `src/ui`: Svelte components and UI state. `ui.svelte.ts` is the shared UI state (selection, tool, view mode, settings); the project itself lives in the undo/redo store `history` (`src/state.ts`). `Editor.svelte` (2D SVG), `Preview3D.svelte` + `scene3d.ts` (three.js, lazy-loaded), `Sidebar.svelte` with tabs Pacco / Lamelle / Portacelle / Esporta, `PackBar.svelte` (data strip), `Toolbar.svelte`.
 - Keep logic in `core`; the UI only wires state and rendering.
 
@@ -54,3 +55,10 @@ Before finishing a change: tests and `npm run check` must pass; for UI work look
 ## Known limits
 
 The holder STL has never been tested in a real slicer; the 3D view was only tested with software rendering. See [docs/TODO.md](docs/TODO.md) for the rest.
+
+## Translations
+
+- All user-visible text is `t('key')` (plural: `tn('base', n)` with `base_one` / `base_other`; numbers: `fmtNum`). Never hard-code UI text. Add the key to **both** `src/i18n/it.ts` and `en.ts`: a missing English key does not compile, and a test checks that both have the same parameters and that every key is used.
+- `t()` also works in `core` (messages, checks, export text): the language is a module variable, `'it'` outside the browser, so unit tests run in Italian. Data tables (materials, welders, cutters, catalogue names, cooling) expose `name` / `note` as getters that call `t()`.
+- Language: saved choice (`localStorage` `cellalab:lang`), else the browser language (`it*` → Italian, anything else → English). The IT/EN switch is next to the title; `App.svelte` re-mounts the UI on change (`{#key ui.locale}`), so caches keyed on settings need no language in the key.
+- Do not name a variable `t` in a file that uses `t()` (it shadows the function).

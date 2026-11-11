@@ -3,6 +3,8 @@
  * I valori di default sono prudenti e MODIFICABILI: ogni saldatrice è diversa.
  */
 
+import { t } from '../i18n';
+
 export interface WelderProfile {
   id: string;
   name: string;
@@ -22,7 +24,9 @@ export interface WelderProfile {
 export const WELDER_PROFILES: readonly WelderProfile[] = [
   {
     id: 'hobby',
-    name: 'Saldatrice a punti hobby (prudente)',
+    get name() {
+      return t('welder.hobby.name');
+    },
     maxThicknessMm: 0.2,
     maxLayers: 2,
     spotCurrentA: 5,
@@ -32,7 +36,9 @@ export const WELDER_PROFILES: readonly WelderProfile[] = [
   },
   {
     id: 'hobby-potente',
-    name: 'Saldatrice hobby potente',
+    get name() {
+      return t('welder.hobby-potente.name');
+    },
     maxThicknessMm: 0.3,
     maxLayers: 2,
     spotCurrentA: 8,
@@ -42,7 +48,9 @@ export const WELDER_PROFILES: readonly WelderProfile[] = [
   },
   {
     id: 'professionale',
-    name: 'Saldatrice a punti professionale',
+    get name() {
+      return t('welder.professionale.name');
+    },
     maxThicknessMm: 0.5,
     maxLayers: 3,
     spotCurrentA: 15,
@@ -65,10 +73,10 @@ export interface CutterProfile {
 }
 
 export const CUTTER_PROFILES: readonly CutterProfile[] = [
-  { id: 'manual', kind: 'manual', name: 'A mano (dima e forbici/taglierino)', kerfMm: 0, minGapMm: 1 },
-  { id: 'laser', kind: 'laser', name: 'Laser (CO₂/fibra)', kerfMm: 0.15, minGapMm: 0.5 },
-  { id: 'cnc', kind: 'cnc', name: 'CNC / fresa', kerfMm: 1, minGapMm: 2 },
-  { id: 'service', kind: 'service', name: 'Servizio esterno (laser/waterjet)', kerfMm: 0.2, minGapMm: 1 },
+  { id: 'manual', kind: 'manual', get name() { return t('cutter.manual.name'); }, kerfMm: 0, minGapMm: 1 },
+  { id: 'laser', kind: 'laser', get name() { return t('cutter.laser.name'); }, kerfMm: 0.15, minGapMm: 0.5 },
+  { id: 'cnc', kind: 'cnc', get name() { return t('cutter.cnc.name'); }, kerfMm: 1, minGapMm: 2 },
+  { id: 'service', kind: 'service', get name() { return t('cutter.service.name'); }, kerfMm: 0.2, minGapMm: 1 },
 ];
 
 export const findWelder = (id: string) => WELDER_PROFILES.find((w) => w.id === id);

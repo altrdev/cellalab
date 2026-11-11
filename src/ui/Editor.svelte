@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n';
   import { onMount } from 'svelte';
   import { findCellType } from '../core/catalog';
   import { cellsInRect, normalizeRect, snapTo, type Rect } from '../core/geometry';
@@ -306,7 +307,7 @@
     class:adding={ui.tool === 'add'}
     class:painting={ui.tool === 'series'}
     role="application"
-    aria-label="Editor del pacco batterie"
+    aria-label={t('editor.aria')}
     {onpointerdown}
     {onpointermove}
     {onpointerup}
@@ -407,7 +408,7 @@
         <line x1={bounds.minX - 2 * k} x2={bounds.minX - off - tick} y1={bounds.maxY} y2={bounds.maxY} />
         <text transform="translate({bounds.minX - off - 8 * k} {(bounds.minY + bounds.maxY) / 2}) rotate(-90)">{d.toFixed(1)} mm</text>
         <!-- altezza (asse verticale delle celle, non visibile da sopra) -->
-        <text class="h" x={bounds.maxX} y={bounds.maxY + 14 * k}>altezza {bounds.withHolder ? 'pacco' : 'celle'} {bounds.heightMm.toFixed(1)} mm</text>
+        <text class="h" x={bounds.maxX} y={bounds.maxY + 14 * k}>{t(bounds.withHolder ? 'editor.heightPack' : 'editor.heightCells', { height: bounds.heightMm.toFixed(1) })}</text>
       </g>
     {/if}
 
@@ -427,11 +428,11 @@
     {/if}
   </svg>
 
-  <span class="face-tag" class:bottom={ui.face === 'bottom'} title="Cambia faccia (V)">Vista {ui.face === 'top' ? 'SOPRA' : 'SOTTO'}</span>
+  <span class="face-tag" class:bottom={ui.face === 'bottom'} title={t('editor.flipFace')}>{t('editor.faceTag', { face: t(ui.face === 'top' ? 'editor.faceTop' : 'editor.faceBottom') })}</span>
 
   {#if project.cells.length === 0}
     <p class="empty">
-      Nessuna cella.<br />Genera un pacco dal pannello a sinistra oppure premi <kbd>A</kbd> e clicca per aggiungerne.
+      {t('editor.empty1')}<br />{t('editor.empty2a')} <kbd>A</kbd> {t('editor.empty2b')}
     </p>
   {/if}
 </div>

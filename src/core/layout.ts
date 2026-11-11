@@ -1,5 +1,6 @@
 import { slotPosition, type LatticeKind } from './lattice';
 import type { NewCell } from './ops';
+import { t } from '../i18n';
 
 export type LayoutKind = LatticeKind;
 
@@ -26,13 +27,13 @@ export interface GridSpec {
  */
 export function generateGrid(spec: GridSpec): Omit<NewCell, 'id'>[] {
   const { typeId, diameterMm, series, parallel, kind, gapMm } = spec;
-  if (!Number.isInteger(series) || series < 1) throw new RangeError('S deve essere un intero >= 1');
-  if (!Number.isInteger(parallel) || parallel < 1) throw new RangeError('P deve essere un intero >= 1');
+  if (!Number.isInteger(series) || series < 1) throw new RangeError(t('layout.err.s'));
+  if (!Number.isInteger(parallel) || parallel < 1) throw new RangeError(t('layout.err.p'));
   if (series * parallel > MAX_GENERATED_CELLS) {
-    throw new RangeError(`Troppe celle (massimo ${MAX_GENERATED_CELLS})`);
+    throw new RangeError(t('layout.err.tooMany', { max: MAX_GENERATED_CELLS }));
   }
-  if (!(diameterMm > 0)) throw new RangeError('Diametro cella non valido');
-  if (!(gapMm >= 0) || !Number.isFinite(gapMm)) throw new RangeError('Lo spazio tra le celle non può essere negativo');
+  if (!(diameterMm > 0)) throw new RangeError(t('layout.err.diameter'));
+  if (!(gapMm >= 0) || !Number.isFinite(gapMm)) throw new RangeError(t('layout.err.gap'));
 
   const lattice = { kind, pitchMm: diameterMm + gapMm };
   const cells: Omit<NewCell, 'id'>[] = [];

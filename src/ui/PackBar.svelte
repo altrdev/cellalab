@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, tn } from '../i18n';
   import { computeStats } from '../core/stats';
   import { history } from '../state';
   import { packExtent } from './holder';
@@ -21,33 +22,33 @@
   const voltageRange = $derived(
     stats.minV === null || stats.maxV === null ? null : `${stats.minV.toFixed(1)}–${stats.maxV.toFixed(1)} V`,
   );
-  const sizeLabel = $derived(extent?.withHolder ? 'Ingombro pacco' : 'Ingombro celle');
+  const sizeLabel = $derived(extent?.withHolder ? t('packbar.sizePack') : t('packbar.sizeCells'));
 </script>
 
-<section class="bar" aria-label="Riepilogo del pacco">
+<section class="bar" aria-label={t('packbar.aria')}>
   <div class="id">
-    <span class="cfg" class:none={empty}>{stats.configLabel ?? (empty ? 'Nessuna cella' : '—')}</span>
-    {#if !empty}<span class="count">{stats.cellCount} {stats.cellCount === 1 ? 'cella' : 'celle'}</span>{/if}
+    <span class="cfg" class:none={empty}>{stats.configLabel ?? (empty ? t('packbar.noCells') : '—')}</span>
+    {#if !empty}<span class="count">{tn('packbar.cell', stats.cellCount)}</span>{/if}
   </div>
-  <div class="m" title="Nominale e, tra parentesi, da scarica a carica completa">
-    <b>Tensione</b><span class="big">{voltage}</span>{#if voltageRange}<small>{voltageRange}</small>{/if}
+  <div class="m" title={t('packbar.voltageTitle')}>
+    <b>{t('packbar.voltage')}</b><span class="big">{voltage}</span>{#if voltageRange}<small>{voltageRange}</small>{/if}
   </div>
   <div class="m">
-    <b>Capacità</b><span class="big">{num(stats.capacityAh, 1, ' Ah')}</span>{#if stats.energyWh !== null}<small>{num(stats.energyWh, 0, ' Wh')}</small>{/if}
+    <b>{t('packbar.capacity')}</b><span class="big">{num(stats.capacityAh, 1, ' Ah')}</span>{#if stats.energyWh !== null}<small>{num(stats.energyWh, 0, ' Wh')}</small>{/if}
   </div>
   <div
     class="m"
     title={stats.limitedByBms
-      ? `Corrente di progetto: le celle reggerebbero ${num(stats.cellCurrentA, 0, ' A')}`
-      : 'Corrente continua che reggono le celle'}
+      ? t('packbar.currentLimited', { cells: num(stats.cellCurrentA, 0, ' A') })
+      : t('packbar.currentTitle')}
   >
-    <b>Corrente</b><span class="big">{num(stats.maxCurrentA, 0, ' A')}</span>{#if stats.limitedByBms}<small class="bms">di progetto</small>{/if}
+    <b>{t('packbar.current')}</b><span class="big">{num(stats.maxCurrentA, 0, ' A')}</span>{#if stats.limitedByBms}<small class="bms">{t('packbar.designBadge')}</small>{/if}
   </div>
-  <div class="m s"><b>Peso celle</b><span>{weight}</span></div>
-  <div class="m s" title="Disponibile se tutte le celle hanno un prezzo nel catalogo">
-    <b>Costo celle</b><span>{cost}</span>{#if perWh}<small>{perWh}</small>{/if}
+  <div class="m s"><b>{t('packbar.weight')}</b><span>{weight}</span></div>
+  <div class="m s" title={t('packbar.costTitle')}>
+    <b>{t('packbar.cost')}</b><span>{cost}</span>{#if perWh}<small>{perWh}</small>{/if}
   </div>
-  <div class="m s" title={extent?.withHolder ? 'Ingombro totale con le due piastre del portacelle' : 'Ingombro delle sole celle'}>
+  <div class="m s" title={extent?.withHolder ? t('packbar.sizeWithHolderTitle') : t('packbar.sizeCellsTitle')}>
     <b>{sizeLabel}</b><span>{size}</span>
   </div>
 </section>

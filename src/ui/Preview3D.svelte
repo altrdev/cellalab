@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../i18n';
   import { rangeFill } from './rangeFill';
   import { onMount } from 'svelte';
   import { history } from '../state';
@@ -24,7 +25,7 @@
       created.setView(preset, history.get().present);
       scene = created;
     } catch (err) {
-      failed = err instanceof Error ? err.message : 'WebGL non disponibile';
+      failed = err instanceof Error ? err.message : t('preview.noWebgl');
     }
     return () => {
       created?.dispose();
@@ -59,33 +60,33 @@
   });
 </script>
 
-<div class="panel" role="region" aria-label="Anteprima 3D">
+<div class="panel" role="region" aria-label={t('preview.aria')}>
   <header>
     <label class="slider">
-      Esplosione
+      {t('preview.explosion')}
       <input use:rangeFill={explosion} type="range" min="0" max="60" step="1" bind:value={explosion} />
       <span>{explosion} mm</span>
     </label>
-    <label class="check"><input type="checkbox" bind:checked={showCells} /> Celle</label>
-    <label class="check" title="Portacelle (nascosto nella vista esplosa)"><input type="checkbox" bind:checked={ui.showHolder} /> Holder</label>
-    <label class="check" title="Lamelle sopra e sotto (nascoste nella vista esplosa)"><input type="checkbox" bind:checked={showBus} /> Lamelle</label>
-    <label class="check"><input type="checkbox" bind:checked={showPlane} /> Piano</label>
+    <label class="check"><input type="checkbox" bind:checked={showCells} /> {t('preview.cells')}</label>
+    <label class="check" title={t('preview.holderTitle')}><input type="checkbox" bind:checked={ui.showHolder} /> Holder</label>
+    <label class="check" title={t('preview.busbarsTitle')}><input type="checkbox" bind:checked={showBus} /> {t('preview.busbars')}</label>
+    <label class="check"><input type="checkbox" bind:checked={showPlane} /> {t('preview.plane')}</label>
     <label class="check">
-      Vista
+      {t('preview.view')}
       <select bind:value={preset}>
-        <option value="iso">Isometrica</option>
-        <option value="top">Dall'alto</option>
-        <option value="front">Frontale</option>
-        <option value="side">Laterale</option>
+        <option value="iso">{t('preview.iso')}</option>
+        <option value="top">{t('preview.viewTop')}</option>
+        <option value="front">{t('preview.front')}</option>
+        <option value="side">{t('preview.side')}</option>
       </select>
     </label>
     <span class="spacer"></span>
   </header>
   <div class="host" bind:this={host}></div>
   {#if failed}
-    <p class="fail">Impossibile avviare il 3D: {failed}. Il browser potrebbe avere WebGL disattivato.</p>
+    <p class="fail">{t('preview.fail', { reason: failed })}</p>
   {:else}
-    <p class="legend"><i class="plus"></i> bottone + con anello rosso <i class="minus"></i> fondo piatto −  · trascina per ruotare, rotella per lo zoom, tasto destro per spostare</p>
+    <p class="legend"><i class="plus"></i> {t('preview.legendPlus')} <i class="minus"></i> {t('preview.legendMinus')} · {t('preview.legendHelp')}</p>
   {/if}
 </div>
 

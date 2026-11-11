@@ -5,6 +5,7 @@ import { circlePolygon, closeRegions, differenceRegions, offsetRegions, regionAr
 import type { Rect } from './geometry';
 import type { Pt } from './polygon';
 import type { Project } from './types';
+import { fmtNum, t } from '../i18n';
 
 /**
  * Portacelle monolitico a due piastre (sopra e sotto). Ogni piastra è un "cappuccio":
@@ -333,12 +334,12 @@ export function analyzeHolder(project: Project, model: HolderModel): HolderRepor
     if (minWall <= 0) {
       issues.push({
         level: 'error',
-        text: 'Due celle sono così vicine che le loro tasche si sovrappongono: allarga lo spazio tra le celle o riduci il gioco.',
+        text: t('holder.issue.overlap'),
       });
     } else if (minWall < MIN_PRINT_WALL_MM) {
       issues.push({
         level: 'warning',
-        text: `Tra due celle resta una parete di soli ${minWall.toFixed(2).replace('.', ',')} mm: sotto ${String(MIN_PRINT_WALL_MM).replace('.', ',')} mm è fragile e può non stamparsi bene. Aumenta lo spazio tra le celle.`,
+        text: t('holder.issue.thinWall', { wall: fmtNum(minWall, 2), min: fmtNum(MIN_PRINT_WALL_MM, 1) }),
       });
     }
   }
@@ -347,21 +348,21 @@ export function analyzeHolder(project: Project, model: HolderModel): HolderRepor
   if (!fitsBed(widthMm, depthMm)) {
     issues.push({
       level: 'warning',
-      text: `La piastra misura ${widthMm.toFixed(0)}×${depthMm.toFixed(0)} mm e non sta nel piano di stampa (${s.bedXMm}×${s.bedYMm} mm): andrà divisa in pezzi (funzione in arrivo).`,
+      text: t('holder.issue.bed', { w: widthMm.toFixed(0), d: depthMm.toFixed(0), bx: s.bedXMm, by: s.bedYMm }),
     });
   }
   if (model.lipMm < s.lipMm - 1e-9) {
-    issues.push({ level: 'info', text: `Le pareti sono state limitate a ${model.lipMm.toFixed(1).replace('.', ',')} mm: le due piastre non devono toccarsi a metà cella.` });
+    issues.push({ level: 'info', text: t('holder.issue.lip', { lip: fmtNum(model.lipMm, 1) }) });
   }
   if (model.chamferMm < s.chamferMm - 1e-9) {
-    issues.push({ level: 'info', text: `Lo smusso è stato ridotto a ${model.chamferMm.toFixed(2).replace('.', ',')} mm: non può superare i tre quarti della parete.` });
+    issues.push({ level: 'info', text: t('holder.issue.chamfer', { chamfer: fmtNum(model.chamferMm, 2) }) });
   }
   if (!s.lockCells) {
-    issues.push({ level: 'info', text: 'Senza il fondo le celle non sono trattenute sul lato dei poli: le piastre da sole non le bloccano.' });
+    issues.push({ level: 'info', text: t('holder.issue.noFloor') });
   }
   issues.push({
     level: 'info',
-    text: 'Stampa in PETG, ASA o ABS: il PLA si ammorbidisce intorno ai 60 °C e il pacco, sotto carico, può scaldarsi.',
+    text: t('holder.issue.material'),
   });
 
   return {

@@ -1,4 +1,5 @@
 import { boundsOfCells } from '../core/geometry';
+import { loadLocale, saveLocale, setLocale, type Locale } from '../i18n';
 import type { HolderSettings } from '../core/holder';
 import type { LamellaSettings } from '../core/lamelle';
 import type { LatticeKind } from '../core/lattice';
@@ -12,8 +13,23 @@ export type Tool = 'select' | 'add' | 'series';
 /** 'slot' = aggancio alle posizioni della griglia di celle; un numero = passo in mm (0 = libero). */
 export type Snap = 'slot' | number;
 
+/** Lingua di partenza: quella salvata o quella del browser. Si imposta subito, prima che si disegni qualcosa. */
+function initialLocale(): Locale {
+  const l = loadLocale();
+  setLocale(l);
+  return l;
+}
+
 /** Stato dell'interfaccia (selezione, strumento, vista). Il progetto sta in `history`. */
 class UiState {
+  /** Lingua dell'interfaccia; cambiandola App.svelte rimonta tutto. */
+  locale = $state<Locale>(initialLocale());
+  setLanguage(l: Locale) {
+    if (l === this.locale) return;
+    setLocale(l);
+    saveLocale(l);
+    this.locale = l;
+  }
   selected = $state<ReadonlySet<string>>(new Set());
   tool = $state<Tool>('select');
   snap = $state<Snap>('slot');

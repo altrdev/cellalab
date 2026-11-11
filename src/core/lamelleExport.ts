@@ -1,4 +1,5 @@
 import { offsetRegion, regionRings } from './clip';
+import { t } from '../i18n';
 import { labelPlacements } from './dxf';
 import type { Pt } from './polygon';
 import type { LamellaReport } from './lamelle';
@@ -45,7 +46,7 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
 
   const out: string[] = [];
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${r3(w)}mm" height="${r3(h)}mm" viewBox="${r3(minX)} ${r3(minY)} ${r3(w)} ${r3(h)}">`);
-  out.push(`<title>${esc(o.title ?? 'Lamelle')} - faccia ${o.face === 'top' ? 'sopra' : 'sotto'}</title>`);
+  out.push(`<title>${esc(t('export.svg.title', { title: o.title ?? t('export.svg.defaultTitle'), face: t(o.face === 'top' ? 'face.top' : 'face.bottom') }))}</title>`);
   out.push('<g fill="none" stroke-linejoin="round" font-family="sans-serif">');
   list.forEach((s, i) => {
     out.push(`<path d="${(rings[i] as Pt[][]).map(d).join(' ')}" fill-rule="evenodd" stroke="#d00" stroke-width="0.2"/>`);
@@ -67,7 +68,7 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
   });
   const by = maxY - 6;
   out.push(`<path d="M${r3(minX + MARGIN_MM)} ${r3(by)} h${SCALE_BAR_MM} m0 -1.5 v3 m-${SCALE_BAR_MM} 0 v-3" stroke="#000" stroke-width="0.3"/>`);
-  out.push(`<text x="${r3(minX + MARGIN_MM)}" y="${r3(by + 5)}" font-size="3" fill="#000" stroke="none">${SCALE_BAR_MM} mm - stampa al 100% (nessun adattamento alla pagina)</text>`);
+  out.push(`<text x="${r3(minX + MARGIN_MM)}" y="${r3(by + 5)}" font-size="3" fill="#000" stroke="none">${esc(t('export.svg.scale', { n: SCALE_BAR_MM }))}</text>`);
   out.push('</g></svg>');
   return out.join('\n') + '\n';
 }
@@ -76,12 +77,12 @@ const fmt = (n: number | null, d = 2) => (n === null ? '' : n.toFixed(d));
 
 /** Lista di taglio in CSV (separatore ';', decimali con il punto). */
 export function buildCutListCsv(strips: readonly Strip[], report: LamellaReport): string {
-  const rows = ['faccia;lamella;celle_collegate;area_mm2;collo_mm;corrente_A;spessore_min_mm;punti_per_cella'];
+  const rows = [t('export.csv.header')];
   for (const s of strips) {
     const r = report.strips.find((x) => x.stripId === s.id);
     rows.push(
       [
-        s.face === 'top' ? 'sopra' : 'sotto',
+        t(s.face === 'top' ? 'face.top' : 'face.bottom'),
         s.label,
         s.nodes.length,
         fmt(s.areaMm2, 0),
@@ -97,14 +98,22 @@ export function buildCutListCsv(strips: readonly Strip[], report: LamellaReport)
 
 /** Riepilogo leggibile da stampare con la dima. */
 export function buildCutSummary(report: LamellaReport, projectName: string): string {
-  const t = report.thicknessMm;
+  const th = report.thicknessMm;
+  const thickness =
+    th === null
+      ? t('export.summary.thicknessNone', { required: fmt(report.requiredMm) })
+      : t('export.summary.thicknessValue', { thickness: fmt(th), layers: report.layers });
   const lines = [
-    `Lamelle - ${projectName}`,
-    `Materiale: ${report.material.name}`,
-    `Spessore: ${t === null ? 'nessuno basta (servono almeno ' + fmt(report.requiredMm) + ' mm)' : fmt(t) + ' mm x ' + report.layers + ' strato/i'}`,
-    `Corrente di progetto: ${fmt(report.currentA, 0)} A`,
-    `Pezzi: ${report.strips.length} - area ${fmt(report.totalAreaCm2, 1)} cm2${report.massG !== null ? ' - ' + fmt(report.massG, 0) + ' g' : ''}`,
-    `Saldatrice: ${report.welder.name} - taglio: ${report.cutter.name}`,
+    t('export.summary.title', { name: projectName }),
+    t('export.summary.material', { material: report.material.name }),
+    t('export.summary.thickness', { value: thickness }),
+    t('export.summary.current', { current: fmt(report.currentA, 0) }),
+    t('export.summary.parts', {
+      count: report.strips.length,
+      area: fmt(report.totalAreaCm2, 1),
+      mass: report.massG !== null ? ' - ' + fmt(report.massG, 0) + ' g' : '',
+    }),
+    t('export.summary.tools', { welder: report.welder.name, cutter: report.cutter.name }),
     '',
     ...report.issues.map((i) => `[${i.severity}] ${i.message}`),
   ];

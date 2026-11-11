@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { t } from '../i18n';
   import type { Snippet } from 'svelte';
-  let { label = 'Come funziona', children }: { label?: string; children: Snippet } = $props();
+  let { label = t('help.how'), children }: { label?: string; children: Snippet } = $props();
   let open = $state(false);
 </script>
 

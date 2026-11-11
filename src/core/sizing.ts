@@ -8,14 +8,31 @@
  *  - punti di saldatura: n = ceil((I/P) / I_per_punto), per ogni terminale.
  */
 
+import { t } from '../i18n';
+
 const MM = 1e-3;
 
 /** Coefficienti di scambio termico verso l'aria, W/(m²·K). */
 export const COOLING = {
-  free: { label: 'aria libera', h: 10 },
-  ventilated: { label: 'ventilato', h: 25 },
-  enclosed: { label: 'chiuso (nel contenitore)', h: 5 },
-} as const;
+  free: {
+    get label() {
+      return t('cooling.free');
+    },
+    h: 10,
+  },
+  ventilated: {
+    get label() {
+      return t('cooling.ventilated');
+    },
+    h: 25,
+  },
+  enclosed: {
+    get label() {
+      return t('cooling.enclosed');
+    },
+    h: 5,
+  },
+};
 export type CoolingId = keyof typeof COOLING;
 
 export interface ThermalInput {

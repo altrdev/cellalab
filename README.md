@@ -15,7 +15,7 @@ English · [🇮🇹 Italiano](README.it.md)
 - **3D-printable holder:** two custom plates with cell pockets, a floor that retains the cells, fillets and a smooth sloped chamfer. Export an **STL** in print orientation.
 - **Project:** automatic saving in the browser; save and open `.cellalab.json` files (they include the busbar and holder settings).
 
-The interface is in Italian.
+The interface is available in English and Italian: it follows the browser language and can be switched with the IT/EN toggle next to the title.
 
 ## Quick start
 

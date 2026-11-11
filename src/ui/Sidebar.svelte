@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, tn } from '../i18n';
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
   import { computeStats } from '../core/stats';
@@ -29,6 +30,7 @@
   import HolderPanel from './HolderPanel.svelte';
   import { holderOf, sanitizeHolderSettings } from './holder';
   import LamellePanel from './LamellePanel.svelte';
+  import LangSwitch from './LangSwitch.svelte';
   import { reportOf, sanitizeLamellaSettings } from './lamelle';
   import { ui } from './ui.svelte';
 
@@ -40,10 +42,10 @@
   const sumTone = $derived(sumErrors > 0 ? 'error' : sumWarnings > 0 ? 'warning' : 'ok');
   const sumLabel = $derived(
     sumErrors > 0
-      ? `${sumErrors} ${sumErrors === 1 ? 'problema' : 'problemi'}`
+      ? tn('side.sum.problem', sumErrors)
       : sumWarnings > 0
-        ? `${sumWarnings} ${sumWarnings === 1 ? 'avviso' : 'avvisi'}`
-        : 'Tutto a posto',
+        ? tn('side.sum.warning', sumWarnings)
+        : t('side.sum.ok'),
   );
   const allTypes = $derived([...project.customCellTypes, ...BUILTIN_CELL_TYPES]);
   let series = $state(4);
@@ -51,15 +53,15 @@
   let groupNumber = $state(1);
   let autoP = $state(3);
   let strategy = $state<GroupStrategy>('auto');
-  const strategyNames = { x: 'a colonne', y: 'a righe', blob: 'a blocchi compatti' } as const;
+  const strategyNames = { x: t('side.strategy.x'), y: t('side.strategy.y'), blob: t('side.strategy.blob') } as const;
   let message = $state<{ kind: 'error' | 'ok'; text: string } | null>(null);
 
   type Tab = typeof ui.sideTab;
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'pack', label: 'Pacco' },
-    { id: 'strips', label: 'Lamelle' },
-    { id: 'holder', label: 'Portacelle' },
-    { id: 'file', label: 'Esporta' },
+    { id: 'pack', label: t('side.tab.pack') },
+    { id: 'strips', label: t('side.tab.strips') },
+    { id: 'holder', label: t('side.tab.holder') },
+    { id: 'file', label: t('side.tab.file') },
   ];
   // Pallino sulla scheda quando c'è qualcosa da guardare: 'error' rosso, 'warning' giallo.
   const tabFlag = $derived.by((): Record<Tab, 'error' | 'warning' | null> => {
@@ -133,7 +135,7 @@
     if (!next) {
       message = {
         kind: 'error',
-        text: 'Alcune celle non stanno più sugli slot del pacco generato: non posso adeguarle. Riportale sugli slot oppure rigenera il pacco.',
+        text: t('side.err.applySlots'),
       };
       return;
     }
@@ -170,13 +172,13 @@
       ui.fit(history.get().present);
       message = null;
     } catch (err) {
-      message = { kind: 'error', text: err instanceof Error ? err.message : 'Impossibile generare il pacco' };
+      message = { kind: 'error', text: err instanceof Error ? err.message : t('side.err.generate') };
     }
   }
 
   function applyGroup() {
     if (!Number.isInteger(groupNumber) || groupNumber < 1) {
-      message = { kind: 'error', text: 'Il numero del gruppo deve essere un intero >= 1' };
+      message = { kind: 'error', text: t('side.err.groupNumber') };
       return;
     }
     assignGroupToSelected(groupNumber - 1);
@@ -197,11 +199,10 @@
       message = {
         kind: 'ok',
         text:
-          `${result.groupCount} gruppi da ${autoP} celle (S${start + 1}–S${start + result.groupCount}), ` +
-          `disposizione ${strategyNames[result.strategy]}. Controlla l'ordine in serie e correggi a mano se serve.`,
+          t('side.msg.groups', { count: result.groupCount, p: autoP, from: start + 1, to: start + result.groupCount, strategy: strategyNames[result.strategy] }),
       };
     } catch (err) {
-      message = { kind: 'error', text: err instanceof Error ? err.message : 'Impossibile suggerire i gruppi' };
+      message = { kind: 'error', text: err instanceof Error ? err.message : t('side.err.suggest') };
     }
   }
 
@@ -259,7 +260,7 @@
       if (ui.addTypeId === id) ui.addTypeId = BUILTIN_CELL_TYPES[0]!.id;
       message = null;
     } catch (err) {
-      message = { kind: 'error', text: err instanceof Error ? err.message : 'Impossibile eliminare il tipo' };
+      message = { kind: 'error', text: err instanceof Error ? err.message : t('side.err.deleteType') };
     }
   }
 
@@ -297,7 +298,7 @@
     input.value = '';
     if (!file) return;
     if (file.size > 5_000_000) {
-      message = { kind: 'error', text: 'File troppo grande per essere un progetto CellaLab' };
+      message = { kind: 'error', text: t('side.err.tooBig') };
       return;
     }
     try {
@@ -312,20 +313,23 @@
       ui.fit(history.get().present);
       message = {
         kind: 'ok',
-        text: `Aperto: ${file.name}${saved.lamella !== undefined || saved.holder !== undefined ? ' (con le impostazioni di lamelle e portacelle)' : ''}`,
+        text: t(saved.lamella !== undefined || saved.holder !== undefined ? 'side.msg.openedSettings' : 'side.msg.opened', { name: file.name }),
       };
     } catch (err) {
-      message = { kind: 'error', text: err instanceof ProjectParseError ? err.message : 'Impossibile leggere il file' };
+      message = { kind: 'error', text: err instanceof ProjectParseError ? err.message : t('side.err.read') };
     }
   }
 </script>
 
 <div class="side">
   <header>
-    <h1>CellaLab</h1>
+    <div class="brand">
+      <h1>CellaLab</h1>
+      <LangSwitch />
+    </div>
     <input
       class="name"
-      aria-label="Nome del progetto"
+      aria-label={t('side.projectName')}
       value={project.name}
       oninput={(e) => history.commit((p) => renameProject(p, e.currentTarget.value), { coalesceKey: 'rename' })}
     />
@@ -335,10 +339,10 @@
     <p class="banner" class:error={message.kind === 'error'} role="status">{message.text}</p>
   {/if}
 
-  <div class="tabs" role="tablist" aria-label="Sezioni">
-    {#each tabs as t (t.id)}
-      <button role="tab" aria-selected={ui.sideTab === t.id} class:on={ui.sideTab === t.id} onclick={() => pickTab(t.id)}>
-        {t.label}{#if tabFlag[t.id]}<span class="flag {tabFlag[t.id]}" title={tabFlag[t.id] === 'error' ? 'Ci sono problemi' : 'Ci sono avvisi'}></span>{/if}
+  <div class="tabs" role="tablist" aria-label={t('side.sections')}>
+    {#each tabs as tab (tab.id)}
+      <button role="tab" aria-selected={ui.sideTab === tab.id} class:on={ui.sideTab === tab.id} onclick={() => pickTab(tab.id)}>
+        {tab.label}{#if tabFlag[tab.id]}<span class="flag {tabFlag[tab.id]}" title={tabFlag[tab.id] === 'error' ? t('side.tab.flagError') : t('side.tab.flagWarning')}></span>{/if}
       </button>
     {/each}
   </div>
@@ -347,16 +351,16 @@
 
   {#snippet layoutFields(dia: number)}
     <div class="row">
-      <label>Disposizione
+      <label>{t('side.layout')}
         <select bind:value={ui.layoutKind}>
-          <option value="hex">Esagonale (compatta)</option>
-          <option value="square">Quadrata</option>
+          <option value="hex">{t('side.layout.hex')}</option>
+          <option value="square">{t('side.layout.square')}</option>
         </select>
       </label>
     </div>
     <div class="row">
-      <label>Spazio tra celle (mm)<input type="number" min="0" max="20" step="0.1" bind:value={ui.gapMm} /></label>
-      <label title="Distanza tra i centri di due celle vicine = diametro + spazio">Centro-centro (mm)
+      <label>{t('side.gap')}<input type="number" min="0" max="20" step="0.1" bind:value={ui.gapMm} /></label>
+      <label title={t('side.pitchTitle')}>{t('side.pitch')}
         <input
           type="number"
           min={dia}
@@ -374,37 +378,37 @@
 
   {#snippet seriesParallel()}
     <div class="row">
-      <label>S (serie)<input type="number" min="1" max={MAX_GENERATED_CELLS} step="1" bind:value={series} /></label>
-      <label>P (parallelo)<input type="number" min="1" max={MAX_GENERATED_CELLS} step="1" bind:value={parallel} /></label>
+      <label>{t('side.series')}<input type="number" min="1" max={MAX_GENERATED_CELLS} step="1" bind:value={series} /></label>
+      <label>{t('side.parallel')}<input type="number" min="1" max={MAX_GENERATED_CELLS} step="1" bind:value={parallel} /></label>
     </div>
   {/snippet}
 
   {#snippet generateButton(verb: string)}
-    <button class="primary" onclick={generate}>{verb} {Number.isInteger(series) && Number.isInteger(parallel) ? `${series}S${parallel}P` : 'pacco'}</button>
-    <p class="note">Sostituisce le celle attuali; puoi annullare con Ctrl+Z.</p>
+    <button class="primary" onclick={generate}>{verb} {Number.isInteger(series) && Number.isInteger(parallel) ? `${series}S${parallel}P` : t('side.packWord')}</button>
+    <p class="note">{t('side.replaces')}</p>
   {/snippet}
 
   {#if project.cells.length > 0}
     <div class="sum {sumTone}" role="status">
       <div class="sum-main">
-        <span class="cfg">{stats.configLabel ?? `${stats.cellCount} celle`}</span>
+        <span class="cfg">{stats.configLabel ?? tn('packbar.cell', stats.cellCount)}</span>
         <span class="pill">{sumLabel}</span>
       </div>
       <div class="sum-grid">
-        <span><b>{stats.nominalV === null ? '—' : stats.nominalV.toFixed(1)} V</b>tensione</span>
-        <span><b>{stats.energyWh === null ? '—' : stats.energyWh.toFixed(0)} Wh</b>energia</span>
-        <span><b>{stats.maxCurrentA === null ? '—' : stats.maxCurrentA.toFixed(0)} A</b>{stats.limitedByBms ? 'corrente · progetto' : 'corrente'}</span>
+        <span><b>{stats.nominalV === null ? '—' : stats.nominalV.toFixed(1)} V</b>{t('side.voltage')}</span>
+        <span><b>{stats.energyWh === null ? '—' : stats.energyWh.toFixed(0)} Wh</b>{t('side.energy')}</span>
+        <span><b>{stats.maxCurrentA === null ? '—' : stats.maxCurrentA.toFixed(0)} A</b>{stats.limitedByBms ? t('side.currentDesign') : t('side.current')}</span>
       </div>
     </div>
   {/if}
 
   {#if !(packMode === 'empty' && ui.startMode === null)}
   <details class="sec" open>
-    <summary><Icon name="battery" /> Cella</summary>
-    <label>{packMode === 'generated' ? 'Cella del pacco' : packMode === 'manual' ? 'Cella da aggiungere' : 'Tipo di cella'}
+    <summary><Icon name="battery" /> {t('side.cell.title')}</summary>
+    <label>{packMode === 'generated' ? t('side.cell.of') : packMode === 'manual' ? t('side.cell.toAdd') : t('side.cell.type')}
       <select bind:value={ui.addTypeId}>
-        {#each allTypes as t (t.id)}
-          <option value={t.id}>{t.name}</option>
+        {#each allTypes as ct (ct.id)}
+          <option value={ct.id}>{ct.name}</option>
         {/each}
       </select>
     </label>
@@ -412,40 +416,40 @@
       <div class="spec">
         <span>{typeSummary(selectedType)}</span>
         {#if selectedType.generic}
-          <button type="button" class="tag" class:on={showGenericInfo} onclick={() => (showGenericInfo = !showGenericInfo)} title="Valori generici di catalogo">generico</button>
+          <button type="button" class="tag" class:on={showGenericInfo} onclick={() => (showGenericInfo = !showGenericInfo)} title={t('side.cell.genericTitle')}>{t('side.cell.generic')}</button>
         {/if}
       </div>
       {#if selectedType.generic && showGenericInfo}
-        <p class="note">Sono valori tipici di catalogo, non di una cella precisa: verifica sulla scheda tecnica, oppure duplicala e metti i tuoi dati.</p>
+        <p class="note">{t('side.cell.genericInfo')}</p>
       {/if}
     {/if}
     {#if packMode === 'manual' && otherTypeCount > 0}
       <button type="button" onclick={() => history.commit((p) => setCellType(p, ui.addTypeId, ui.selected.size > 0 ? ui.selected : undefined))}>
-        {ui.selected.size > 0 ? `Usa questa cella per le ${otherTypeCount} selezionate` : `Usa questa cella per tutte le ${otherTypeCount} altre`}
+        {ui.selected.size > 0 ? t('side.cell.useSelected', { n: otherTypeCount }) : t('side.cell.useAll', { n: otherTypeCount })}
       </button>
     {/if}
     {#if !draft}
       <div class="row">
         {#if selectedType && !selectedType.generic && project.customCellTypes.some((c) => c.id === selectedType.id)}
-          <button onclick={() => startDraft(selectedType, true)}>Modifica</button>
-          <button onclick={() => removeType(selectedType.id)}>Elimina</button>
+          <button onclick={() => startDraft(selectedType, true)}>{t('side.cell.edit')}</button>
+          <button onclick={() => removeType(selectedType.id)}>{t('side.cell.delete')}</button>
         {:else}
-          <button onclick={() => selectedType && startDraft(selectedType, false)}>Duplica e modifica</button>
+          <button onclick={() => selectedType && startDraft(selectedType, false)}>{t('side.cell.duplicate')}</button>
         {/if}
       </div>
     {/if}
     {#if draft}
       <form class="draft" onsubmit={(e) => { e.preventDefault(); saveDraft(); }}>
-        <label>Nome<input type="text" bind:value={draft.name} maxlength="60" /></label>
-        <label>Chimica
+        <label>{t('side.draft.name')}<input type="text" bind:value={draft.name} maxlength="60" /></label>
+        <label>{t('side.draft.chemistry')}
           <select bind:value={draft.chemistry}>
             <option value="li-ion">Li-ion</option>
             <option value="lifepo4">LiFePO4</option>
           </select>
         </label>
         <div class="row">
-          <label>Diametro (mm)<input type="number" step="0.1" bind:value={draft.diameterMm} /></label>
-          <label>Altezza (mm)<input type="number" step="0.1" bind:value={draft.heightMm} /></label>
+          <label>{t('side.draft.diameter')}<input type="number" step="0.1" bind:value={draft.diameterMm} /></label>
+          <label>{t('side.draft.height')}<input type="number" step="0.1" bind:value={draft.heightMm} /></label>
         </div>
         <div class="row">
           <label>V min<input type="number" step="0.05" bind:value={draft.minV} /></label>
@@ -453,19 +457,19 @@
           <label>V max<input type="number" step="0.05" bind:value={draft.maxV} /></label>
         </div>
         <div class="row">
-          <label>Capacità (Ah)<input type="number" step="0.1" bind:value={draft.capacityAh} /></label>
-          <label>Scarica max (A)<input type="number" step="0.5" bind:value={draft.maxDischargeA} /></label>
+          <label>{t('side.draft.capacity')}<input type="number" step="0.1" bind:value={draft.capacityAh} /></label>
+          <label>{t('side.draft.discharge')}<input type="number" step="0.5" bind:value={draft.maxDischargeA} /></label>
         </div>
         <div class="row">
-          <label>Peso (g)<input type="number" step="0.5" bind:value={draft.weightG} /></label>
-          <label>Prezzo (€/cella)<input type="number" step="0.01" min="0" placeholder="facoltativo" bind:value={draft.priceEur} /></label>
+          <label>{t('side.draft.weight')}<input type="number" step="0.5" bind:value={draft.weightG} /></label>
+          <label>{t('side.draft.price')}<input type="number" step="0.01" min="0" placeholder={t('side.draft.optional')} bind:value={draft.priceEur} /></label>
         </div>
         {#if draftErrors.length > 0}
           <ul class="errs">{#each draftErrors as err (err)}<li>{err}</li>{/each}</ul>
         {/if}
         <div class="row">
-          <button type="submit" class="primary">{editingId ? 'Salva modifiche' : 'Aggiungi al catalogo'}</button>
-          <button type="button" onclick={cancelDraft}>Annulla</button>
+          <button type="submit" class="primary">{editingId ? t('side.draft.save') : t('side.draft.add')}</button>
+          <button type="button" onclick={cancelDraft}>{t('side.draft.cancel')}</button>
         </div>
       </form>
     {/if}
@@ -474,13 +478,13 @@
 
   {#if !(packMode === 'empty' && ui.startMode === null)}
   <details class="sec" open>
-    <summary><Icon name="bolt" /> Corrente</summary>
-    <label>Corrente di progetto (A)
+    <summary><Icon name="bolt" /> {t('side.currentSection')}</summary>
+    <label>{t('side.currentDesignLabel')}
       <input
         type="number"
         min="0"
         step="1"
-        placeholder={stats.cellCurrentA === null ? 'nessuno' : `celle: ${stats.cellCurrentA.toFixed(0)}`}
+        placeholder={stats.cellCurrentA === null ? t('side.none') : t('side.cellsCurrent', { n: stats.cellCurrentA.toFixed(0) })}
         value={project.currentLimitA ?? ''}
         onchange={(e) => {
           const v = e.currentTarget.value === '' ? undefined : Number(e.currentTarget.value);
@@ -488,149 +492,149 @@
         }}
       />
     </label>
-    <Help label="Come funziona">
-      {#if stats.cellCurrentA === null}Con le celle il pacco regge quanto indicato dalle schede; scrivi qui la corrente continua che userai.
-      {:else if stats.limitedByBms}Il pacco è dimensionato per {stats.maxCurrentA?.toFixed(0)} A (le celle reggerebbero {stats.cellCurrentA.toFixed(0)} A). Lamelle e verifiche usano {stats.maxCurrentA?.toFixed(0)} A.
-      {:else}Vuoto = corrente massima delle celle ({stats.cellCurrentA.toFixed(0)} A), che è un limite assoluto e non un valore di progetto. Scrivi la corrente continua che userai davvero: le lamelle e le saldature si dimensionano su quella. Il limite del tuo BMS è solo un tetto.{/if}
+    <Help label={t('help.how')}>
+      {#if stats.cellCurrentA === null}{t('side.currentHelp.noCells')}
+      {:else if stats.limitedByBms}{t('side.currentHelp.limited', { design: stats.maxCurrentA?.toFixed(0) ?? '', cells: stats.cellCurrentA.toFixed(0) })}
+      {:else}{t('side.currentHelp.default', { cells: stats.cellCurrentA.toFixed(0) })}{/if}
     </Help>
   </details>
   {/if}
 
   {#if packMode === 'empty' && ui.startMode === null}
     <section class="sec start">
-      <h2>Come vuoi partire?</h2>
+      <h2>{t('side.start.title')}</h2>
       <button class="choice" onclick={() => (ui.startMode = 'auto')}>
-        <b>Genera automaticamente</b>
-        <span>Scegli cella, serie (S) e parallelo (P): il pacco si costruisce da solo.</span>
+        <b>{t('side.start.auto')}</b>
+        <span>{t('side.start.autoHelp')}</span>
       </button>
       <button class="choice" onclick={() => (ui.startMode = 'manual')}>
-        <b>Disegna a mano</b>
-        <span>Parti da un disegno vuoto e aggiungi le celle una alla volta o a pennello.</span>
+        <b>{t('side.start.manual')}</b>
+        <span>{t('side.start.manualHelp')}</span>
       </button>
     </section>
   {:else if packMode === 'empty' && ui.startMode === 'auto'}
     <details class="sec" open>
-      <summary><Icon name="wand" /> Genera pacco</summary>
-      <button class="back" onclick={() => (ui.startMode = null)}>← Cambia scelta</button>
+      <summary><Icon name="wand" /> {t('side.generate.title')}</summary>
+      <button class="back" onclick={() => (ui.startMode = null)}>{t('side.back')}</button>
       {@render seriesParallel()}
       {@render layoutFields(diameter)}
-      {@render generateButton('Genera')}
+      {@render generateButton(t('side.generate.verb'))}
     </details>
   {:else if packMode === 'empty'}
     <details class="sec" open>
-      <summary><Icon name="pen" /> Disegna a mano</summary>
-      <button class="back" onclick={() => (ui.startMode = null)}>← Cambia scelta</button>
+      <summary><Icon name="pen" /> {t('side.start.manual')}</summary>
+      <button class="back" onclick={() => (ui.startMode = null)}>{t('side.back')}</button>
       {@render layoutFields(diameter)}
-      <Help label="Come si aggiungono">Aggiungi le celle con <b>＋ Aggiungi</b> (tasto A) nella barra sotto il disegno, poi assegna le serie col pennello (tasto S). La griglia a slot segue disposizione e spazio.</Help>
+      <Help label={t('side.draw.helpLabel')}>{t('side.draw.help')}</Help>
     </details>
   {:else if packMode === 'generated'}
     <details class="sec" open>
-      <summary><Icon name="grid" /> Pacco generato</summary>
-      <p class="note">{genType?.name ?? 'Cella'} · {generator?.series}S{generator?.parallel}P all'origine</p>
+      <summary><Icon name="grid" /> {t('side.gen.title')}</summary>
+      <p class="note">{t('side.gen.origin', { name: genType?.name ?? t('side.cell.title'), s: generator?.series ?? '', p: generator?.parallel ?? '' })}</p>
       {@render layoutFields(diameter)}
-      <button class="primary" onclick={applyToPack} disabled={!layoutDirty}>Applica al pacco</button>
+      <button class="primary" onclick={applyToPack} disabled={!layoutDirty}>{t('side.gen.apply')}</button>
       {#if layoutDirty}
         <p class="note warn">
-          {#if typeDirty}Hai scelto un'altra cella: premi Applica per sostituirla in tutto il pacco e adeguare il passo.{:else}La griglia è cambiata ma le celle sono ancora al vecchio passo: premi Applica per spostarle.{/if}
+          {#if typeDirty}{t('side.gen.dirtyType')}{:else}{t('side.gen.dirtyGrid')}{/if}
         </p>
       {:else}
-        <Help label="Come si applica">Cambia disposizione o spazio e premi Applica: le celle si spostano sulla nuova griglia, con serie, polarità e modifiche intatte.</Help>
+        <Help label={t('side.gen.applyHelpLabel')}>{t('side.gen.applyHelp')}</Help>
       {/if}
       <details class="adv">
-        <summary>Rigenera da S×P</summary>
+        <summary>{t('side.gen.regen')}</summary>
         {@render seriesParallel()}
-        {@render generateButton('Rigenera')}
+        {@render generateButton(t('side.gen.regenVerb'))}
       </details>
-      <button type="button" class="restart" onclick={clearAll} title="Toglie le celle e torna alla scelta iniziale (Ctrl+Z annulla)">↺ Ricomincia da capo</button>
+      <button type="button" class="restart" onclick={clearAll} title={t('side.restartTitle')}>{t('side.restart')}</button>
     </details>
   {:else}
     <details class="sec" open>
-      <summary><Icon name="grid" /> Pacco a mano <span class="count">{project.cells.length}</span></summary>
+      <summary><Icon name="grid" /> {t('side.manual.title')} <span class="count">{project.cells.length}</span></summary>
       {@render layoutFields(diameter)}
-      <Help label="A cosa servono">Sono la griglia di aggancio per le celle che aggiungi: disposizione e spazio non spostano le celle già messe.</Help>
+      <Help label={t('side.manual.helpLabel')}>{t('side.manual.help')}</Help>
       <details class="adv">
-        <summary>Genera un pacco automatico</summary>
+        <summary>{t('side.manual.generate')}</summary>
         {@render seriesParallel()}
-        {@render generateButton('Genera')}
+        {@render generateButton(t('side.generate.verb'))}
       </details>
-      <button type="button" class="restart" onclick={clearAll} title="Toglie le celle e torna alla scelta iniziale (Ctrl+Z annulla)">↺ Ricomincia da capo</button>
+      <button type="button" class="restart" onclick={clearAll} title={t('side.restartTitle')}>{t('side.restart')}</button>
     </details>
   {/if}
 
   <details class="sec">
-    <summary><Icon name="pen" /> Serie a pennello</summary>
+    <summary><Icon name="pen" /> {t('side.brush.title')}</summary>
     <div class="row end">
-      <label>Serie n.
+      <label>{t('side.brush.n')}
         <input type="number" min="1" step="1" value={ui.activeSeries + 1}
           onchange={(e) => { const v = Math.floor(e.currentTarget.valueAsNumber); if (v >= 1) ui.activeSeries = v - 1; else e.currentTarget.value = String(ui.activeSeries + 1); }} />
       </label>
-      <span class="swatch" style:background={groupColor(ui.activeSeries)} title="Colore della serie"></span>
-      <button onclick={() => stepSeries(-1)} disabled={ui.activeSeries === 0} title="Serie precedente (←)">−</button>
-      <button onclick={() => stepSeries(1)} title="Serie successiva (→)">+</button>
+      <span class="swatch" style:background={groupColor(ui.activeSeries)} title={t('side.brush.colorTitle')}></span>
+      <button onclick={() => stepSeries(-1)} disabled={ui.activeSeries === 0} title={t('side.brush.prevTitle')}>−</button>
+      <button onclick={() => stepSeries(1)} title={t('side.brush.nextTitle')}>+</button>
     </div>
-    <label class="inline"><input type="checkbox" bind:checked={ui.alternateOnPaint} /> Alterna la polarità (serie pari: + sopra)</label>
+    <label class="inline"><input type="checkbox" bind:checked={ui.alternateOnPaint} /> {t('side.brush.alternate')}</label>
     <button class="primary" class:on={ui.tool === 'series'} onclick={toggleSeriesTool}>
-      {ui.tool === 'series' ? 'Pennello attivo — clicca per uscire' : 'Attiva il pennello (S)'}
+      {ui.tool === 'series' ? t('side.brush.active') : t('side.brush.activate')}
     </button>
-    <Help label="Come si usa">Trascina sulle celle per assegnarle alla serie, oppure disegna un rettangolo. Con ←/→ cambi serie. Un solo annulla per ogni pennellata.</Help>
+    <Help label={t('side.brush.helpLabel')}>{t('side.brush.help')}</Help>
     {#if groupCounts.groups.length > 0 || groupCounts.none > 0}
       <div class="chips">
         {#each groupCounts.groups as [g, n] (g)}
-          <button class="chip" class:active={g === ui.activeSeries} onclick={() => selectGroup(g)} title="Seleziona le celle della serie">
+          <button class="chip" class:active={g === ui.activeSeries} onclick={() => selectGroup(g)} title={t('side.brush.selectTitle')}>
             <span class="dot" style:background={groupColor(g)}></span>S{g + 1} · {n}
           </button>
         {/each}
-        {#if groupCounts.none > 0}<span class="chip static">senza serie · {groupCounts.none}</span>{/if}
+        {#if groupCounts.none > 0}<span class="chip static">{t('side.brush.noSeries', { n: groupCounts.none })}</span>{/if}
       </div>
     {/if}
   </details>
 
   <details class="sec">
-    <summary><Icon name="cursor" /> Selezione <span class="count">{ui.selected.size}</span></summary>
+    <summary><Icon name="cursor" /> {t('side.sel.title')} <span class="count">{ui.selected.size}</span></summary>
     {#if ui.selected.size === 0}
-      <p class="note">Clicca una cella o trascina un rettangolo. Il simbolo mostra il polo rivolto verso l'alto.</p>
+      <p class="note">{t('side.sel.help')}</p>
     {:else}
       <div class="row">
-        <button onclick={flipSelected}>Inverti polarità</button>
-        <button onclick={deleteSelected}>Elimina</button>
+        <button onclick={flipSelected}>{t('side.sel.flip')}</button>
+        <button onclick={deleteSelected}>{t('side.sel.delete')}</button>
       </div>
       <div class="row end">
-        <label>Gruppo in serie n.<input type="number" min="1" step="1" bind:value={groupNumber} /></label>
-        <button onclick={applyGroup}>Assegna</button>
+        <label>{t('side.sel.groupNo')}<input type="number" min="1" step="1" bind:value={groupNumber} /></label>
+        <button onclick={applyGroup}>{t('side.sel.assign')}</button>
       </div>
-      <button onclick={() => assignGroupToSelected(null)}>Dissocia dal gruppo</button>
+      <button onclick={() => assignGroupToSelected(null)}>{t('side.sel.dissociate')}</button>
     {/if}
   </details>
 
   <details class="sec">
-    <summary><Icon name="wand" /> Gruppi automatici</summary>
+    <summary><Icon name="wand" /> {t('side.auto.title')}</summary>
     <div class="row">
-      <label>Celle per gruppo (P)<input type="number" min="1" step="1" bind:value={autoP} /></label>
-      <label>Disposizione
+      <label>{t('side.auto.p')}<input type="number" min="1" step="1" bind:value={autoP} /></label>
+      <label>{t('side.layout')}
         <select bind:value={strategy}>
-          <option value="auto">Automatica</option>
-          <option value="x">A colonne</option>
-          <option value="y">A righe</option>
-          <option value="blob">A blocchi compatti</option>
+          <option value="auto">{t('side.auto.auto')}</option>
+          <option value="x">{t('side.auto.cols')}</option>
+          <option value="y">{t('side.auto.rows')}</option>
+          <option value="blob">{t('side.auto.blocks')}</option>
         </select>
       </label>
     </div>
     <button onclick={suggest} disabled={project.cells.length === 0}>
-      Suggerisci gruppi ({ui.selected.size > 0 ? `${ui.selected.size} selezionate` : 'tutte le celle'})
+      {t('side.auto.suggest', { what: ui.selected.size > 0 ? t('side.auto.selected', { n: ui.selected.size }) : t('side.auto.allCells') })}
     </button>
-    <button onclick={alternate} disabled={project.cells.length === 0} title="Gruppi pari con + sopra, dispari con − sopra">
-      Alterna polarità tra gruppi
+    <button onclick={alternate} disabled={project.cells.length === 0} title={t('side.auto.alternateTitle')}>
+      {t('side.auto.alternate')}
     </button>
-    <Help label="Cosa fa">È un suggerimento: puoi correggerlo a mano o annullarlo con Ctrl+Z.</Help>
+    <Help label={t('side.auto.helpLabel')}>{t('side.auto.help')}</Help>
   </details>
 
 
   <details class="sec" open>
-    <summary><Icon name={$drc.some((i) => i.severity !== 'info') ? 'alert' : 'check'} /> Verifiche {#if $drc.length > 0}<span class="count">{$drc.length}</span>{/if}</summary>
+    <summary><Icon name={$drc.some((i) => i.severity !== 'info') ? 'alert' : 'check'} /> {t('side.checks.title')} {#if $drc.length > 0}<span class="count">{$drc.length}</span>{/if}</summary>
     {#if project.cells.length === 0}
-      <p class="note">Nessun pacco.</p>
+      <p class="note">{t('side.checks.none')}</p>
     {:else if $drc.length === 0}
-      <p class="ok">Nessun problema: pacco coerente.</p>
+      <p class="ok">{t('side.checks.ok')}</p>
     {:else}
       <ul>
         {#each $drc as issue (issue.message)}
@@ -639,7 +643,7 @@
               class="issue {issue.severity}"
               onclick={() => show(issue.cellIds)}
               disabled={issue.cellIds.length === 0}
-              title={issue.cellIds.length ? 'Seleziona le celle coinvolte' : ''}
+              title={issue.cellIds.length ? t('side.checks.selectTitle') : ''}
             >
               <span class="dot"></span><span>{issue.message}</span>
             </button>
@@ -670,6 +674,12 @@
     flex-direction: column;
     gap: 6px;
     margin-bottom: 4px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
   h1 {
     margin: 0;

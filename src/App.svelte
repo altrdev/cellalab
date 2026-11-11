@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from './i18n';
   import { history } from './state';
   import { deleteSelected, fitView, flipSelected, selectAll, stepSeries, toggleAddTool, toggleSeriesTool } from './ui/actions';
   import Editor from './ui/Editor.svelte';
@@ -8,6 +9,12 @@
   import { saveHolderSettings, saveHolderView } from './ui/holder';
   import { saveLamellaSettings } from './ui/lamelle';
   import { ui } from './ui/ui.svelte';
+
+  // Titolo e lingua della pagina seguono la lingua scelta.
+  $effect(() => {
+    document.documentElement.lang = ui.locale;
+    document.title = t('app.title');
+  });
 
   // Le impostazioni delle lamelle si ricordano nel browser.
   $effect(() => {
@@ -109,6 +116,7 @@
 
 <svelte:window {onkeydown} {onkeyup} onblur={() => (ui.spaceDown = false)} />
 
+{#key ui.locale}
 <div class="app">
   <aside><Sidebar /></aside>
   <main class="m-{ui.viewMode}" bind:this={mainEl}>
@@ -118,7 +126,7 @@
         class="divider"
         role="separator"
         aria-orientation="vertical"
-        aria-label="Ridimensiona anteprima 3D"
+        aria-label={t('app.resize3d')}
         onpointerdown={startDrag}
       ></div>
       <div class="pane three" style="--pct: {ui.splitPct}%">
@@ -131,6 +139,7 @@
   </main>
   <div class="bottom"><PackBar /><Toolbar /></div>
 </div>
+{/key}
 
 <style>
   .app {

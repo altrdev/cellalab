@@ -1,3 +1,4 @@
+import { t, tn } from '../i18n';
 import { findCellType } from './catalog';
 import { computeStats } from './stats';
 import type { PlacedCell, Project } from './types';
@@ -107,8 +108,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     issues.push({
       code: 'overlap',
       severity: 'error',
-      message:
-        overlapPairs === 1 ? 'Due celle si sovrappongono.' : `${overlapPairs} coppie di celle si sovrappongono.`,
+      message: tn('drc.overlap', overlapPairs),
       cellIds: [...overlapIds],
     });
   }
@@ -116,9 +116,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     issues.push({
       code: 'too-close',
       severity: 'warning',
-      message:
-        `${closePairs === 1 ? 'Una coppia di celle ha' : `${closePairs} coppie di celle hanno`} meno di ${minGap} mm di spazio: ` +
-        'il holder non ha posto per la parete.',
+      message: tn('drc.tooClose', closePairs, { gap: minGap }),
       cellIds: [...closeIds],
     });
   }
@@ -140,7 +138,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     issues.push({
       code: 'ungrouped',
       severity: 'warning',
-      message: `${ungrouped.length} celle senza gruppo: non entrano nei calcoli elettrici.`,
+      message: t('drc.ungrouped', { n: ungrouped.length }),
       cellIds: ungrouped.map((c) => c.id),
     });
   }
@@ -153,7 +151,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
       issues.push({
         code: 'group-gap',
         severity: 'error',
-        message: `Mancano i gruppi ${labelList(missing)}: gli indici di serie devono essere consecutivi.`,
+        message: t('drc.missingGroups', { list: labelList(missing) }),
         cellIds: [],
       });
     }
@@ -168,7 +166,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
       issues.push({
         code: 'parallel-polarity',
         severity: 'error',
-        message: `${label(g)} ha celle con polarità opposta in parallelo: andrebbero in cortocircuito.`,
+        message: t('drc.oppositePolarity', { group: label(g) }),
         cellIds: members.map((m) => m.id),
       });
     } else {
@@ -196,9 +194,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
       issues.push({
         code: 'unequal-parallel',
         severity: 'warning',
-        message:
-          `Numero di celle diverso dagli altri gruppi (${mode}): ${labelList(odd)}. ` +
-          'Capacità e corrente seguono il gruppo più debole.',
+        message: t('drc.groupSize', { mode, list: labelList(odd) }),
         cellIds: odd.flatMap((g) => groups.get(g)!.map((c) => c.id)),
       });
     }
@@ -209,7 +205,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     issues.push({
       code: 'mixed-types',
       severity: 'warning',
-      message: `Tipi di cella diversi nello stesso gruppo: ${labelList(mixed)}.`,
+      message: t('drc.mixedTypes', { list: labelList(mixed) }),
       cellIds: mixed.flatMap((g) => groups.get(g)!.map((c) => c.id)),
     });
   }
@@ -241,7 +237,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     issues.push({
       code: 'split-group',
       severity: 'warning',
-      message: `Celle separate dentro lo stesso gruppo (${labelList(split)}): la lamella di collegamento sarebbe lunga o impossibile.`,
+      message: t('drc.splitGroup', { list: labelList(split) }),
       cellIds: split.flatMap((g) => groups.get(g)!.map((c) => c.id)),
     });
   }
@@ -262,10 +258,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     issues.push({
       code: 'series-same-polarity',
       severity: 'info',
-      message:
-        `${samePolarity.length === 1 ? 'Due gruppi consecutivi hanno' : `${samePolarity.length} coppie di gruppi consecutivi hanno`} ` +
-        'la stessa polarità verso l’alto: il collegamento in serie dovrà unire facce opposte. ' +
-        'Con «Alterna polarità» i gruppi si alternano e le lamelle restano corte.',
+      message: tn('drc.samePolarity', samePolarity.length),
       cellIds: [...involved].flatMap((g) => groups.get(g)?.map((c) => c.id) ?? []),
     });
   }
@@ -278,9 +271,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
       issues.push({
         code: 'current-over-cells',
         severity: 'warning',
-        message:
-          `La corrente di progetto (${limit} A) supera quella che reggono le celle (${cellA.toFixed(0)} A): ` +
-          'ogni cella verrebbe usata oltre la corrente massima. Abbassa la corrente di progetto o aggiungi celle in parallelo.',
+        message: t('drc.currentOverCells', { limit, cells: cellA.toFixed(0) }),
         cellIds: [],
       });
     }

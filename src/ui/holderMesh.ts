@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { t } from '../i18n';
 import type { Region } from '../core/clip';
 import type { HolderModel } from '../core/holder';
 import type { Pt } from '../core/polygon';
@@ -163,5 +164,5 @@ export function holderStl(model: HolderModel, half: HolderHalf): Uint8Array {
     out[i] = out[i]! - minX;
     out[i + 1] = out[i + 1]! - minY;
   }
-  return stlBinary(out, `CellaLab portacelle ${half === 'top' ? 'sopra' : 'sotto'}`);
+  return stlBinary(out, t('export.stl.header', { half: t(half === 'top' ? 'face.top' : 'face.bottom') }));
 }

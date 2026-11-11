@@ -1,3 +1,4 @@
+import { getLocale } from '../i18n';
 import type { Region } from '../core/clip';
 import { findCellType } from '../core/catalog';
 import { boundsOfCells, type Rect } from '../core/geometry';
@@ -10,7 +11,7 @@ import type { Project } from '../core/types';
 let last: { project: Project; key: string; model: HolderModel | null; report: HolderReport | null } | null = null;
 
 export function holderOf(project: Project, settings: HolderSettings): { model: HolderModel | null; report: HolderReport | null } {
-  const key = JSON.stringify(settings);
+  const key = getLocale() + JSON.stringify(settings); // i messaggi del rapporto sono nella lingua corrente
   if (last && last.project === project && last.key === key) return last;
   const model = buildHolder(project, settings, true);
   const report = model ? analyzeHolder(project, model) : null;

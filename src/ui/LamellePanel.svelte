@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fmtNum, t } from '../i18n';
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
   import { rangeFill } from './rangeFill';
@@ -12,8 +13,8 @@
   const project = $derived($history.present);
   const report = $derived(reportOf(project, ui.lamella));
   const material = $derived(report.material);
-  const weldLabel = { good: 'si salda bene', fair: 'saldatura media', poor: 'si salda male a punti' } as const;
-  const fmt = (n: number | null, d = 2) => (n === null ? '—' : n.toFixed(d).replace('.', ','));
+  const weldLabel = { good: t('lam.weld.good'), fair: t('lam.weld.fair'), poor: t('lam.weld.poor') } as const;
+  const fmt = (n: number | null, d = 2) => (n === null ? '—' : fmtNum(n, d));
 
   function num(e: Event, min: number, max: number): number | null {
     const v = (e.currentTarget as HTMLInputElement).valueAsNumber;
@@ -21,14 +22,14 @@
   }
 
   const PRESETS = [
-    { k: 15, label: 'Prudente', hint: 'si scalda poco (+15 °C)' },
-    { k: 25, label: 'Normale', hint: 'tiepida (+25 °C)' },
-    { k: 40, label: 'Tirato', hint: 'calda al tatto (+40 °C)' },
+    { k: 15, label: t('lam.preset.careful'), hint: t('lam.preset.carefulHint') },
+    { k: 25, label: t('lam.preset.normal'), hint: t('lam.preset.normalHint') },
+    { k: 40, label: t('lam.preset.pushed'), hint: t('lam.preset.pushedHint') },
   ] as const;
   const COOLING_TEXT: Record<CoolingId, string> = {
-    free: 'All\'aperto',
-    ventilated: 'Con ventole',
-    enclosed: 'Chiuso in un box',
+    free: t('lam.cool.free'),
+    ventilated: t('lam.cool.ventilated'),
+    enclosed: t('lam.cool.enclosed'),
   };
   const isPreset = $derived(PRESETS.some((p) => p.k === ui.lamella.deltaTK));
 
@@ -38,48 +39,48 @@
     const name = r.material.name.replace(/\s*\(.*\)$/, '');
     if (r.status === 'empty') return '';
     if (r.thicknessMm === null) {
-      return `Con ${name.toLowerCase()} non basta: servono almeno ${fmt(r.requiredMm)} mm. Prova un altro materiale, più strati o allarga la lamella.`;
+      return t('lam.verdict.none', { name: name.toLowerCase(), required: fmt(r.requiredMm) });
     }
-    const spess = `${fmt(r.thicknessMm)} mm${r.layers > 1 ? ` × ${r.layers} strati` : ''}`;
-    if (r.status === 'error') return `${name} ${spess}: ci sono problemi da risolvere (vedi sotto).`;
-    if (r.status === 'warning') return `${name} ${spess} regge ${fmt(r.currentA, 0)} A, ma c'è qualcosa da controllare (vedi sotto).`;
-    return `${name} ${spess}: va bene per ${fmt(r.currentA, 0)} A.`;
+    const spess = `${fmt(r.thicknessMm)} mm${r.layers > 1 ? t('lam.verdict.layers', { n: r.layers }) : ''}`;
+    if (r.status === 'error') return t('lam.verdict.error', { name, spec: spess });
+    if (r.status === 'warning') return t('lam.verdict.warning', { name, spec: spess, current: fmt(r.currentA, 0) });
+    return t('lam.verdict.ok', { name, spec: spess, current: fmt(r.currentA, 0) });
   });
 </script>
 
 <div class="stack">
   {#if report.status === 'empty'}
-    <section class="sec"><h3><Icon name="layers" /> Lamelle</h3><p class="note">Aggiungi celle e assegna le serie per vedere le lamelle.</p></section>
+    <section class="sec"><h3><Icon name="layers" /> {t('lam.title')}</h3><p class="note">{t('lam.empty')}</p></section>
   {:else}
     <div class="result {report.status}" role="status">
-      <div class="rhead"><Icon name="layers" size={15} /> Lamelle <span class="badge {report.status}">{report.status === 'ok' ? 'ok' : report.status === 'warning' ? 'attenzione' : 'problemi'}</span></div>
+      <div class="rhead"><Icon name="layers" size={15} /> {t('lam.title')} <span class="badge {report.status}">{report.status === 'ok' ? t('lam.badge.ok') : report.status === 'warning' ? t('lam.badge.warning') : t('lam.badge.error')}</span></div>
       <div class="big">{verdict}</div>
       <div class="small">
-        {fmt(report.totalAreaCm2, 1)} cm² di lamella{report.massG !== null ? ` · ${fmt(report.massG, 0)} g` : ''}
+        {t('lam.area', { area: fmt(report.totalAreaCm2, 1) })}{report.massG !== null ? ` · ${fmt(report.massG, 0)} g` : ''}
       </div>
     </div>
   {/if}
 
   <section class="sec">
-    <h3><Icon name="sliders" /> Materiale e spessore</h3>
-  <label>Materiale
+    <h3><Icon name="sliders" /> {t('lam.matSection')}</h3>
+  <label>{t('lam.material')}
     <select bind:value={ui.lamella.materialId}>
       {#each LAMELLA_MATERIALS as m (m.id)}<option value={m.id}>{m.name}</option>{/each}
     </select>
   </label>
-  <Help label="Com'è questo materiale">{weldLabel[material.weldability]}. {material.note}</Help>
+  <Help label={t('lam.materialHelp')}>{weldLabel[material.weldability]}. {material.note}</Help>
 
   <div class="row">
-    <label>Spessore
+    <label>{t('lam.thickness')}
       <select
         value={ui.lamella.thicknessMm === null ? 'auto' : String(ui.lamella.thicknessMm)}
         onchange={(e) => (ui.lamella.thicknessMm = e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value))}
       >
-        <option value="auto">automatico</option>
-        {#each material.thicknessesMm as t (t)}<option value={String(t)}>{fmt(t)} mm</option>{/each}
+        <option value="auto">{t('lam.thicknessAuto')}</option>
+        {#each material.thicknessesMm as th (th)}<option value={String(th)}>{fmt(th)} mm</option>{/each}
       </select>
     </label>
-    <label>Larghezza collegamento (mm)
+    <label>{t('lam.linkWidth')}
       <input
         type="number"
         min="1"
@@ -93,9 +94,9 @@
   </section>
 
   <section class="sec">
-    <h3><Icon name="ruler" /> Forma</h3>
+    <h3><Icon name="ruler" /> {t('lam.shape')}</h3>
   <label>
-    <span class="top"><span>Allarga / stringi i collegamenti</span><b>{ui.lamella.widthMm ? `${fmt(ui.lamella.widthMm, 1)} mm` : 'auto'}</b></span>
+    <span class="top"><span>{t('lam.widen')}</span><b>{ui.lamella.widthMm ? `${fmt(ui.lamella.widthMm, 1)} mm` : 'auto'}</b></span>
     <input
       use:rangeFill={ui.lamella.widthMm}
       type="range"
@@ -106,9 +107,9 @@
       oninput={(e) => (ui.lamella.widthMm = e.currentTarget.valueAsNumber > 0 ? e.currentTarget.valueAsNumber : null)}
     />
   </label>
-  <Help label="Cosa fa">Tra le celle vicine ci sono bande larghe quanto scegli. Allargandole le finestre si chiudono; tutto a destra = lamella piena.</Help>
+  <Help label={t('lam.what')}>{t('lam.widenHelp')}</Help>
 
-  <label>Ø area di saldatura (mm)
+  <label>{t('lam.weldArea')}
     <input
       type="number"
       min="1"
@@ -118,31 +119,31 @@
       onchange={(e) => (ui.lamella.contactDiameterMm = e.currentTarget.value === '' ? null : num(e, 1, 30))}
     />
   </label>
-  <Help label="Cosa fa">È la zona della cella dove metti i punti. Vuoto = il bottone (polo +). Fuori da questa zona la lamella lascia 1 mm di nichel, perché i punti non finiscano sul taglio.</Help>
+  <Help label={t('lam.what')}>{t('lam.weldAreaHelp')}</Help>
 
-  <label>Punti per terminale
+  <label>{t('lam.spotsPer')}
     <select
       value={ui.lamella.spotsPerTerminal ?? 'auto'}
       onchange={(e) => (ui.lamella.spotsPerTerminal = e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value))}
     >
-      <option value="auto">Automatico (in base alla corrente)</option>
-      {#each [2, 4, 6, 8] as n (n)}<option value={n}>{n} punti</option>{/each}
+      <option value="auto">{t('lam.spotsAuto')}</option>
+      {#each [2, 4, 6, 8] as n (n)}<option value={n}>{t('lam.spotsN', { n })}</option>{/each}
     </select>
   </label>
-  <Help label="Come si scelgono i punti">In automatico i punti sono quelli che servono per la corrente della cella, a coppie perché la penna ne fa due per volta (con 5 A a punto: fino a 10 A → 2, fino a 20 A → 4). Se ne scegli un numero, l'app controlla che reggano la corrente e che entrino nell'area di saldatura.</Help>
+  <Help label={t('lam.spotsHelpLabel')}>{t('lam.spotsHelp')}</Help>
 
   <label>
-    <span class="top"><span>Trasparenza lamelle</span><b>{Math.round((1 - ui.stripOpacity) * 100)}%</b></span>
+    <span class="top"><span>{t('lam.opacity')}</span><b>{Math.round((1 - ui.stripOpacity) * 100)}%</b></span>
     <input use:rangeFill={ui.stripOpacity} type="range" min="0.2" max="1" step="0.05" bind:value={ui.stripOpacity} style="direction: rtl" />
   </label>
 
   </section>
 
   {#if report.status !== 'empty'}
-  <button type="button" class="gotoexp" onclick={() => (ui.sideTab = 'file')}><Icon name="download" /> Esporta DXF, dima e lista di taglio →</button>
+  <button type="button" class="gotoexp" onclick={() => (ui.sideTab = 'file')}><Icon name="download" /> {t('lam.gotoExport')}</button>
 
     <details class="adv">
-      <summary>Dettagli e consigli</summary>
+      <summary>{t('lam.details')}</summary>
       {#if report.issues.length}
         <ul class="issues">
           {#each report.issues as issue (issue.message)}
@@ -151,15 +152,15 @@
         </ul>
       {/if}
       {#if report.alternatives.length}
-        <p class="alt-title">Alternative</p>
+        <p class="alt-title">{t('lam.alternatives')}</p>
         <ul class="alts">
           {#each report.alternatives as a (a)}<li>{a}</li>{/each}
         </ul>
       {/if}
       {#if report.strips.length}
-        <p class="alt-title">Lamella per lamella</p>
+        <p class="alt-title">{t('lam.perStrip')}</p>
         <table>
-          <thead><tr><th>Lamella</th><th>Banda</th><th>Corr.</th><th>Spess. min</th><th>Punti</th></tr></thead>
+          <thead><tr><th>{t('lam.th.strip')}</th><th>{t('lam.th.band')}</th><th>{t('lam.th.current')}</th><th>{t('lam.th.thickness')}</th><th>{t('lam.th.spots')}</th></tr></thead>
           <tbody>
             {#each report.strips as s (s.stripId)}
               <tr>
@@ -167,28 +168,28 @@
                 <td>{fmt(s.neckMm, 1)}</td>
                 <td>{fmt(s.neckCurrentA, 0)}</td>
                 <td>{fmt(s.requiredMm)}</td>
-                <td class:low={s.spotCapacity < s.spotsNeeded || s.spotsCarryA < s.cellCurrentA} title="{s.spotsNeeded} punti reggono circa {fmt(s.spotsCarryA, 0)} A; la cella ne porta {fmt(s.cellCurrentA, 1)}">{s.spotsNeeded}/{s.spotCapacity} <small>({fmt(s.spotsCarryA, 0)} A)</small></td>
+                <td class:low={s.spotCapacity < s.spotsNeeded || s.spotsCarryA < s.cellCurrentA} title={t('lam.spotsTitle', { n: s.spotsNeeded, carry: fmt(s.spotsCarryA, 0), cell: fmt(s.cellCurrentA, 1) })}>{s.spotsNeeded}/{s.spotCapacity} <small>({fmt(s.spotsCarryA, 0)} A)</small></td>
               </tr>
             {/each}
           </tbody>
         </table>
-        <Help label="Come leggere la tabella">Larghezza della banda in mm, corrente in A che la attraversa, spessore minimo in mm; punti di saldatura = da mettere/che entrano, con tra parentesi la corrente che reggono (in rosso se i punti non entrano o non bastano per la cella).</Help>
+        <Help label={t('lam.tableHelpLabel')}>{t('lam.tableHelp')}</Help>
       {/if}
     </details>
   {/if}
 
   <details class="adv">
-    <summary>Avanzate</summary>
+    <summary>{t('lam.advanced')}</summary>
 
-    <label>Che saldatrice hai
+    <label>{t('lam.welder')}
       <select bind:value={ui.lamella.welderId}>
         {#each WELDER_PROFILES as w (w.id)}<option value={w.id}>{w.name}</option>{/each}
       </select>
     </label>
-    <Help label="Spiegazione">Decide lo spessore massimo che riesci a saldare e i valori di partenza per i punti.</Help>
+    <Help label={t('lam.explain')}>{t('lam.welderHelp')}</Help>
 
     <div class="row">
-      <label>Corrente per punto (A)
+      <label>{t('lam.spotCurrent')}
         <input
           type="number"
           min="1"
@@ -198,7 +199,7 @@
           onchange={(e) => (ui.lamella.spotCurrentA = e.currentTarget.value === '' ? null : num(e, 1, 100))}
         />
       </label>
-      <label>Distanza punti (mm)
+      <label>{t('lam.spotSpacing')}
         <input
           type="number"
           min="1"
@@ -209,62 +210,62 @@
         />
       </label>
     </div>
-    <Help label="Spiegazione">«Corrente per punto» è una stima: confermala con una prova di strappo. «Distanza punti» è quella tra i due elettrodi della penna. Il numero di punti si sceglie in Forma.</Help>
+    <Help label={t('lam.explain')}>{t('lam.spotsNote')}</Help>
 
-    <label>Come tagli le lamelle
+    <label>{t('lam.cutter')}
       <select bind:value={ui.lamella.cutterId}>
         {#each CUTTER_PROFILES as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
       </select>
     </label>
 
     <div class="field">
-      <span class="lbl">Dove sta il pacco</span>
+      <span class="lbl">{t('lam.where')}</span>
       <div class="seg3">
         {#each Object.keys(COOLING) as id (id)}
           <button class:on={ui.lamella.cooling === id} onclick={() => (ui.lamella.cooling = id as CoolingId)}>{COOLING_TEXT[id as CoolingId]}</button>
         {/each}
       </div>
-      <span class="hint">Un pacco chiuso smaltisce meno calore: servono lamelle più generose.</span>
+      <span class="hint">{t('lam.whereHint')}</span>
     </div>
 
     <div class="field">
-      <span class="lbl">Quanto può scaldarsi la lamella</span>
+      <span class="lbl">{t('lam.howHot')}</span>
       <div class="seg3">
         {#each PRESETS as p (p.k)}
           <button class:on={ui.lamella.deltaTK === p.k} title={p.hint} onclick={() => (ui.lamella.deltaTK = p.k)}>{p.label}</button>
         {/each}
       </div>
       <span class="hint">
-        {#if isPreset}{PRESETS.find((p) => p.k === ui.lamella.deltaTK)?.hint}, a regime.{:else}Valore personalizzato: +{ui.lamella.deltaTK} °C.{/if}
+        {#if isPreset}{t('lam.steady', { hint: PRESETS.find((p) => p.k === ui.lamella.deltaTK)?.hint ?? '' })}{:else}{t('lam.custom', { delta: ui.lamella.deltaTK })}{/if}
       </span>
     </div>
 
-    <label>Fogli sovrapposti
+    <label>{t('lam.layers')}
       <input type="number" min="1" max="4" step="1" value={ui.lamella.layers} onchange={(e) => (ui.lamella.layers = Math.round(num(e, 1, 4) ?? 1))} />
     </label>
-    <Help label="Spiegazione">Più fogli saldati insieme portano più corrente, ma la saldatrice deve riuscire a bucarli tutti.</Help>
+    <Help label={t('lam.explain')}>{t('lam.layersHelp')}</Help>
 
     <div class="row">
-      <label>Temperatura ambiente (°C)
+      <label>{t('lam.ambient')}
         <input type="number" step="1" value={ui.lamella.ambientC} onchange={(e) => (ui.lamella.ambientC = num(e, -20, 60) ?? 25)} />
       </label>
-      <label>Celle più calde di (°C)
+      <label>{t('lam.cellRise')}
         <input type="number" step="1" min="0" max="40" value={ui.lamella.cellRiseK} onchange={(e) => (ui.lamella.cellRiseK = num(e, 0, 40) ?? 15)} />
       </label>
     </div>
-    <Help label="Perché le celle">Le bande sono corte e saldate alle celle, che portano via parte del calore. Qui metti di quanto pensi che le celle si scaldino sopra l'ambiente sotto carico: più sono calde, meno calore smaltiscono le lamelle.</Help>
+    <Help label={t('lam.cellRiseLabel')}>{t('lam.cellRiseHelp')}</Help>
 
     <div class="row">
-      <label>Picchi di corrente (×)
+      <label>{t('lam.peak')}
         <input type="number" step="0.1" min="1" value={ui.lamella.peakFactor} onchange={(e) => (ui.lamella.peakFactor = num(e, 1, 10) ?? 1.5)} />
       </label>
-      <label>Durata picco (s)
+      <label>{t('lam.peakSeconds')}
         <input type="number" step="0.5" min="0.1" value={ui.lamella.peakSeconds} onchange={(e) => (ui.lamella.peakSeconds = num(e, 0.1, 60) ?? 1)} />
       </label>
     </div>
-    <Help label="Spiegazione">Picchi: per esempio un motore che per 1 secondo assorbe 1,5 volte la corrente normale.</Help>
+    <Help label={t('lam.explain')}>{t('lam.peakHelp')}</Help>
 
-    <label class="inline"><input type="checkbox" bind:checked={ui.showSpots} /> Mostra i punti di saldatura</label>
+    <label class="inline"><input type="checkbox" bind:checked={ui.showSpots} /> {t('lam.showSpots')}</label>
   </details>
 </div>
 

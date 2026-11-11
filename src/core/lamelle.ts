@@ -1,3 +1,4 @@
+import { fmtNum as fmt, t, tn } from '../i18n';
 import { findMaterial, LAMELLA_MATERIALS, resistivityAt, volumetricHeat, type LamellaMaterial } from './materials';
 import { regionDistance } from './clip';
 import {
@@ -141,7 +142,6 @@ export interface LamellaReport {
   massG: number | null;
 }
 
-const fmt = (n: number, d = 2) => n.toFixed(d).replace('.', ',');
 
 interface Requirement {
   neckMm: number;
@@ -226,14 +226,14 @@ export function analyzeLamelle(
       totalThicknessMm: null,
       requiredMm: 0,
       strips: [],
-      issues: [{ severity: 'info', message: 'Assegna le celle ai gruppi in serie per generare le lamelle.', stripIds: [] }],
+      issues: [{ severity: 'info', message: t('lamelle.issue.assign'), stripIds: [] }],
       alternatives,
       totalAreaCm2: 0,
       massG: null,
     };
   }
   if (!(currentA > 0)) {
-    issues.push({ severity: 'error', message: 'La corrente di progetto deve essere maggiore di zero.', stripIds: [] });
+    issues.push({ severity: 'error', message: t('lamelle.issue.currentZero'), stripIds: [] });
   }
 
   // --- Requisiti per ogni lamella
@@ -299,15 +299,21 @@ export function analyzeLamelle(
 
   // --- Verifiche sullo spessore
   const critical = reports.reduce((a, b) => (b.requiredMm > a.requiredMm ? b : a));
-  const faceName = (f: Strip['face']) => (f === 'top' ? 'sopra' : 'sotto');
+  const faceName = (f: Strip['face']) => t(f === 'top' ? 'face.top' : 'face.bottom');
   let thicknessProblem = false;
   if (thicknessMm === null) {
     thicknessProblem = true;
     issues.push({
       severity: 'error',
-      message:
-        `Con ${material.name} e ${layers} ${layers === 1 ? 'strato' : 'strati'} nessuno spessore commerciale basta: ` +
-        `servono ${fmt(requiredMm)} mm in totale per ${fmt(currentA, 0)} A (lamella più critica: ${critical.label} ${faceName(critical.face)}, collo ${fmt(critical.neckMm, 1)} mm).`,
+      message: t('lamelle.issue.noThickness', {
+        material: material.name,
+        layers: tn('lamelle.layers', layers),
+        required: fmt(requiredMm),
+        current: fmt(currentA, 0),
+        strip: critical.label,
+        face: faceName(critical.face),
+        neck: fmt(critical.neckMm, 1),
+      }),
       stripIds: [critical.stripId],
     });
   } else if (totalThicknessMm! < requiredMm - 1e-9) {
@@ -315,9 +321,14 @@ export function analyzeLamelle(
     const hot = reports.filter((r) => (r.deltaTK ?? 0) > settings.deltaTK + 1e-9);
     issues.push({
       severity: 'error',
-      message:
-        `Spessore ${fmt(totalThicknessMm!)} mm insufficiente per ${fmt(currentA, 0)} A: ne servono ${fmt(requiredMm)} mm. ` +
-        (hot.length ? `Scalderebbe di circa ${fmt(Math.max(...hot.map((r) => r.deltaTK ?? 0)), 0)} K invece di ${settings.deltaTK} K.` : 'Il picco di corrente supera la sezione.'),
+      message: t('lamelle.issue.tooThin', {
+        thickness: fmt(totalThicknessMm!),
+        current: fmt(currentA, 0),
+        required: fmt(requiredMm),
+        why: hot.length
+          ? t('lamelle.issue.tooThinHot', { rise: fmt(Math.max(...hot.map((r) => r.deltaTK ?? 0)), 0), allowed: settings.deltaTK })
+          : t('lamelle.issue.tooThinPeak'),
+      }),
       stripIds: hot.length ? hot.map((r) => r.stripId) : [critical.stripId],
     });
   }
@@ -326,7 +337,7 @@ export function analyzeLamelle(
   if (layers > welder.maxLayers) {
     issues.push({
       severity: 'warning',
-      message: `${layers} strati: la saldatrice «${welder.name}» ne salda al massimo ${welder.maxLayers}.`,
+      message: t('lamelle.issue.welderLayers', { layers, welder: welder.name, max: welder.maxLayers }),
       stripIds: [],
     });
   }
@@ -334,49 +345,66 @@ export function analyzeLamelle(
     thicknessProblem = true;
     issues.push({
       severity: 'warning',
-      message: `Spessore totale ${fmt(totalThicknessMm)} mm: oltre i ${fmt(welder.maxThicknessMm)} mm che la saldatrice «${welder.name}» salda in modo affidabile.`,
+      message: t('lamelle.issue.welderThickness', { total: fmt(totalThicknessMm), max: fmt(welder.maxThicknessMm), welder: welder.name }),
       stripIds: [],
     });
   }
   if (material.weldability === 'poor') {
     issues.push({
       severity: 'warning',
-      message: `${material.name} si salda male con una saldatrice a punti hobby: ${material.note}`,
+      message: t('lamelle.issue.weldPoor', { material: material.name, note: material.note }),
       stripIds: [],
     });
   } else if (material.weldability === 'fair') {
     issues.push({
       severity: 'info',
-      message: `${material.name}: richiede più energia di saldatura del nichel; prova su un campione.`,
+      message: t('lamelle.issue.weldFair', { material: material.name }),
       stripIds: [],
     });
   }
   const fixedSpots = settings.spotsPerTerminal !== null;
   for (const r of reports) {
-    const where = `Lamella ${r.label} (${faceName(r.face)})`;
+    const where = t('lamelle.where', { strip: r.label, face: faceName(r.face) });
     if (r.spotCapacity < r.spotsNeeded) {
       // dice perché: com'è l'area di saldatura e quanto serve per i punti voluti
       const need = minRadiusForSpots(r.spotsNeeded, welder.spotDiameterMm, welder.spotSpacingMm);
       const needR = Math.ceil(need * 10) / 10;
       const how = Number.isFinite(need)
-        ? ` L'area di saldatura ha raggio ${fmt(r.contactRadiusMm, 1)} mm (Ø ${fmt(2 * r.contactRadiusMm, 1)} mm): ` +
-          `per ${r.spotsNeeded} punti da ${fmt(welder.spotDiameterMm, 0)} mm a passo ${fmt(welder.spotSpacingMm, 1)} mm ne servono almeno ${fmt(needR, 1)} ` +
-          `(Ø ${fmt(2 * needR, 1)} mm). Allarga l'area di saldatura o riduci la distanza tra i punti.`
+        ? t('lamelle.issue.spotsHow', {
+            radius: fmt(r.contactRadiusMm, 1),
+            diameter: fmt(2 * r.contactRadiusMm, 1),
+            count: r.spotsNeeded,
+            spot: fmt(welder.spotDiameterMm, 0),
+            pitch: fmt(welder.spotSpacingMm, 1),
+            need: fmt(needR, 1),
+            needDiameter: fmt(2 * needR, 1),
+          })
         : '';
       issues.push({
         severity: 'error',
         message: fixedSpots
-          ? `${where}: hai scelto ${r.spotsNeeded} punti per terminale ma sul contatto più piccolo ne entrano ${r.spotCapacity}.${how}`
-          : `${where}: servono ${r.spotsForCurrent} punti per terminale (${fmt(r.cellCurrentA, 1)} A per cella, ${fmt(welder.spotCurrentA, 0)} A a punto) ` +
-            `ma sul contatto più piccolo ne entrano ${r.spotCapacity}.${how}`,
+          ? t('lamelle.issue.spotsChosen', { where, count: r.spotsNeeded, capacity: r.spotCapacity, how })
+          : t('lamelle.issue.spotsNeeded', {
+              where,
+              count: r.spotsForCurrent,
+              cell: fmt(r.cellCurrentA, 1),
+              perSpot: fmt(welder.spotCurrentA, 0),
+              capacity: r.spotCapacity,
+              how,
+            }),
         stripIds: [r.stripId],
       });
     } else if (fixedSpots && r.spotsNeeded < r.spotsForCurrent) {
       issues.push({
         severity: 'error',
-        message:
-          `${where}: ${r.spotsNeeded} punti per terminale reggono circa ${fmt(r.spotsCarryA, 0)} A ma la cella ne porta ${fmt(r.cellCurrentA, 1)} ` +
-          `(${fmt(welder.spotCurrentA, 0)} A a punto): ne servono almeno ${r.spotsForCurrent}.`,
+        message: t('lamelle.issue.spotsWeak', {
+          where,
+          count: r.spotsNeeded,
+          carry: fmt(r.spotsCarryA, 0),
+          cell: fmt(r.cellCurrentA, 1),
+          perSpot: fmt(welder.spotCurrentA, 0),
+          min: r.spotsForCurrent,
+        }),
         stripIds: [r.stripId],
       });
     }
@@ -387,7 +415,7 @@ export function analyzeLamelle(
     if (s.partial) {
       issues.push({
         severity: 'warning',
-        message: `Lamella ${s.label} (${faceName(s.face)}): collega solo un lato. Controlla le polarità del gruppo: forse ci sono celle con polarità miste.`,
+        message: t('lamelle.issue.partial', { strip: s.label, face: faceName(s.face) }),
         stripIds: [s.id],
       });
     }
@@ -398,13 +426,13 @@ export function analyzeLamelle(
       for (let j = i + 1; j < list.length; j++) {
         const d = regionDistance(list[i]!, list[j]!);
         const pair = [list[i]!.id, list[j]!.id];
-        const names = `${list[i]!.label} e ${list[j]!.label} (${faceName(face)})`;
+        const names = t('lamelle.names', { a: list[i]!.label, b: list[j]!.label, face: faceName(face) });
         if (d <= 0) {
-          issues.push({ severity: 'error', message: `Le lamelle ${names} si toccano: sarebbe un cortocircuito.`, stripIds: pair });
+          issues.push({ severity: 'error', message: t('lamelle.issue.touch', { names }), stripIds: pair });
         } else if (d < cutter.minGapMm) {
           issues.push({
             severity: 'warning',
-            message: `Le lamelle ${names} distano ${fmt(d, 1)} mm: meno dei ${fmt(cutter.minGapMm, 1)} mm minimi per il taglio «${cutter.name}».`,
+            message: t('lamelle.issue.gap', { names, gap: fmt(d, 1), min: fmt(cutter.minGapMm, 1), cutter: cutter.name }),
             stripIds: pair,
           });
         }
@@ -415,23 +443,23 @@ export function analyzeLamelle(
   // --- Alternative, se lo spessore è un problema
   if (thicknessProblem && requiredMm > 0) {
     for (let l = Math.max(2, layers + 1); l <= welder.maxLayers; l++) {
-      const t = smallestThickness(material, l, requiredMm);
-      if (t !== null && t * l <= welder.maxThicknessMm + 1e-9) {
-        alternatives.push(`${l} strati di ${material.name} da ${fmt(t)} mm sovrapposti e saldati insieme.`);
+      const th = smallestThickness(material, l, requiredMm);
+      if (th !== null && th * l <= welder.maxThicknessMm + 1e-9) {
+        alternatives.push(t('lamelle.alt.layers', { layers: l, material: material.name, thickness: fmt(th) }));
         break;
       }
     }
     for (const m of LAMELLA_MATERIALS) {
       if (m.id === material.id) continue;
       const need = worstRequiredMm(strips, m, settings, currentA);
-      const t = smallestThickness(m, 1, need);
-      if (t !== null && t <= welder.maxThicknessMm + 1e-9) {
-        const note = m.weldability === 'poor' ? ' (si salda male a punti: serve stagno o altra giunzione)' : m.weldability === 'fair' ? ' (richiede più energia di saldatura)' : '';
-        alternatives.push(`${m.name} da ${fmt(t)} mm${note}.`);
+      const th = smallestThickness(m, 1, need);
+      if (th !== null && th <= welder.maxThicknessMm + 1e-9) {
+        const note = m.weldability === 'poor' ? t('lamelle.alt.noteWeldPoor') : m.weldability === 'fair' ? t('lamelle.alt.noteWeldFair') : '';
+        alternatives.push(t('lamelle.alt.material', { material: m.name, thickness: fmt(th), note }));
       }
     }
-    alternatives.push('Struttura a due livelli: linguette di nichel sulle celle + barra di rame (in arrivo).');
-    alternatives.push(`Abbassare la corrente di progetto o aumentare l'aumento di temperatura ammesso (ora ${settings.deltaTK} K).`);
+    alternatives.push(t('lamelle.alt.twoLevel'));
+    alternatives.push(t('lamelle.alt.lowerCurrent', { delta: settings.deltaTK }));
   }
 
   const totalAreaMm2 = strips.reduce((a, s) => a + s.areaMm2, 0);

@@ -1,4 +1,5 @@
 import type { PlacedCell } from './types';
+import { t } from '../i18n';
 
 /**
  * Suggerisce la divisione di un insieme di celle in gruppi da P celle (in parallelo)
@@ -132,12 +133,10 @@ export function suggestGroups<T extends Cell>(
   options: { strategy?: GroupStrategy; startGroup?: number } = {},
 ): AutoGroupResult {
   const { strategy = 'auto', startGroup = 0 } = options;
-  if (!Number.isInteger(parallel) || parallel < 1) throw new RangeError('P deve essere un intero >= 1');
-  if (cells.length === 0) throw new RangeError('Non ci sono celle da raggruppare');
+  if (!Number.isInteger(parallel) || parallel < 1) throw new RangeError(t('autogroup.err.p'));
+  if (cells.length === 0) throw new RangeError(t('autogroup.err.none'));
   if (cells.length % parallel !== 0) {
-    throw new RangeError(
-      `Le ${cells.length} celle non si dividono in gruppi da ${parallel}: ne servono multipli di ${parallel}`,
-    );
+    throw new RangeError(t('autogroup.err.multiple', { n: cells.length, p: parallel }));
   }
 
   const candidates: Record<Exclude<GroupStrategy, 'auto'>, () => T[][]> = {

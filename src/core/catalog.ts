@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { CellType, Project } from './types';
 
 /**
@@ -10,7 +11,9 @@ import type { CellType, Project } from './types';
 export const BUILTIN_CELL_TYPES: readonly CellType[] = [
   {
     id: '18650-3000-10a',
-    name: '18650 Li-ion 3000 mAh · 10 A (energia)',
+    get name() {
+      return t('cell.18650-3000-10a.name');
+    },
     chemistry: 'li-ion',
     diameterMm: 18.4,
     heightMm: 65.2,
@@ -24,7 +27,9 @@ export const BUILTIN_CELL_TYPES: readonly CellType[] = [
   },
   {
     id: '18650-2500-20a',
-    name: '18650 Li-ion 2500 mAh · 20 A (potenza)',
+    get name() {
+      return t('cell.18650-2500-20a.name');
+    },
     chemistry: 'li-ion',
     diameterMm: 18.4,
     heightMm: 65.2,
@@ -38,7 +43,9 @@ export const BUILTIN_CELL_TYPES: readonly CellType[] = [
   },
   {
     id: '21700-5000-10a',
-    name: '21700 Li-ion 5000 mAh · 10 A (energia)',
+    get name() {
+      return t('cell.21700-5000-10a.name');
+    },
     chemistry: 'li-ion',
     diameterMm: 21.4,
     heightMm: 70.4,
@@ -52,7 +59,9 @@ export const BUILTIN_CELL_TYPES: readonly CellType[] = [
   },
   {
     id: '21700-4000-30a',
-    name: '21700 Li-ion 4000 mAh · 30 A (potenza)',
+    get name() {
+      return t('cell.21700-4000-30a.name');
+    },
     chemistry: 'li-ion',
     diameterMm: 21.4,
     heightMm: 70.4,
@@ -80,7 +89,9 @@ export const BUILTIN_CELL_TYPES: readonly CellType[] = [
   },
   {
     id: 'bak-n21700cg-50e',
-    name: 'BAK N21700CG-50E · 21700 · 5000 mAh · 14,7 A',
+    get name() {
+      return t('cell.bak-n21700cg-50e.name');
+    },
     chemistry: 'li-ion',
     diameterMm: 21.4,
     heightMm: 70.4,
@@ -178,7 +189,9 @@ export const BUILTIN_CELL_TYPES: readonly CellType[] = [
   },
   {
     id: 'samsung-50e',
-    name: 'Samsung 50E · 21700 · 4900 mAh · 9,8 A',
+    get name() {
+      return t('cell.samsung-50e.name');
+    },
     chemistry: 'li-ion',
     diameterMm: 21.4,
     heightMm: 70.4,
@@ -220,7 +233,9 @@ export const BUILTIN_CELL_TYPES: readonly CellType[] = [
   },
   {
     id: 'lg-m50lt',
-    name: 'LG M50LT · 21700 · 4930 mAh · 14,4 A',
+    get name() {
+      return t('cell.lg-m50lt.name');
+    },
     chemistry: 'li-ion',
     diameterMm: 21.4,
     heightMm: 70.4,

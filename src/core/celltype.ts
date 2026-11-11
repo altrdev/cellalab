@@ -1,34 +1,35 @@
+import { t } from '../i18n';
 import { BUILTIN_CELL_TYPES } from './catalog';
 import type { CellType, Project } from './types';
 
 /** Controlli sui tipi di cella inseriti dall'utente. Restituisce l'elenco dei problemi (vuoto = valido). */
-export function validateCellType(t: CellType): string[] {
+export function validateCellType(type: CellType): string[] {
   const problems: string[] = [];
-  if (t.name.trim() === '') problems.push('Il nome non può essere vuoto.');
-  if (t.chemistry !== 'li-ion' && t.chemistry !== 'lifepo4') problems.push('Chimica non valida.');
+  if (type.name.trim() === '') problems.push(t('celltype.name'));
+  if (type.chemistry !== 'li-ion' && type.chemistry !== 'lifepo4') problems.push(t('celltype.chemistry'));
 
   const positive: [string, number, number][] = [
-    ['Il diametro', t.diameterMm, 100],
-    ['L’altezza', t.heightMm, 500],
-    ['La tensione nominale', t.nominalV, 10],
-    ['La tensione massima', t.maxV, 10],
-    ['La tensione minima', t.minV, 10],
-    ['La capacità', t.capacityAh, 1000],
-    ['La corrente massima di scarica', t.maxDischargeA, 1000],
-    ['Il peso', t.weightG, 5000],
+    [t('celltype.label.diameter'), type.diameterMm, 100],
+    [t('celltype.label.height'), type.heightMm, 500],
+    [t('celltype.label.nominalV'), type.nominalV, 10],
+    [t('celltype.label.maxV'), type.maxV, 10],
+    [t('celltype.label.minV'), type.minV, 10],
+    [t('celltype.label.capacity'), type.capacityAh, 1000],
+    [t('celltype.label.discharge'), type.maxDischargeA, 1000],
+    [t('celltype.label.weight'), type.weightG, 5000],
   ];
   for (const [label, value, max] of positive) {
-    if (!Number.isFinite(value) || value <= 0) problems.push(`${label} deve essere un numero maggiore di zero.`);
-    else if (value > max) problems.push(`${label} sembra troppo grande (massimo ${max}).`);
+    if (!Number.isFinite(value) || value <= 0) problems.push(t('celltype.positive', { label }));
+    else if (value > max) problems.push(t('celltype.tooBig', { label, max }));
   }
   if (
-    Number.isFinite(t.minV) && Number.isFinite(t.nominalV) && Number.isFinite(t.maxV) &&
-    !(t.minV < t.nominalV && t.nominalV < t.maxV)
+    Number.isFinite(type.minV) && Number.isFinite(type.nominalV) && Number.isFinite(type.maxV) &&
+    !(type.minV < type.nominalV && type.nominalV < type.maxV)
   ) {
-    problems.push('Le tensioni devono essere in ordine: minima < nominale < massima.');
+    problems.push(t('celltype.voltages'));
   }
-  if (t.priceEur !== undefined && (!Number.isFinite(t.priceEur) || t.priceEur < 0)) {
-    problems.push('Il prezzo non può essere negativo.');
+  if (type.priceEur !== undefined && (!Number.isFinite(type.priceEur) || type.priceEur < 0)) {
+    problems.push(t('celltype.price'));
   }
   return problems;
 }
