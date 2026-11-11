@@ -23,6 +23,8 @@ npm run build    # production build in dist/
 
 TypeScript 7 is not supported by svelte-check yet: stay on TypeScript 6. Do not share `node_modules` between Linux and macOS: run `npm install` locally. `dist/` is ignored by git.
 
+CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run check`, `npm test` and `npm run build` on every push to `main` and on pull requests.
+
 Before finishing a change: tests and `npm run check` must pass; for UI work look at it in a browser (Playwright is handy for screenshots).
 
 ## Architecture

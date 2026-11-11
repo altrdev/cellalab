@@ -1,8 +1,12 @@
 # CellaLab
 
+[![CI](https://github.com/altrdev/cellalab/actions/workflows/ci.yml/badge.svg)](https://github.com/altrdev/cellalab/actions/workflows/ci.yml)
+
 **Configuratore per pacchi batteria fai-da-te, nel browser.** Disegni il pacco (o lo generi da serie e parallelo), lo guardi in 3D e ne esporti il portacelle da stampare e le lamelle da tagliare.
 
 [🇬🇧 English](README.md) · Italiano
+
+![Un pacco 4S3P nell'anteprima 3D, con portacelle e lamelle](docs/img/3d.png)
 
 ## Cosa fa
 
@@ -16,6 +20,13 @@
 - **Progetto:** salvataggio automatico nel browser; salva e apri file `.cellalab.json` (include le impostazioni di lamelle e portacelle).
 
 Interfaccia in italiano e in inglese (segue la lingua del browser); lunghezze in mm o pollici, temperature in °C o °F, pesi in g/kg o oz/lb, prezzi in €, $ o £: le impostazioni sono nell'ingranaggio accanto al titolo. I file da tagliare seguono l'unità di lunghezza (DXF, dima SVG); l'STL è sempre in mm.
+
+## Schermate
+
+| | |
+|---|---|
+| ![Lamelle: materiale, forma e punti di saldatura](docs/img/busbars.png) | ![Portacelle: forma, gioco e smusso](docs/img/holder.png) |
+| Lamelle: materiale, forma e punti di saldatura | Portacelle: forma, gioco e smusso |
 
 ## Avvio rapido
 

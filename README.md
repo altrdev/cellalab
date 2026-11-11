@@ -1,8 +1,12 @@
 # CellaLab
 
+[![CI](https://github.com/altrdev/cellalab/actions/workflows/ci.yml/badge.svg)](https://github.com/altrdev/cellalab/actions/workflows/ci.yml)
+
 **A browser-based configurator for DIY battery packs.** Design the pack (or generate it from series and parallel counts), view it in 3D, and export a 3D-printable cell holder and busbar strips ready to cut.
 
 English · [🇮🇹 Italiano](README.it.md)
+
+![A 4S3P pack in the 3D preview, with holder and busbars](docs/img/3d.png)
 
 ## What it does
 
@@ -16,6 +20,13 @@ English · [🇮🇹 Italiano](README.it.md)
 - **Project:** automatic saving in the browser; save and open `.cellalab.json` files (they include the busbar and holder settings).
 
 The interface is available in English and Italian (it follows the browser language) and can show lengths in mm or inches, temperatures in °C or °F, weights in g/kg or oz/lb and prices in €, $ or £: open the settings with the gear next to the title. Files for cutting follow the length unit (DXF, SVG template); the STL is always in mm.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Busbar strips: material, shape and weld spots](docs/img/busbars.png) | ![Cell holder: shape, clearance and chamfer](docs/img/holder.png) |
+| Busbar strips: material, shape and weld spots | Cell holder: shape, clearance and chamfer |
 
 ## Quick start
 
