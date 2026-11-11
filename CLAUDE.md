@@ -25,6 +25,8 @@ TypeScript 7 is not supported by svelte-check yet: stay on TypeScript 6. Do not 
 
 CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run check`, `npm test` and `npm run build` on every push to `main` and on pull requests.
 
+Releases: bump `version` in `package.json` (shown small next to the title), commit, then `git tag vX.Y.Z && git push --tags`. `.github/workflows/release.yml` checks that the tag matches `package.json`, runs check/test/build, creates the GitHub release with the built app zipped, and deploys `dist/` to GitHub Pages (Pages source must be set to "GitHub Actions"). `vite.config.ts` uses `base: './'` so the app works under a sub-path.
+
 Before finishing a change: tests and `npm run check` must pass; for UI work look at it in a browser (Playwright is handy for screenshots).
 
 ## Architecture
@@ -64,12 +66,12 @@ The holder STL has never been tested in a real slicer; the 3D view was only test
 
 - All user-visible text is `t('key')` (plural: `tn('base', n)` with `base_one` / `base_other`; numbers: `fmtNum`). Never hard-code UI text. Add the key to **both** `src/i18n/it.ts` and `en.ts`: a missing English key does not compile, and a test checks that both have the same parameters and that every key is used.
 - `t()` also works in `core` (messages, checks, export text): the language is a module variable, `'it'` outside the browser, so unit tests run in Italian. Data tables (materials, welders, cutters, catalogue names, cooling) expose `name` / `note` as getters that call `t()`.
-- Language: saved choice (`localStorage` `cellalab:lang`), else the browser language (`it*` → Italian, anything else → English). The IT/EN switch is next to the title; `App.svelte` re-mounts the UI on change (`{#key ui.locale}`), so caches keyed on settings need no language in the key.
+- Language: saved choice (`localStorage` `cellalab:lang`), else the browser language (`it*` → Italian, anything else → English). The language is chosen in the settings popup; `App.svelte` re-mounts the UI on change (`{#key ui.locale}`), so caches keyed on settings need no language in the key.
 - Do not name a variable `t` in a file that uses `t()` (it shadows the function).
 
 ## Units and currency
 
-- Preferences live in the settings popup (gear next to the title): language, length, temperature, weight, currency + rate. They change only how values are shown and typed; saving, calculations and the STL are always mm / °C / g / euro.
+- Preferences live in the settings popup (gear next to the title): language, theme (auto / light / dark, `src/theme.ts`, an attribute `data-theme` on `<html>`; colours are CSS variables, the 3D view re-reads them), length, temperature, weight, currency + rate. Units and currency change only how values are shown and typed; saving, calculations and the STL are always mm / °C / g / euro.
 - Dictionary texts have **no fixed units**: callers pass values already formatted with their unit (`len(mm)`, `tempDelta(k)`, `massSmall(g)`, `money(eur)`, `area(cm2)`). Only field labels keep a metric token, `(mm)` `(°C)` `(g)` `(€/…)`, which `t()` swaps for the chosen unit. A test fails if a text hard-codes `mm`, `°C`, `K`, `cm²`, `kg` or `€` (a few exceptions are listed there).
 - Number fields in a non-metric unit use `UnitInput.svelte` (props in internal units); the 2D editor, messages, cut list, summary and exports follow the preferences. DXF is written in the chosen unit with `$INSUNITS`; the SVG template declares its size in that unit; the STL stays in mm (the format has no units).
 - `App.svelte` re-mounts the UI when language or preferences change (`ui.viewKey`); caches of text-bearing results key on `renderKey()`.

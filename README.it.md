@@ -19,7 +19,7 @@
 - **Portacelle stampabile in 3D:** due piastre su misura con tasche, fondo che trattiene le celle, raccordi e smusso a rampa liscia. Esportazione **STL** in posizione di stampa. Le piastre più grandi del piano di stampa si dividono in pezzi da incollare (il taglio passa nella parete tra le celle), con un STL per pezzo e uno ZIP con tutti.
 - **Progetto:** salvataggio automatico nel browser; salva e apri file `.cellalab.json` (include le impostazioni di lamelle e portacelle).
 
-Interfaccia in italiano e in inglese (segue la lingua del browser); lunghezze in mm o pollici, temperature in °C o °F, pesi in g/kg o oz/lb, prezzi in €, $ o £: le impostazioni sono nell'ingranaggio accanto al titolo. I file da tagliare seguono l'unità di lunghezza (DXF, dima SVG); l'STL è sempre in mm.
+Interfaccia in italiano e in inglese (segue la lingua del browser); lunghezze in mm o pollici, temperature in °C o °F, pesi in g/kg o oz/lb, prezzi in €, $ o £, tema chiaro, scuro o automatico: le impostazioni sono nell'ingranaggio accanto al titolo. I file da tagliare seguono l'unità di lunghezza (DXF, dima SVG); l'STL è sempre in mm.
 
 ## Schermate
 

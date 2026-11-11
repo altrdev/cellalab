@@ -19,7 +19,7 @@ English · [🇮🇹 Italiano](README.it.md)
 - **3D-printable holder:** two custom plates with cell pockets, a floor that retains the cells, fillets and a smooth sloped chamfer. Export an **STL** in print orientation. Plates bigger than your print bed are split into pieces to glue (cuts run through the wall between cells), with one STL per piece and a ZIP of all of them.
 - **Project:** automatic saving in the browser; save and open `.cellalab.json` files (they include the busbar and holder settings).
 
-The interface is available in English and Italian (it follows the browser language) and can show lengths in mm or inches, temperatures in °C or °F, weights in g/kg or oz/lb and prices in €, $ or £: open the settings with the gear next to the title. Files for cutting follow the length unit (DXF, SVG template); the STL is always in mm.
+The interface is available in English and Italian (it follows the browser language) and can show lengths in mm or inches, temperatures in °C or °F, weights in g/kg or oz/lb and prices in €, $ or £, and has a light, dark or automatic theme: open the settings with the gear next to the title. Files for cutting follow the length unit (DXF, SVG template); the STL is always in mm.
 
 ## Screenshots
 
@@ -42,10 +42,10 @@ npm run build    # production build in dist/
 
 ## How to use it
 
-1. **Pacco (Pack):** choose "Genera automaticamente" (set S, P, cell and spacing) or "Disegna a mano" (draw by hand).
-2. **Lamelle (Busbars):** pick material, thickness and welder; the tab shows the result and warnings.
-3. **Portacelle (Holder):** adjust walls, clearance, floor and chamfer.
-4. **Esporta (Export):** DXF, template, cut list, STL and project saving.
+1. **Pack:** choose "Generate automatically" (set S, P, cell and spacing) or "Draw by hand".
+2. **Busbars:** pick material, thickness and welder; the tab shows the result and warnings.
+3. **Holder:** adjust walls, clearance, floor and chamfer.
+4. **Export:** DXF, template, cut list, STL and project saving.
 
 ## Status and limitations
 
