@@ -393,7 +393,7 @@
       <div class="sum-grid">
         <span><b>{stats.nominalV === null ? '—' : stats.nominalV.toFixed(1)} V</b>tensione</span>
         <span><b>{stats.energyWh === null ? '—' : stats.energyWh.toFixed(0)} Wh</b>energia</span>
-        <span><b>{stats.maxCurrentA === null ? '—' : stats.maxCurrentA.toFixed(0)} A</b>{stats.limitedByBms ? 'corrente · BMS' : 'corrente'}</span>
+        <span><b>{stats.maxCurrentA === null ? '—' : stats.maxCurrentA.toFixed(0)} A</b>{stats.limitedByBms ? 'corrente · progetto' : 'corrente'}</span>
       </div>
     </div>
   {/if}
@@ -475,7 +475,7 @@
   {#if !(packMode === 'empty' && ui.startMode === null)}
   <details class="sec" open>
     <summary><Icon name="bolt" /> Corrente</summary>
-    <label>Limite del pacco / BMS (A)
+    <label>Corrente di progetto (A)
       <input
         type="number"
         min="0"
@@ -489,9 +489,9 @@
       />
     </label>
     <Help label="Come funziona">
-      {#if stats.cellCurrentA === null}Con le celle il pacco regge quanto indicato dalle schede; il BMS può limitarlo.
-      {:else if stats.limitedByBms}Il BMS limita il pacco a {stats.maxCurrentA?.toFixed(0)} A (le celle reggerebbero {stats.cellCurrentA.toFixed(0)} A). Lamelle e verifiche usano {stats.maxCurrentA?.toFixed(0)} A.
-      {:else}Vuoto = corrente massima delle celle ({stats.cellCurrentA.toFixed(0)} A). Scrivi la corrente continua del tuo BMS o dell'uso previsto: le lamelle si dimensionano su quella.{/if}
+      {#if stats.cellCurrentA === null}Con le celle il pacco regge quanto indicato dalle schede; scrivi qui la corrente continua che userai.
+      {:else if stats.limitedByBms}Il pacco è dimensionato per {stats.maxCurrentA?.toFixed(0)} A (le celle reggerebbero {stats.cellCurrentA.toFixed(0)} A). Lamelle e verifiche usano {stats.maxCurrentA?.toFixed(0)} A.
+      {:else}Vuoto = corrente massima delle celle ({stats.cellCurrentA.toFixed(0)} A), che è un limite assoluto e non un valore di progetto. Scrivi la corrente continua che userai davvero: le lamelle e le saldature si dimensionano su quella. Il limite del tuo BMS è solo un tetto.{/if}
     </Help>
   </details>
   {/if}

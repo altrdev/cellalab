@@ -23,9 +23,9 @@ export interface PackStats {
   energyWh: number | null;
   /** Corrente continua massima delle sole celle = quella del gruppo più debole. */
   cellCurrentA: number | null;
-  /** Corrente continua del pacco: la più bassa tra celle e limite impostato (BMS). */
+  /** Corrente continua del pacco: la più bassa tra celle e corrente di progetto impostata. */
   maxCurrentA: number | null;
-  /** true se il limite impostato è più basso di quello delle celle. */
+  /** true se la corrente di progetto impostata è più bassa di quello delle celle. */
   limitedByBms: boolean;
   weightG: number;
   /** Null se almeno una cella non ha prezzo. */

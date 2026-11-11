@@ -35,8 +35,6 @@ export interface LamellaSettings {
   layers: number;
   welderId: string;
   cutterId: string;
-  /** Corrente continua di progetto, A; null = la massima del pacco. */
-  currentA: number | null;
   cooling: CoolingId;
   /** Aumento di temperatura ammesso a regime, K. */
   deltaTK: number;
@@ -61,7 +59,6 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   layers: 1,
   welderId: 'hobby',
   cutterId: 'manual',
-  currentA: null,
   cooling: 'free',
   deltaTK: 25,
   ambientC: 25,
@@ -188,7 +185,7 @@ export function analyzeLamelle(
   const material = findMaterial(settings.materialId) ?? LAMELLA_MATERIALS[0]!;
   const welder = findWelder(settings.welderId) ?? WELDER_PROFILES[0]!;
   const cutter = findCutter(settings.cutterId) ?? CUTTER_PROFILES[0]!;
-  const currentA = settings.currentA ?? packCurrentA;
+  const currentA = packCurrentA;
   const layers = Math.max(1, Math.floor(settings.layers));
   const issues: LamellaIssue[] = [];
   const alternatives: string[] = [];

@@ -40,7 +40,7 @@ describe('forma delle lamelle', () => {
   });
   it("il collo è la larghezza delle bande e l'analisi divide la corrente tra le celle in parallelo (I/P)", () => {
     const strips = buildStrips(p, { widthMm: 8 });
-    const r = analyzeLamelle(p, strips, { ...DEFAULT_LAMELLA_SETTINGS, currentA: 30 }, 30);
+    const r = analyzeLamelle(p, strips, DEFAULT_LAMELLA_SETTINGS, 30);
     const row = r.strips.find((x) => x.label.startsWith('S'))!;
     expect(row.neckMm).toBeCloseTo(8);
     expect(row.neckCurrentA).toBeCloseTo(30 / 2); // P = 2

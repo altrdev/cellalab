@@ -35,7 +35,7 @@ Before finishing a change: tests and `npm run check` must pass; for UI work look
 
 - Units are **millimetres**. Origin top-left, **y points down**. In the 3D scene the drawing x,y map to X,Z and height goes up Y.
 - **Geometry** (cell position, type, polarity) is separate from **electrical topology**: `group` is the 0-based parallel-group index, groups are in series in index order. 3D, holder, busbars and calculations derive from this model.
-- `Project.generator` remembers how an automatic S×P pack was generated (layout, spacing, pitch, cell type); `applyLayout` remaps cells onto new slots. `Project.currentLimitA` is the BMS/use limit; pack current is the lower of the cells' and that limit.
+- `Project.generator` remembers how an automatic S×P pack was generated (layout, spacing, pitch, cell type); `applyLayout` remaps cells onto new slots. `Project.currentLimitA` is the design current (shown as "Corrente di progetto": your real use, or the BMS cap); pack current is the lower of the cells' and that value. It is the single source for busbar and spot-weld sizing.
 - Lattice: centre-to-centre pitch = cell diameter + gap (default gap 1.5 mm). Hexagonal rows are horizontal with vertical pitch p·√3/2 and odd rows offset by p/2.
 - Busbar and holder **settings** are UI state (not in undo history), saved in `localStorage` and also written under `settings` in the exported project JSON. Project files are `.cellalab.json`.
 - Holder: each plate is a "cap" (floor + walls with a pocket per cell). `buildHolder(project, settings, smooth)`: with `smooth` the outer chamfer is a continuous ramp (closed wedge meshes in `ui/holderMesh.ts`), falling back to 0.2 mm stairs if offsetting changes topology. The UI always uses `holderOf` (smooth).

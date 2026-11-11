@@ -32,7 +32,8 @@ describe('impostazioni nel file del progetto', () => {
     expect(l.thicknessMm).toBeNull();
     expect(l.layers).toBe(5);
     expect(l.cooling).toBe(DEFAULT_LAMELLA_SETTINGS.cooling);
-    expect(l.currentA).toBeNull();
+    // il vecchio campo currentA non esiste più: un file o un salvataggio che lo contiene lo ignora
+    expect('currentA' in l).toBe(false);
     const h = sanitizeHolderSettings({ wallMm: 999, shape: 'strano', lockCells: 'sì' });
     expect(h.wallMm).toBeLessThanOrEqual(6);
     expect(h.shape).toBe(DEFAULT_HOLDER_SETTINGS.shape);

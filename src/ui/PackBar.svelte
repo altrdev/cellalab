@@ -38,10 +38,10 @@
   <div
     class="m"
     title={stats.limitedByBms
-      ? `Limitata dal BMS: le celle reggerebbero ${num(stats.cellCurrentA, 0, ' A')}`
+      ? `Corrente di progetto: le celle reggerebbero ${num(stats.cellCurrentA, 0, ' A')}`
       : 'Corrente continua che reggono le celle'}
   >
-    <b>Corrente</b><span class="big">{num(stats.maxCurrentA, 0, ' A')}</span>{#if stats.limitedByBms}<small class="bms">limite BMS</small>{/if}
+    <b>Corrente</b><span class="big">{num(stats.maxCurrentA, 0, ' A')}</span>{#if stats.limitedByBms}<small class="bms">di progetto</small>{/if}
   </div>
   <div class="m s"><b>Peso celle</b><span>{weight}</span></div>
   <div class="m s" title="Disponibile se tutte le celle hanno un prezzo nel catalogo">

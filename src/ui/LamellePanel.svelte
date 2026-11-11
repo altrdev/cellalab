@@ -168,18 +168,6 @@
   <details class="adv">
     <summary>Avanzate</summary>
 
-    <label>Corrente del pacco (A)
-      <input
-        type="number"
-        min="0"
-        step="1"
-        placeholder={`calcolata: ${fmt(report.currentA, 0)}`}
-        value={ui.lamella.currentA ?? ''}
-        onchange={(e) => (ui.lamella.currentA = e.currentTarget.value === '' ? null : num(e, 0, 1000))}
-      />
-    </label>
-    <Help label="Spiegazione">Lascia vuoto per usare la corrente del pacco (la più bassa tra celle e limite BMS, impostata nella scheda Pacco); scrivi un numero solo per provare un valore diverso.</Help>
-
     <label>Che saldatrice hai
       <select bind:value={ui.lamella.welderId}>
         {#each WELDER_PROFILES as w (w.id)}<option value={w.id}>{w.name}</option>{/each}

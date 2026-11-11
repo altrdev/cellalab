@@ -279,8 +279,8 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
         code: 'current-over-cells',
         severity: 'warning',
         message:
-          `Il limite di corrente (${limit} A) supera quello che reggono le celle (${cellA.toFixed(0)} A): ` +
-          'ogni cella verrebbe usata oltre la corrente massima. Abbassa il limite o aggiungi celle in parallelo.',
+          `La corrente di progetto (${limit} A) supera quella che reggono le celle (${cellA.toFixed(0)} A): ` +
+          'ogni cella verrebbe usata oltre la corrente massima. Abbassa la corrente di progetto o aggiungi celle in parallelo.',
         cellIds: [],
       });
     }

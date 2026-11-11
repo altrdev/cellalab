@@ -59,7 +59,7 @@ export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
   for (const k of Object.keys(base) as (keyof LamellaSettings)[]) {
     const v = data[k];
     const def = base[k];
-    const nullable = k === 'thicknessMm' || k === 'currentA' || k === 'contactDiameterMm' || k === 'widthMm';
+    const nullable = k === 'thicknessMm' || k === 'contactDiameterMm' || k === 'widthMm';
     if (nullable) {
       out[k] = v === null ? null : typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
     } else if (typeof v === typeof def && (typeof v !== 'number' || Number.isFinite(v))) out[k] = v;

@@ -200,7 +200,7 @@ export function paintGroup(
   });
 }
 
-/** Imposta il limite di corrente continua del pacco (BMS); `undefined` o valore non valido lo toglie. */
+/** Imposta la corrente continua di progetto del pacco (il tuo uso, tetto del BMS); `undefined` o valore non valido lo toglie. */
 export function setCurrentLimit(project: Project, limitA: number | undefined): Project {
   if (limitA !== undefined && Number.isFinite(limitA) && limitA > 0) return { ...project, currentLimitA: limitA };
   const { currentLimitA: _limit, ...rest } = project;
