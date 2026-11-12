@@ -38,6 +38,8 @@ const RIM_MM = 7;
 /** Quanto lontano dal punto di saldatura si cerca il foro, mm. */
 const SEARCH_MM = 24;
 const STEP_MM = 0.5;
+/** Un foro che chiede un rinforzo del contorno vale come se fosse così più lontano dal punto di saldatura, mm: si preferisce un posto dove la plastica basta. */
+const BOSS_PENALTY_MM = 8;
 
 /** Una lamella per giunzione, di preferenza completa e della faccia sopra (come per le linguette). */
 function chosenStrips(strips: readonly Strip[]): Strip[] {
@@ -90,7 +92,7 @@ export function findWireExits(
     // punto di saldatura: sul lobo della lamella, dal lato di uscita, appena dentro il bordo
     const solder = { x: node.x + d.x * (node.reachMm - 0.7), y: node.y + d.y * (node.reachMm - 0.7) };
     const covering = strips.filter((o) => o.face === s.face).map((o) => ({ outline: o.outline, holes: o.holes }));
-    let best: { p: Pt; score: number } | null = null;
+    let best: { p: Pt; score: number; room: boolean } | null = null;
     for (let dx = -SEARCH_MM; dx <= SEARCH_MM; dx += STEP_MM) {
       for (let dy = -SEARCH_MM; dy <= SEARCH_MM; dy += STEP_MM) {
         const c = { x: solder.x + dx, y: solder.y + dy };
@@ -98,20 +100,22 @@ export function findWireExits(
         if (dist > SEARCH_MM) continue;
         // il filo non torna indietro verso l'interno: il foro sta oltre il punto di saldatura o al suo fianco
         if (dx * d.x + dy * d.y < -2) continue;
-        if (best && dist >= best.score) continue;
+        if (best && dist >= best.score) continue; // la distanza da sola è già un limite inferiore del punteggio
         // nella fascia lungo il bordo (o appena fuori, nell'incavo tra due celle), mai in una tasca
         if (!pointInRegions(c, near) || pointInRegions(c, deep) || pockets.some((q) => pointInRegions(c, [q]))) continue;
         if (taken.some((q) => Math.hypot(q.x - c.x, q.y - c.y) < 2 * rOut + 0.5)) continue;
         const disk = circlePoints(c.x, c.y, rPocket, 16);
         if (pockets.some((q) => intersectRegions(q, [disk]).some((x) => regionArea(x) > 0.01))) continue;
         if (covering.some((r) => intersectRegions(r, [disk]).some((x) => regionArea(x) > 0.01))) continue;
-        best = { p: c, score: dist };
+        // se il gioco verso il bordo non sta nel contorno servirà un rinforzo: meglio un altro posto, se c'è
+        const room = circlePoints(c.x, c.y, rOut, 16).every((q) => pointInRegions(q, wall));
+        const score = dist + (room ? 0 : BOSS_PENALTY_MM);
+        if (!best || score < best.score) best = { p: c, score, room };
       }
     }
     if (!best) continue;
     taken.push(best.p);
-    // se il gioco verso il bordo non sta nel contorno, si aggiunge un rinforzo attorno al foro
-    const room = circlePoints(best.p.x, best.p.y, rOut, 16).every((q) => pointInRegions(q, wall));
+    const room = best.room;
     out.push({ stripId: s.id, face: s.face, side, solder, hole: best.p, diameterMm: holeMm, plateMm, floorMm, bossMm: room ? 0 : rOut + 0.3 });
   }
   return out;
