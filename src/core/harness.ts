@@ -27,7 +27,7 @@ export interface HarnessWire {
   /** Lamella e faccia a cui è saldato. */
   stripId: string;
   face: Face;
-  /** Percorso: foro della linguetta, piede della discesa, (scavalca il bordo della scatola), connettore. */
+  /** Percorso: foro della linguetta, discesa, ingresso sotto, corsia, (scavalca il bordo della scatola), pad o connettore. */
   points: Pt3[];
   /** Lunghezza lungo il percorso, mm. */
   lengthMm: number;
@@ -60,6 +60,9 @@ const WIRE_CLEARANCE_MM = 1.5;
 const CONNECTOR_END_GAP_MM = 3;
 /** Margine tra la testata e il primo pad sulla faccia superiore, mm. */
 const TOP_MARGIN_MM = 4;
+/** Profondità delle corsie dal fianco delle celle e distanza minima in profondità tra discesa e corsia, mm. */
+const LANE_DEPTH_MM = 1;
+const DEPTH_SEP_MM = 1;
 /** Distanza del filo dal bordo della scatola mentre lo scavalca, mm. */
 const EDGE_GAP_MM = 2;
 /** Distanza tra due fili in corsie vicine, mm. */
@@ -111,6 +114,7 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     pMax = Math.max(pMax, p + r);
   }
   const aWire = edge + WIRE_CLEARANCE_MM;
+  const aIn = edge + LANE_DEPTH_MM; // profondità delle corsie, vicino alle celle
   const size: BmsSize | undefined = bms.sizeMm;
   const box = mount.mode === 'pack' && size !== undefined;
   const aConn = aWire; // il connettore sta sulla faccia del BMS verso il pacco
@@ -136,6 +140,10 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   for (const face of ['top', 'bottom'] as const) {
     withTab.filter((x) => x.face === face).sort((x, y) => y.joint - x.joint).forEach((x, i) => faceRank.set(x.id, i));
   }
+  // Profondità: corsie vicino alle celle, discese dalle linguette più in fuori, salita al connettore ancora più fuori.
+  const bendAt = (s: Strip) => ((s.tab!.bend[0].x + s.tab!.bend[1].x) / 2) * d.x + ((s.tab!.bend[0].y + s.tab!.bend[1].y) / 2) * d.y;
+  const aDown = Math.max(aIn + DEPTH_SEP_MM, ...withTab.map(bendAt));
+  const aUp = aDown + DEPTH_SEP_MM;
   const wires: HarnessWire[] = withTab
     .map((s): HarnessWire => {
       const tab = s.tab!;
@@ -146,19 +154,20 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
       const pHole = tab.holeX * perp.x + tab.holeY * perp.y;
       const yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
       const pPin = pConn + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
+      const aOut = Math.max(aBend, aDown); // le discese stanno più in fuori delle corsie
       const p0 = to3(aBend, pHole, yHole);
       const len = (x: Pt3, y: Pt3) => Math.hypot(x.x - y.x, x.y - y.y, x.z - y.z);
       const points: Pt3[] = [p0];
-      if (boxSize) {
-        // I fili non passano mai dietro la scatola: scendono (o salgono) lungo il bordo del pacco fino sopra (o sotto) la
-        // scatola, e da lì vanno al pad scavalcandone il bordo (faccia superiore) o a un connettore oltre la testata.
-        // Con il connettore oltre la testata ogni filo prende la sua corsia, così non si sovrappongono.
-        const lane = onEnd ? (faceRank.get(s.id) ?? 0) * WIRE_LANE_MM : 0;
-        const yE = s.face === 'top' ? Math.min(yHole, yMid + boxSize.widthMm / 2 + EDGE_GAP_MM + lane) : Math.max(yHole, yMid - boxSize.widthMm / 2 - EDGE_GAP_MM - lane);
-        points.push(to3(aBend, pHole, yE));
-        if (onTop) points.push(to3(aConn, pPin, yE), to3(aTop + EDGE_GAP_MM, pPin, yE), to3(aTop, pPin, yMid));
-        else points.push(to3(aConn, pPin, yE), to3(aConn, pPin, yMid));
-      } else points.push(to3(aBend, pHole, yMid), to3(aConn, pPin, yMid));
+      // Ogni filo ha la sua corsia (quota) e non ne tocca nessun altro: scende (o sale) lungo il bordo del pacco, entra
+      // sotto (verso il pacco) dove deve incrociare, corre sulla sua corsia e arriva al pad o al connettore. Le discese
+      // dalle linguette e quelle sui pad stanno a profondità diverse dalle corsie, quindi quando si incrociano un filo
+      // passa sotto l'altro.
+      const lane = (faceRank.get(s.id) ?? 0) * WIRE_LANE_MM;
+      const half = boxSize ? boxSize.widthMm / 2 : 0;
+      const yE = s.face === 'top' ? Math.min(yHole, yMid + half + EDGE_GAP_MM + lane) : Math.max(yHole, yMid - half - EDGE_GAP_MM - lane);
+      points.push(to3(aOut, pHole, yE), to3(aIn, pHole, yE), to3(aIn, pPin, yE));
+      if (onTop) points.push(to3(aTop + EDGE_GAP_MM, pPin, yE), to3(aTop, pPin, yMid));
+      else points.push(to3(aUp, pPin, yE), to3(aUp, pPin, yMid)); // la salita al connettore sta fuori dalle corsie
       const lengthMm = points.slice(1).reduce((acc, q, i) => acc + len(points[i]!, q), 0);
       const extra = mount.slackMm + (mount.mode === 'external' ? mount.tailMm : 0);
       return {
@@ -173,7 +182,7 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     })
     .sort((a, b) => a.node - b.node);
 
-  const connector = to3(onTop ? aTop : aConn, pConn, yMid);
+  const connector = to3(onTop ? aTop : aUp, pConn, yMid);
   let boxOut: BmsBox | null = null;
   if (box && size) {
     // Lunghezza lungo il lato, larghezza in altezza, spessore verso l'esterno; la faccia verso il pacco è quella del connettore.

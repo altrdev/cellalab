@@ -397,6 +397,33 @@ describe('cablaggio del BMS', () => {
     }
   });
 
+  it('nessun filo ne tocca un altro: ogni percorso ha la sua corsia, e dove si incrociano passano a profondità diverse', () => {
+    const DIAMETER = 0.9; // filo 26 AWG con la guaina, un po' abbondante
+    const sample = (pts: { x: number; y: number; z: number }[]) => {
+      const out: { x: number; y: number; z: number }[] = [];
+      for (let k = 0; k + 1 < pts.length; k++) {
+        const a = pts[k]!;
+        const b = pts[k + 1]!;
+        const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 0.1));
+        for (let t = 0; t <= steps; t++) out.push({ x: a.x + ((b.x - a.x) * t) / steps, y: a.y + ((b.y - a.y) * t) / steps, z: a.z + ((b.z - a.z) * t) / steps });
+      }
+      return out;
+    };
+    for (const connector of ['top', 'end'] as const) {
+      for (const connectorEnd of ['start', 'end'] as const) {
+        const e = buildHarness(setBmsMount(p, { connector, connectorEnd }), strips, 0.1)!;
+        const paths = e.wires.map((w) => sample(w.points));
+        let closest = Infinity;
+        for (let i = 0; i < paths.length; i++) {
+          for (let j = i + 1; j < paths.length; j++) {
+            for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
+          }
+        }
+        expect(closest).toBeGreaterThanOrEqual(DIAMETER - 1e-6);
+      }
+    }
+  });
+
   it('nessun filo entra nel volume della scatola', () => {
     const box = h.box!;
     const inside = (q: { x: number; y: number; z: number }) =>
@@ -440,13 +467,13 @@ describe('cablaggio del BMS', () => {
     const halfT = (alongX ? box.size.z : box.size.x) / 2;
     const outward = Math.sign(o(box.center) - o(h.wires[0]!.points[0]!));
     for (const w of h.wires) {
-      expect(w.points.length).toBe(5);
-      const pin = w.points[4]!;
+      expect(w.points.length).toBe(6);
+      const pin = w.points[5]!;
       expect(Math.abs(c(pin) - c(box.center))).toBeLessThan(halfL); // sopra la scheda
       expect(o(pin)).toBeCloseTo(o(box.center) + outward * halfT, 6); // sulla faccia esterna
       expect(Math.abs(pin.y - box.center.y)).toBeLessThan(1e-6);
     }
-    const cs = h.wires.map((w) => c(w.points[4]!)).sort((a, b) => a - b);
+    const cs = h.wires.map((w) => c(w.points[5]!)).sort((a, b) => a - b);
     for (let k = 1; k < cs.length; k++) expect(cs[k]! - cs[k - 1]!).toBeCloseTo(2.5, 6);
   });
 
@@ -462,8 +489,8 @@ describe('cablaggio del BMS', () => {
       expect(Math.abs(off)).toBeGreaterThan(half);
       expect(off < 0).toBe(end === 'start');
       for (const w of e.wires) {
-        expect(w.points.length).toBe(4);
-        expect(o(w.points[3]!)).toBeCloseTo(o(e.connector), 6); // stessa quota del retro della scatola
+        expect(w.points.length).toBe(6);
+        expect(o(w.points[5]!)).toBeCloseTo(o(e.connector), 6); // stessa quota del retro della scatola
       }
     }
   });
