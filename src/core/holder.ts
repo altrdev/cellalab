@@ -72,8 +72,6 @@ export const MIN_OPEN_GAP_MM2 = 25;
 const CHAMFER_STEP_MM = 0.2;
 
 /** Una fetta della piastra: forme da `z0` a `z1`, con z misurato dalla faccia esterna del fondo verso il bordo delle pareti. */
-export type HolderHalfName = 'top' | 'bottom';
-
 export interface HolderLayer {
   z0: number;
   z1: number;
@@ -98,8 +96,6 @@ export interface HolderModel {
   wall: Region[];
   /** Fette della piastra, dalla faccia esterna al bordo delle pareti. */
   layers: HolderLayer[];
-  /** Fette diverse per una delle due piastre (quella con la tasca dell'NTC); l'altra usa `layers`. */
-  halfLayers?: Partial<Record<HolderHalfName, HolderLayer[]>>;
   /**
    * Smusso a rampa continua (solo con `smooth`): le fette arretrano di `chamferMm` sulle due facce e lo smusso
    * è il raccordo inclinato tra il contorno pieno (`a`) e quello arretrato (`b`). Coppie di contorni corrispondenti.
@@ -209,11 +205,6 @@ export interface BuildOptions {
   extraPockets?: readonly (readonly Pt[])[];
   /** Fori in più che passano anche nel fondo (per esempio il filo dell'NTC). */
   throughHoles?: readonly (readonly Pt[])[];
-  /** Solchi sulla faccia esterna del fondo (per i fili): profondi `grooveMm`, solo nel fondo. */
-  grooves?: readonly (readonly Pt[])[];
-  grooveMm?: number;
-  /** Se c'è, tasca extra, fori passanti e solchi valgono solo per questa piastra; l'altra resta com'è. Assente = entrambe. */
-  cutsHalf?: HolderHalfName | null;
 }
 
 /**
@@ -257,13 +248,11 @@ export function buildHolder(
   const openings = cells.map(({ c, r }) => circlePolygon(c.x, c.y, Math.max(r - s.ledgeMm, 1)));
   const through = opts.throughHoles ?? [];
   const extra = opts.extraPockets ?? [];
-  const wallPocketsPlain = pockets;
-  const slabOpeningsPlain = openings;
   const wallPocketsCut = [...pockets, ...extra, ...through];
   const slabOpeningsCut = [...openings, ...through];
   // Sagome di riferimento (disegno, divisione in pezzi): senza la tasca dell'NTC, che sta su una sola piastra e solo nelle fette.
-  const wall = differenceRegions(outer, wallPocketsPlain);
-  const slab = s.lockCells ? differenceRegions(outer, slabOpeningsPlain) : [];
+  const wall = differenceRegions(outer, pockets);
+  const slab = s.lockCells ? differenceRegions(outer, openings) : [];
 
   // Smusso a rampa: contorno arretrato e coppie di contorni da raccordare (se la topologia regge).
   let ramp: HolderModel['ramp'] = null;
@@ -275,12 +264,8 @@ export function buildHolder(
   // Fette: ai bordi dello smusso la sagoma esterna si ritira a gradini; sotto `floorMm` si taglia con i fori, sopra con le tasche.
   const engrave = opts.engrave && opts.engrave.length > 0 ? opts.engrave : null;
   const engraveFromZ = totalMm - Math.max(0, Math.min(opts.engraveMm ?? 0, totalMm - floorMm - 0.4));
-  const allGrooves = s.lockCells && opts.grooves && opts.grooves.length > 0 ? opts.grooves : null;
-  const grooveDepth = Math.max(0, Math.min(opts.grooveMm ?? floorMm / 2, floorMm - 0.2));
-  const makeLayers = (wallPockets: readonly (readonly Pt[])[], slabOpenings: readonly (readonly Pt[])[], grooves: readonly (readonly Pt[])[] | null): HolderLayer[] => {
-    const groovesOn = !!grooves && grooveDepth > 0.05;
+  const makeLayers = (wallPockets: readonly (readonly Pt[])[], slabOpenings: readonly (readonly Pt[])[]): HolderLayer[] => {
     const cuts = new Set<number>([0, floorMm, totalMm]);
-    if (groovesOn) cuts.add(grooveDepth);
     if (engrave) cuts.add(engraveFromZ);
     if (ramp) {
       cuts.add(chamferMm);
@@ -309,13 +294,11 @@ export function buildHolder(
           : 0;
       const useSlab = s.lockCells && mid < floorMm;
       const engraved = !!engrave && mid > engraveFromZ && !useSlab;
-      const grooved = groovesOn && useSlab && mid < grooveDepth;
-      const key = `${inset.toFixed(4)}|${useSlab ? 's' : 'w'}${engraved ? 'e' : ''}${grooved ? 'g' : ''}`;
+      const key = `${inset.toFixed(4)}|${useSlab ? 's' : 'w'}${engraved ? 'e' : ''}`;
       let regions = cache.get(key);
       if (!regions) {
         regions = differenceRegions(inset > 1e-9 ? offsetRegions(outer, -inset) : outer, useSlab ? slabOpenings : wallPockets);
         if (engraved) regions = differenceRegions(regions, engrave!);
-        if (grooved) regions = differenceRegions(regions, grooves!);
         cache.set(key, regions);
       }
       const prev = layers[layers.length - 1];
@@ -325,10 +308,7 @@ export function buildHolder(
     }
     return layers;
   };
-  const hasExtra = extra.length > 0 || through.length > 0 || !!allGrooves;
-  const cutsHalf = opts.cutsHalf ?? null;
-  const layers = makeLayers(cutsHalf && hasExtra ? wallPocketsPlain : wallPocketsCut, cutsHalf && hasExtra ? slabOpeningsPlain : slabOpeningsCut, cutsHalf && hasExtra ? null : allGrooves);
-  const halfLayers: HolderModel['halfLayers'] = cutsHalf && hasExtra ? { [cutsHalf]: makeLayers(wallPocketsCut, slabOpeningsCut, allGrooves) } : undefined;
+  const layers = makeLayers(wallPocketsCut, slabOpeningsCut);
 
   const minR = Math.min(...cells.map((x) => x.r));
   return {
@@ -341,7 +321,6 @@ export function buildHolder(
     slab,
     wall,
     layers,
-    ...(halfLayers && { halfLayers }),
     ramp,
     openingDiameterMm: s.lockCells ? 2 * Math.max(minR - s.ledgeMm, 1) : null,
     bounds: boundsOf(outer),

@@ -5,9 +5,8 @@ import { DEFAULT_LAMELLA_SETTINGS } from '../core/lamelle';
 import { replaceCells, setBms } from '../core/ops';
 import { createProject } from '../core/project';
 import { buildStrips } from '../core/strips';
-import { buildHolder, DEFAULT_HOLDER_SETTINGS } from '../core/holder';
-import { circlePolygon, intersectRegions, pointInRegions, regionArea } from '../core/clip';
-import { findCellType } from '../core/catalog';
+import { DEFAULT_HOLDER_SETTINGS } from '../core/holder';
+import { intersectRegions, regionArea } from '../core/clip';
 import { freeTabSides, ntcPlanOf, stripsOf, tabSideOf } from './lamelle';
 
 const pack = (s: number, p: number) =>
@@ -37,42 +36,14 @@ describe('NTC sotto le lamelle', () => {
   const plan = ntcPlanOf(p, DEFAULT_LAMELLA_SETTINGS, DEFAULT_HOLDER_SETTINGS);
   const strips = buildStrips(p, { tabs: { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.2, bendMm: 0.3, powerHoleMm: 2.85 } });
 
-  it('c’è una piastra con la strada libera e il solco è un percorso vero', () => {
-    expect(plan.face).not.toBeNull();
-    expect(plan.route?.found).toBe(true);
+  it('c’è un vuoto per il sensore', () => {
     expect(plan.site).not.toBeNull();
   });
 
-  it('il foro del filo e il solco non toccano le lamelle della piastra scelta', () => {
-    const face = plan.face!;
-    const regions = strips.filter((s) => s.face === face).map((s) => ({ outline: s.outline, holes: s.holes }));
+  it('il foro del filo non tocca le lamelle di nessuna faccia', () => {
+    const regions = strips.map((s) => ({ outline: s.outline, holes: s.holes }));
     expect(regions.length).toBeGreaterThan(0);
-    const overlap = (poly: { x: number; y: number }[]) => intersectRegions(regions, [poly]).reduce((a, r) => a + regionArea(r), 0);
-    expect(overlap(plan.site!.wirePolygon)).toBeLessThan(0.01);
-    for (const g of plan.route!.polygons) expect(overlap(g)).toBeLessThan(0.01);
-  });
-
-  it('il solco lascia un po’ di fondo attorno alle aperture delle celle', () => {
-    const ledge = DEFAULT_HOLDER_SETTINGS.ledgeMm;
-    for (const c of p.cells) {
-      const r = findCellType(p, c.typeId)!.diameterMm / 2 - ledge;
-      const ring = circlePolygon(c.x, c.y, r + 0.4);
-      for (const g of plan.route!.polygons) {
-        // i punti del solco (a parte la parte finale oltre il bordo) stanno fuori dall'apertura allargata
-        for (const q of g) expect(pointInRegions(q, [{ outline: ring, holes: [] }])).toBe(false);
-      }
-    }
-  });
-
-  it('la tasca e il solco sono solo sulla piastra scelta', () => {
-    const half = plan.face!;
-    const other = half === 'top' ? 'bottom' : 'top';
-    const cut = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true, { extraPockets: [plan.site!.polygon], throughHoles: [plan.site!.wirePolygon], grooves: plan.route!.polygons, cutsHalf: half })!;
-    const vol = (ls: typeof cut.layers) => ls.reduce((a, l) => a + (l.z1 - l.z0) * l.regions.reduce((b, r) => b + regionArea(r), 0), 0);
-    const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true)!;
-    expect(vol(cut.halfLayers![half]!)).toBeLessThan(vol(plain.layers));
-    expect(cut.halfLayers![other]).toBeUndefined();
-    expect(vol(cut.layers)).toBeCloseTo(vol(plain.layers), 6);
+    expect(intersectRegions(regions, [plan.site!.wirePolygon]).reduce((a, r) => a + regionArea(r), 0)).toBeLessThan(0.01);
   });
 
   it('stripsOf usa gli stessi lati', () => {

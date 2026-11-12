@@ -11,8 +11,7 @@ import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
 import { holderOf, type HolderCuts } from './holder';
 import { bmsOf } from '../core/bms';
 import { buildHarness, type Harness } from '../core/harness';
-import { ntcSites, type NtcSite } from '../core/ntc';
-import { ntcRoute, type NtcRoute } from '../core/ntcRoute';
+import { ntcSite, type NtcSite } from '../core/ntc';
 import { tabNotches } from '../core/tabNotches';
 import type { WelderProfile } from '../core/profiles';
 import type { Project } from '../core/types';
@@ -44,59 +43,30 @@ export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
 const cutsCache = new WeakMap<Project, { key: string; cuts: HolderCuts }>();
 interface NtcPlan {
   site: NtcSite | null;
-  route: NtcRoute | null;
-  /** La piastra (faccia) su cui il sensore ha la strada libera; null se nessuna. */
-  face: Face | null;
 }
 const ntcCache = new WeakMap<Project, { key: string; plan: NtcPlan }>();
-const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [], grooves: [], half: null };
+const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [], };
 
 /**
- * Il posto dell'NTC e il solco del suo filo (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle).
- * Evita i vuoti dove il foro del filo finirebbe sotto una lamella e il solco evita le lamelle di entrambe le facce:
- * per le lamelle usa la forma senza holder, che qui basta.
+ * Il posto dell'NTC (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle). Preferisce i vuoti dove il
+ * foro del filo non finisce sotto una lamella di nessuna faccia: per le lamelle usa la forma senza holder, che qui basta.
  */
 export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: HolderSettings): NtcPlan {
-  if (!holder.ntc || !bmsOf(project)?.ntc) return { site: null, route: null, face: null };
+  if (!holder.ntc || !bmsOf(project)?.ntc) return { site: null };
   const side = tabSideOf(project, settings);
   const opts = optionsOf(project, settings);
-  const key = JSON.stringify([opts, side, holder.ntcMm, holder.clearanceMm, holder.wallMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
+  const key = JSON.stringify([opts, side, holder.ntcMm, holder.clearanceMm]);
   const hit = ntcCache.get(project);
   if (hit && hit.key === key) return hit.plan;
-  const strips = buildStrips(project, opts);
-  const regionsOf = (face: Face) => strips.filter((s) => s.face === face).map((s) => ({ outline: s.outline, holes: s.holes }));
-  const all = strips.map((s) => ({ outline: s.outline, holes: s.holes }));
-  const plain = holder.lockCells ? buildHolder(project, holder, false) : null;
-  // Il sensore si monta su una sola piastra: si cerca, per ciascuna faccia, il primo vuoto da cui il filo arriva al bordo
-  // senza passare sotto le lamelle di quella faccia, e si tiene il percorso più corto. Il foro e il solco ci sono su entrambe.
-  let best: NtcPlan | null = null;
-  if (plain) {
-    for (const face of ['top', 'bottom'] as const) {
-      const avoid = regionsOf(face);
-      for (const cand of ntcSites(project, side, holder.ntcMm, holder.clearanceMm, avoid).filter((c) => !c.covered).slice(0, 16)) {
-        const r = ntcRoute(plain.slab, avoid, { x: cand.x, y: cand.y }, side, undefined, cand.radiusMm + 0.4);
-        if (!r.found) continue;
-        if (!best || r.lengthMm < best.route!.lengthMm) best = { site: cand, route: r, face };
-        break;
-      }
-    }
-  }
-  let plan: NtcPlan;
-  if (best) plan = best;
-  else {
-    // nessuna strada libera: il vuoto migliore, senza solco
-    const sites = ntcSites(project, side, holder.ntcMm, holder.clearanceMm, all);
-    const site = sites.find((c) => !c.covered) ?? sites[0] ?? null;
-    plan = { site, route: site && plain ? ntcRoute(plain.slab, all, { x: site.x, y: site.y }, side, undefined, site.radiusMm + 0.4) : null, face: null };
-  }
+  const all = buildStrips(project, opts).map((s) => ({ outline: s.outline, holes: s.holes }));
+  const plan: NtcPlan = { site: ntcSite(project, side, holder.ntcMm, holder.clearanceMm, all) };
   ntcCache.set(project, { key, plan });
   return plan;
 }
 
-
 /**
  * Tagli del portacelle legati al BMS: scanalature per le linguette (con un BMS e le linguette accese), tasca dell'NTC
- * con il suo foro e solco per il filo. Le scanalature si ricavano dalle lamelle senza holder, perché la posizione delle
+ * con il suo foro per il filo. Le scanalature si ricavano dalle lamelle senza holder, perché la posizione delle
  * linguette non dipende da lui. Li usa `holderOf`.
  */
 export function holderCutsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): HolderCuts {
@@ -106,8 +76,8 @@ export function holderCutsOf(project: Project, settings: LamellaSettings, holder
   const hit = cutsCache.get(project);
   if (hit && hit.key === key) return hit.cuts;
   const notches = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon) : [];
-  const { site, route, face } = ntcPlanOf(project, settings, holder);
-  const cuts = { notches, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [], grooves: route?.found ? route.polygons : [], half: face };
+  const { site } = ntcPlanOf(project, settings, holder);
+  const cuts = { notches, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
   cutsCache.set(project, { key, cuts });
   return cuts;
 }

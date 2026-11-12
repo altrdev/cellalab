@@ -154,7 +154,7 @@
     <label><span><input type="checkbox" bind:checked={ui.holder.ntc} /> {t('hold.ntc')}</span></label>
     {#if ui.holder.ntc}
       <label>{t('hold.ntcSize')}<UnitInput kind="len" min={2} max={12} step={0.5} value={ui.holder.ntcMm} onchange={(v) => { if (v !== null) ui.holder.ntcMm = v; }} /></label>
-      {#if !ntcSite}<p class="note">{t('hold.ntcNone')}</p>{:else if ntcSite.covered}<p class="note">{t('hold.ntcCovered')}</p>{:else if ntcPlan.route?.found}<p class="note">{t('hold.ntcRoute', { len: len(ntcPlan.route.lengthMm, 0), face: ntcPlan.face === 'bottom' ? t('face.bottom') : t('face.top') })}</p>{:else if ntcPlan.route}<p class="note">{t('hold.ntcNoRoute')}</p>{/if}
+      {#if !ntcSite}<p class="note">{t('hold.ntcNone')}</p>{:else if ntcSite.covered}<p class="note">{t('hold.ntcCovered')}</p>{/if}
       <Help label={t('hold.what')}>{t('hold.ntcHelp')}</Help>
     {/if}
   </section>

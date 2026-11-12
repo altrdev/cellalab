@@ -10,7 +10,6 @@ import { buildDxf } from './dxf';
 import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { buildHarness } from './harness';
 import { ntcSite, ntcSites } from './ntc';
-import { ntcRoute } from './ntcRoute';
 import { tabNotches } from './tabNotches';
 import { DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './lamelle';
 import { holeForWireMm } from './wire';
@@ -321,56 +320,6 @@ describe('filo dell’NTC', () => {
   it('se tutti i vuoti sono coperti lo dice', () => {
     const all = [{ outline: [{ x: -500, y: -500 }, { x: 500, y: -500 }, { x: 500, y: 500 }, { x: -500, y: 500 }], holes: [] }];
     expect(ntcSite(p, 'top', 5, 0.15, all)!.covered).toBe(true);
-  });
-});
-
-describe('solco del filo dell’NTC', () => {
-  const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
-  const settings = DEFAULT_HOLDER_SETTINGS;
-  const site = ntcSite(p, 'top', 5, settings.clearanceMm)!;
-  const slab = buildHolder(p, settings, false)!.slab;
-  const start = { x: site.x, y: site.y };
-  const box = (x0: number, y0: number, x1: number, y1: number) => ({ outline: [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }], holes: [] });
-
-  it('trova un percorso dal foro al bordo di uscita', () => {
-    const t0 = Date.now();
-    const route = ntcRoute(slab, [], start, 'top');
-    expect(Date.now() - t0).toBeLessThan(2000);
-    expect(route.found).toBe(true);
-    expect(route.path[0]).toEqual(start);
-    const end = route.path[route.path.length - 1]!;
-    expect(end.y).toBeLessThan(site.y); // verso l'alto del disegno
-    expect(route.lengthMm).toBeGreaterThan(0);
-  });
-
-  it('con una lamella sulla strada non la attraversa mai: la aggira o dice che non c’è', () => {
-    const wall = box(site.x - 1, site.y - 12, site.x + 1, site.y - 3); // sopra il foro
-    const route = ntcRoute(slab, [wall], start, 'top');
-    for (const poly of route.polygons) for (const q of poly) expect(pointInRegions(q, [wall])).toBe(false);
-    if (route.found) expect(route.lengthMm).toBeGreaterThan(ntcRoute(slab, [], start, 'top').lengthMm);
-  });
-
-  it('senza strada libera dice che non c’è', () => {
-    const everything = box(-500, -500, 500, 500);
-    expect(ntcRoute(slab, [everything], start, 'top').found).toBe(false);
-  });
-
-  it('nel 4S3P con le lamelle nessun vuoto ha una strada libera: lo dice', () => {
-    const strips = buildStrips(p, { tabs: { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.2, bendMm: 0.3, powerHoleMm: 2.85 } });
-    const avoid = strips.map((s) => ({ outline: s.outline, holes: s.holes }));
-    const found = ntcSites(p, 'top', 5, settings.clearanceMm, avoid).some((s) => ntcRoute(slab, avoid, { x: s.x, y: s.y }, 'top').found);
-    expect(found).toBe(false);
-  });
-
-  it('il solco scava solo la faccia esterna del fondo', () => {
-    const route = ntcRoute(slab, [], start, 'top');
-    const plain = buildHolder(p, settings, true)!;
-    const cut = buildHolder(p, settings, true, { grooves: route.polygons })!;
-    const volume = (m: typeof plain) => m.layers.reduce((a, l) => a + (l.z1 - l.z0) * l.regions.reduce((b, r) => b + regionArea(r), 0), 0);
-    expect(volume(cut)).toBeLessThan(volume(plain));
-    expect(plain.totalMm).toBeCloseTo(cut.totalMm, 6);
-    const flat = regionArea(unionPolygons(route.polygons));
-    expect(volume(plain) - volume(cut)).toBeLessThanOrEqual(flat * settings.floorMm / 2 + 1e-6);
   });
 });
 
