@@ -677,6 +677,31 @@ describe('uscita dei fili dal portacelle, senza linguette', () => {
     expect(new Set(routes.map((e) => e.stripId)).size).toBe(5);
   });
 
+  it('con il profilo della cella e il rinforzo ogni giunto ha il suo foro, circondato da plastica', () => {
+    for (const chamferMm of [0.6, 2]) {
+      const st = { ...DEFAULT_HOLDER_SETTINGS, shape: 'profile' as const, chamferMm };
+      const base = buildHolder(p, st, false)!;
+      const routes = findWireRoutes(p, strips, base.wall, 'bottom', 1.21, base.totalMm, base.floorMm, 0.3, chamferMm, true);
+      expect(routes).toHaveLength(5);
+      expect(routes.every((e) => e.hole)).toBe(true); // nessun giro esterno
+      expect(routes.some((e) => (e.bossMm ?? 0) > 0)).toBe(true);
+      const model = buildHolder(p, st, false, { addOuter: routes.filter((e) => (e.bossMm ?? 0) > 0).map((e) => circlePoints(e.hole!.x, e.hole!.y, e.bossMm!, 24)) })!;
+      for (const e of routes) {
+        const r = e.diameterMm / 2 + ((e.bossMm ?? 0) > 0 ? Math.max(0.8, chamferMm + 0.5) : 0.8) - 0.05;
+        for (let k = 0; k < 24; k++) {
+          const a = (k / 24) * 2 * Math.PI;
+          expect(pointInRegions({ x: e.hole!.x + Math.cos(a) * r, y: e.hole!.y + Math.sin(a) * r }, model.wall.map((rg) => ({ outline: rg.outline, holes: [] })))).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('con la forma arrotondata il rinforzo non c’è mai: il contorno non cambia', () => {
+    const base = buildHolder(p, { ...DEFAULT_HOLDER_SETTINGS, shape: 'rounded', chamferMm: 2 }, false)!;
+    const routes = findWireRoutes(p, strips, base.wall, 'bottom', 1.21, base.totalMm, base.floorMm, 0.3, 2, false);
+    expect(routes.every((e) => (e.bossMm ?? 0) === 0)).toBe(true);
+  });
+
   it('i fori tolgono materiale alla piastra e il filo passa per il foro senza toccare gli altri', () => {
     const holes = exits.map((e) => circlePoints(e.hole!.x, e.hole!.y, e.diameterMm / 2, 16));
     const vol = (m: { layers: { z0: number; z1: number; regions: Parameters<typeof regionArea>[0][] }[] }) =>

@@ -155,6 +155,7 @@
     <label><span><input type="checkbox" bind:checked={ui.holder.wireHoles} onchange={() => { if (ui.holder.wireHoles) ui.lamella.tabs = false; }} /> {t('hold.wireHoles')}</span></label>
     {#if ui.holder.wireHoles}
       <p class="note">{t('hold.wireHolesNote', { n: wireExits.filter((e) => e.hole).length })}</p>
+      {#if wireExits.some((e) => (e.bossMm ?? 0) > 0)}<p class="note">{t('hold.wireHolesBoss', { n: wireExits.filter((e) => (e.bossMm ?? 0) > 0).length })}</p>{/if}
       {#if wireExits.some((e) => !e.hole)}<p class="note">{t('hold.wireHolesAround', { m: wireExits.filter((e) => !e.hole).length })}</p>{/if}
     {/if}
     <Help label={t('hold.what')}>{t('hold.wireHolesHelp')}</Help>

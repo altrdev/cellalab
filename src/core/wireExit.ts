@@ -25,6 +25,8 @@ export interface WireExit {
   /** Spessore della piastra e del suo fondo, mm: il filo entra dalla faccia esterna ed esce dal bordo delle pareti. */
   plateMm: number;
   floorMm: number;
+  /** Raggio del rinforzo da aggiungere al contorno attorno al foro (solo con il profilo della cella, dove tra le celle la plastica è sottile); 0 = non serve. */
+  bossMm?: number;
 }
 
 const SIDE: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
@@ -32,6 +34,8 @@ const SIDE: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }
 const MARGIN_MM = MIN_PRINT_WALL_MM;
 /** Il foro sta nella fascia lungo il bordo larga così: più dentro il filo resterebbe chiuso tra le celle, mm. */
 const RIM_MM = 7;
+/** Con il rinforzo il foro può stare fino a così fuori dal contorno (nell'incavo tra due celle), mm. */
+const OUTSIDE_MM = 4;
 /** Quanto lontano dal punto di saldatura si cerca il foro, mm. */
 const SEARCH_MM = 24;
 const STEP_MM = 0.5;
@@ -70,6 +74,8 @@ export function findWireExits(
   holeMm: number,
   plateMm: number,
   floorMm: number,
+  chamferMm = 0,
+  allowBoss = false,
 ): WireExit[] {
   void project;
   void findCellType;
@@ -111,9 +117,37 @@ export function findWireExits(
       found = c;
       break;
     }
+    let bossMm = 0;
+    if (!found && allowBoss) {
+      // Profilo della cella: la plastica tra le celle non basta, quindi si aggiunge al contorno un rinforzo tondo attorno al
+      // foro (che sta il più vicino possibile al punto di saldatura, anche nell'incavo appena fuori dal contorno).
+      const rBoss = holeR + Math.max(MARGIN_MM, chamferMm + 0.5);
+      const near = offsetRegions(outlines, OUTSIDE_MM);
+      const byDist: { c: Pt; dist: number }[] = [];
+      for (let dx = -SEARCH_MM; dx <= SEARCH_MM; dx += STEP_MM) {
+        for (let dy = -SEARCH_MM; dy <= SEARCH_MM; dy += STEP_MM) {
+          const c = { x: solder.x + dx, y: solder.y + dy };
+          const dist = Math.hypot(dx, dy);
+          if (dist > SEARCH_MM || dx * d.x + dy * d.y < -2) continue;
+          if (!pointInRegions(c, near) || pointInRegions(c, deep) || pockets.some((q) => pointInRegions(c, [q]))) continue;
+          byDist.push({ c, dist });
+        }
+      }
+      byDist.sort((u, v) => u.dist - v.dist);
+      for (const { c } of byDist) {
+        if (taken.some((q) => Math.hypot(q.x - c.x, q.y - c.y) < 2 * rBoss + 0.5)) continue;
+        const disk = circlePoints(c.x, c.y, rPocket, 16);
+        if (pockets.some((q) => intersectRegions(q, [disk]).some((x) => regionArea(x) > 0.01))) continue;
+        if (covering.some((r) => intersectRegions(r, [disk]).some((x) => regionArea(x) > 0.01))) continue;
+        found = c;
+        const room = circlePoints(c.x, c.y, rBoss, 16).every((q) => pointInRegions(q, wall));
+        bossMm = room ? 0 : rBoss + 0.3;
+        break;
+      }
+    }
     if (!found) continue;
     taken.push(found);
-    out.push({ stripId: s.id, face: s.face, side, solder, hole: found, diameterMm: holeMm, plateMm, floorMm });
+    out.push({ stripId: s.id, face: s.face, side, solder, hole: found, diameterMm: holeMm, plateMm, floorMm, bossMm });
   }
   return out;
 }
@@ -216,8 +250,10 @@ export function findWireRoutes(
   plateMm: number,
   floorMm: number,
   bendMm = 0.5,
+  chamferMm = 0,
+  allowBoss = false,
 ): WireExit[] {
-  const holed = findWireExits(project, strips, wall, side, holeMm, plateMm, floorMm);
+  const holed = findWireExits(project, strips, wall, side, holeMm, plateMm, floorMm, chamferMm, allowBoss);
   const have = new Set(holed.map((e) => e.stripId));
   const missing = new Set(chosenStrips(strips).filter((x) => !have.has(x.id)).map((x) => x.id));
   return missing.size === 0 ? holed : [...holed, ...findAroundExits(project, strips, wall, side, plateMm, floorMm, bendMm, missing)];

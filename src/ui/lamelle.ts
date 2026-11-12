@@ -55,7 +55,7 @@ interface NtcPlan {
   site: NtcSite | null;
 }
 const ntcCache = new WeakMap<Project, { key: string; plan: NtcPlan }>();
-const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, wireHoles: { top: [], bottom: [] }, pockets: [], through: [] };
+const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, wireHoles: { top: [], bottom: [] }, wireBosses: { top: [], bottom: [] }, pockets: [], through: [] };
 
 const exitCache = new WeakMap<Project, { key: string; exits: WireExit[] }>();
 /**
@@ -72,7 +72,7 @@ export function wireExitsOf(project: Project, settings: LamellaSettings, holder:
   const strips = plain && opts.tabs ? buildStrips(project, opts) : [];
   // Con i fori nel portacelle il filo passa da lì; senza fori né linguette fa il giro esterno sul piano del portacelle.
   const exits = !plain || !opts.tabs ? [] : holder.wireHoles
-    ? findWireRoutes(project, strips, plain.wall, opts.tabs.side, holeForWireMm(settings.balanceAwg), plain.totalMm, plain.floorMm, settings.tabBendMm)
+    ? findWireRoutes(project, strips, plain.wall, opts.tabs.side, holeForWireMm(settings.balanceAwg), plain.totalMm, plain.floorMm, settings.tabBendMm, holder.chamferMm, holder.shape === 'profile')
     : findAroundExits(project, strips, plain.wall, opts.tabs.side, plain.totalMm, plain.floorMm, settings.tabBendMm);
   exitCache.set(project, { key, exits });
   return exits;
@@ -112,8 +112,13 @@ export function holderCutsOf(project: Project, settings: LamellaSettings, holder
   const exits = wireExitsOf(project, settings, holder);
   const holeOf = (e: WireExit) => circlePoints(e.hole!.x, e.hole!.y, e.diameterMm / 2, 16);
   const holed = exits.filter((e) => e.hole); // il giro esterno non fa fori
+  const bossOf = (e: WireExit) => circlePoints(e.hole!.x, e.hole!.y, e.bossMm ?? 0, 24);
+  const wireBosses = {
+    top: holed.filter((e) => e.face === 'top' && (e.bossMm ?? 0) > 0).map(bossOf),
+    bottom: holed.filter((e) => e.face === 'bottom' && (e.bossMm ?? 0) > 0).map(bossOf),
+  };
   const wireHoles = { top: holed.filter((e) => e.face === 'top').map(holeOf), bottom: holed.filter((e) => e.face === 'bottom').map(holeOf) };
-  const cuts = { notches, wireHoles, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
+  const cuts = { notches, wireHoles, wireBosses, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
   cutsCache.set(project, { key, cuts });
   return cuts;
 }
