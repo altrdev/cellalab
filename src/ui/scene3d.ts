@@ -503,7 +503,7 @@ export class PackScene {
     };
     if (h.box) {
       const geo = new THREE.BoxGeometry(h.box.size.x, h.box.size.y, h.box.size.z);
-      // Un po' trasparente, così si vedono i fili che arrivano al connettore dietro la scheda.
+      // Un po' trasparente, così si vedono i fili dietro la scheda (le linguette) e quelli che arrivano al connettore.
       const boxMat = mat(0x1f7a4a, 0.6) as THREE.MeshStandardMaterial;
       boxMat.transparent = true;
       boxMat.opacity = 0.55;
@@ -516,9 +516,8 @@ export class PackScene {
     for (const w of h.wires) {
       const path = new THREE.CurvePath<THREE.Vector3>();
       const pts = w.points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
-      path.add(new THREE.LineCurve3(pts[0]!, pts[1]!));
-      path.add(new THREE.LineCurve3(pts[1]!, pts[2]!));
-      const geo = new THREE.TubeGeometry(path, 24, 0.45, 6, false);
+      for (let i = 0; i + 1 < pts.length; i++) path.add(new THREE.LineCurve3(pts[i]!, pts[i + 1]!));
+      const geo = new THREE.TubeGeometry(path, 24 * path.curves.length, 0.45, 6, false);
       const color = w.node === 0 ? 0x1b1b1b : new THREE.Color().setHSL(groupHue(w.node) / 360, 0.75, 0.5).getHex();
       const mesh = new THREE.Mesh(geo, mat(color, 0.55));
       mesh.castShadow = true;

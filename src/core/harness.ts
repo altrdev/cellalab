@@ -27,7 +27,7 @@ export interface HarnessWire {
   /** Lamella e faccia a cui è saldato. */
   stripId: string;
   face: Face;
-  /** Percorso: foro della linguetta, piede della discesa, (due punti attorno alla testata se arriva sopra), connettore. */
+  /** Percorso: foro della linguetta, piede della discesa, (scavalca il bordo della scatola), connettore. */
   points: Pt3[];
   /** Lunghezza lungo il percorso, mm. */
   lengthMm: number;
@@ -60,8 +60,10 @@ const WIRE_CLEARANCE_MM = 1.5;
 const CONNECTOR_END_GAP_MM = 3;
 /** Margine tra la testata e il primo pad sulla faccia superiore, mm. */
 const TOP_MARGIN_MM = 4;
-/** Quanto il filo si tiene lontano dalla testata mentre la gira, mm. */
-const WRAP_CLEARANCE_MM = 2;
+/** Distanza del filo dal bordo della scatola mentre lo scavalca, mm. */
+const EDGE_GAP_MM = 2;
+/** Distanza tra due fili in corsie vicine, mm. */
+const WIRE_LANE_MM = 1.5;
 
 const DIR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
@@ -113,8 +115,8 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const box = mount.mode === 'pack' && size !== undefined;
   const aConn = aWire; // il connettore sta sulla faccia del BMS verso il pacco
   const pc = pMin + mount.along * (pMax - pMin);
-  // Con la scatola nota i fili arrivano da una testata: o su un connettore oltre la testata, o sulla faccia superiore
-  // (pad o connettore) dopo aver girato attorno alla testata. Mai dietro: lì c'è la scheda.
+  // Con la scatola nota i fili arrivano o sulla faccia superiore (pad o connettore: scavalcano il bordo sopra o sotto la
+  // scatola) o a un connettore oltre una testata. Mai dietro: lì c'è la scheda.
   const pins = withTab.length * CONNECTOR_PITCH_MM;
   const sgn = mount.connectorEnd === 'end' ? 1 : -1;
   const boxSize = box ? size : undefined;
@@ -129,6 +131,11 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const joints = withTab.map((s) => s.joint);
   const last = Math.max(...joints);
   const n = last + 1;
+  // Posto del filo tra quelli della stessa faccia, dal nodo più basso: serve a dare una corsia a ciascuno.
+  const faceRank = new Map<string, number>();
+  for (const face of ['top', 'bottom'] as const) {
+    withTab.filter((x) => x.face === face).sort((x, y) => y.joint - x.joint).forEach((x, i) => faceRank.set(x.id, i));
+  }
   const wires: HarnessWire[] = withTab
     .map((s): HarnessWire => {
       const tab = s.tab!;
@@ -141,13 +148,18 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
       const yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
       const pPin = pConn + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
       const p0 = to3(aBend, pHole, yHole);
-      const p1 = to3(aBend, pHole, yMid);
       const len = (x: Pt3, y: Pt3) => Math.hypot(x.x - y.x, x.y - y.y, x.z - y.z);
-      const points: Pt3[] = [p0, p1];
-      if (onTop) {
-        const pAround = pEnd + sgn * WRAP_CLEARANCE_MM;
-        points.push(to3(aConn, pAround, yMid), to3(aTop + WRAP_CLEARANCE_MM, pAround, yMid), to3(aTop, pPin, yMid));
-      } else points.push(to3(aConn, pPin, yMid));
+      const points: Pt3[] = [p0];
+      if (boxSize) {
+        // I fili non passano mai dietro la scatola: scendono (o salgono) lungo il bordo del pacco fino sopra (o sotto) la
+        // scatola, e da lì vanno al pad scavalcandone il bordo (faccia superiore) o a un connettore oltre la testata.
+        // Con il connettore oltre la testata ogni filo prende la sua corsia, così non si sovrappongono.
+        const lane = onEnd ? (faceRank.get(s.id) ?? 0) * WIRE_LANE_MM : 0;
+        const yE = s.face === 'top' ? Math.min(yHole, yMid + boxSize.widthMm / 2 + EDGE_GAP_MM + lane) : Math.max(yHole, yMid - boxSize.widthMm / 2 - EDGE_GAP_MM - lane);
+        points.push(to3(aBend, pHole, yE));
+        if (onTop) points.push(to3(aConn, pPin, yE), to3(aTop + EDGE_GAP_MM, pPin, yE), to3(aTop, pPin, yMid));
+        else points.push(to3(aConn, pPin, yE), to3(aConn, pPin, yMid));
+      } else points.push(to3(aBend, pHole, yMid), to3(aConn, pPin, yMid));
       const lengthMm = points.slice(1).reduce((acc, q, i) => acc + len(points[i]!, q), 0);
       const extra = mount.slackMm + (mount.mode === 'external' ? mount.tailMm : 0);
       return {
