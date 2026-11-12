@@ -9,6 +9,8 @@ import { pointInRegions, regionArea } from './clip';
 import { buildDxf } from './dxf';
 import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { tabNotches } from './tabNotches';
+import { DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './lamelle';
+import { holeForWireMm } from './wire';
 import { buildSvg } from './lamelleExport';
 import { buildStrips } from './strips';
 import type { Project } from './types';
@@ -243,5 +245,14 @@ describe('tacche con linguette intralciate', () => {
     expect(blocked.length).toBeGreaterThan(0);
     const ids = tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26, powerAwg: 12 }).map((n) => n.stripId);
     for (const s of blocked) expect(ids).not.toContain(s.id);
+  });
+});
+
+describe('fori dalle sezioni dei fili', () => {
+  it('il foro delle linguette in serie segue l’AWG del filo di bilanciamento', () => {
+    expect(holeForWireMm(26)).toBe(1.21);
+    expect(holeForWireMm(12)).toBe(2.85);
+    expect(stripOptionsOf({ ...DEFAULT_LAMELLA_SETTINGS, balanceAwg: 22 }).tabs?.holeMm).toBe(1.44);
+    expect(stripOptionsOf({ ...DEFAULT_LAMELLA_SETTINGS, powerAwg: 10 }).tabs?.powerHoleMm).toBe(3.39);
   });
 });

@@ -30,4 +30,4 @@ export const POWER_AWGS: readonly number[] = [16, 14, 12, 10, 8];
 export const findAwg = (awg: number): Awg => AWG_TABLE.find((a) => a.awg === awg) ?? AWG_TABLE[1]!;
 
 /** Foro per far passare e saldare un filo: il conduttore più un po’ di gioco. */
-export const holeForWireMm = (awg: number): number => Math.round((findAwg(awg).copperMm + 0.8) * 10) / 10;
+export const holeForWireMm = (awg: number): number => Math.round((findAwg(awg).copperMm + 0.8) * 100) / 100;

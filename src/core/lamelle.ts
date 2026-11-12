@@ -65,7 +65,6 @@ export interface LamellaSettings {
   tabSide: TabSide | 'auto';
   tabWidthMm: number;
   tabLengthMm: number;
-  tabHoleMm: number;
   /** Fili: sezione AWG del filo di bilanciamento e del cavo di potenza (P+/P−). */
   balanceAwg: number;
   powerAwg: number;
@@ -95,7 +94,6 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   tabSide: 'auto',
   tabWidthMm: 6,
   tabLengthMm: 8,
-  tabHoleMm: 2,
   tabBendMm: 0.3,
   balanceAwg: 26,
   powerAwg: 12,
@@ -105,7 +103,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
 export const stripOptionsOf = (s: LamellaSettings): StripOptions => ({
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
-  tabs: s.tabs ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: s.tabHoleMm, bendMm: s.tabBendMm, powerHoleMm: holeForWireMm(s.powerAwg) } : null,
+  tabs: s.tabs ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), bendMm: s.tabBendMm, powerHoleMm: holeForWireMm(s.powerAwg) } : null,
 });
 
 export type IssueSeverity = 'error' | 'warning' | 'info';

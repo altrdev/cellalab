@@ -154,7 +154,6 @@
         </label>
       </div>
       <label>{t('lam.tabBend')}<UnitInput kind="len" min={0.5} max={20} step={0.5} value={ui.lamella.tabBendMm} onchange={(v) => { if (v !== null) ui.lamella.tabBendMm = v; }} /></label>
-      <label>{t('lam.tabHole')}<UnitInput kind="len" min={0} max={10} step={0.5} value={ui.lamella.tabHoleMm} onchange={(v) => { if (v !== null) ui.lamella.tabHoleMm = v; }} /></label>
       <Help label={t('lam.what')}>{t('lam.tabsHelp', { min: len(MIN_PRINT_WALL_MM, 1) })}</Help>
     {/if}
   {/if}
