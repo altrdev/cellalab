@@ -7,7 +7,7 @@
   import PackBar from './ui/PackBar.svelte';
   import Toolbar from './ui/Toolbar.svelte';
   import { saveHolderSettings, saveHolderView } from './ui/holder';
-  import { saveLamellaSettings } from './ui/lamelle';
+  import { saveLamellaSettings } from './ui/lamelleSettings';
   import { ui } from './ui/ui.svelte';
 
   // Titolo e lingua della pagina seguono la lingua scelta.

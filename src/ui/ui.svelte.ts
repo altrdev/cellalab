@@ -8,7 +8,8 @@ import type { LatticeKind } from '../core/lattice';
 import type { Face } from '../core/strips';
 import type { Project } from '../core/types';
 import { bindHolderCuts, loadHolderSettings, loadHolderView, type HolderView } from './holder';
-import { bindHolderSettings, holderCutsOf, loadLamellaSettings } from './lamelle';
+import { bindHolderSettings, holderCutsOf } from './lamelle';
+import { loadLamellaSettings } from './lamelleSettings';
 
 export type ViewMode = 'draw' | 'split' | '3d';
 export type Tool = 'select' | 'add' | 'series';

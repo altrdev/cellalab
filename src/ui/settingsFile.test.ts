@@ -3,7 +3,7 @@ import { DEFAULT_HOLDER_SETTINGS } from '../core/holder';
 import { DEFAULT_LAMELLA_SETTINGS } from '../core/lamelle';
 import { createProject, parseProject, parseProjectSettings, serializeProject } from '../core/project';
 import { sanitizeHolderSettings } from './holder';
-import { sanitizeLamellaSettings } from './lamelle';
+import { sanitizeLamellaSettings } from './lamelleSettings';
 
 describe('impostazioni nel file del progetto', () => {
   it('lamelle e portacelle fanno il giro salvataggio → lettura', () => {

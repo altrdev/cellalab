@@ -34,7 +34,8 @@
   import { holderOf, sanitizeHolderSettings } from './holder';
   import LamellePanel from './LamellePanel.svelte';
   import SettingsMenu from './SettingsMenu.svelte';
-  import { bmsFitIssues, reportOf, sanitizeLamellaSettings } from './lamelle';
+  import { bmsFitIssues, reportOf } from './lamelle';
+  import { sanitizeLamellaSettings } from './lamelleSettings';
   import { ui } from './ui.svelte';
 
   const project = $derived($history.present);
