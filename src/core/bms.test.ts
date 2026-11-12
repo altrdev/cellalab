@@ -155,12 +155,15 @@ describe('linea di piega della linguetta', () => {
 
   it('sta sulla linguetta, tra la cella e il foro', () => {
     for (const s of strips.filter((x) => x.tab)) {
-      const [a, b] = s.tab!.bend;
-      expect(a.y).toBeCloseTo(b.y, 6);
-      expect(a.y).toBeGreaterThan(s.tab!.holeY); // y verso il basso: la piega è più vicina alla cella del foro
-      expect(Math.abs(a.x - b.x)).toBeCloseTo(s.tab!.widthMm, 6);
-      if (s.kind === 'series') expect(s.tab!.widthMm).toBeCloseTo(6, 6);
-      else expect(s.tab!.widthMm).toBeGreaterThanOrEqual(2.85 + 2.4 - 1e-6);
+      for (const tab of tabsOf(s)) {
+        const [a, b] = tab.bend;
+        expect(a.y).toBeCloseTo(b.y, 6);
+        const out = tab.side === 'top' ? -1 : 1; // verso dove sporge la linguetta (y verso il basso)
+        expect((tab.holeY - a.y) * out).toBeGreaterThan(0); // il foro sta oltre la piega, in fuori
+        expect(Math.abs(a.x - b.x)).toBeCloseTo(tab.widthMm, 6);
+        if (!tab.power) expect(tab.widthMm).toBeGreaterThanOrEqual(3 - 1e-6);
+        else expect(tab.widthMm).toBeGreaterThanOrEqual(2.85 + 2.4 - 1e-6);
+      }
     }
   });
 
@@ -460,20 +463,17 @@ describe('linguette dei terminali: potenza e bilanciamento separate', () => {
     }
   });
 
-  it('la potenza esce dal lato scelto e il bilanciamento di lato, verso il bordo più vicino', () => {
+  it('il bilanciamento esce dal lato scelto con gli altri, la potenza dal lato opposto', () => {
     for (const s of terminals) {
-      expect(s.tab!.side).toBe('top');
-      expect(['left', 'right']).toContain(s.balanceTab!.side);
+      expect(s.balanceTab!.side).toBe('top');
+      expect(s.tab!.side).toBe('bottom');
     }
-    const plus = terminals.find((s) => s.kind === 'terminal-plus')!;
-    const minus = terminals.find((s) => s.kind === 'terminal-minus')!;
-    // P+ è la colonna a sinistra, P− quella a destra: ognuno esce dal proprio bordo
-    expect(plus.balanceTab!.side).toBe('left');
-    expect(minus.balanceTab!.side).toBe('right');
+    for (const s of series) expect(s.tab!.side).toBe('top');
+    // la potenza parte dall'altro capo della lamella: la sua cella sta dalla parte opposta
+    for (const s of terminals) expect(s.tab!.anchor.y).toBeGreaterThan(s.balanceTab!.anchor.y);
   });
 
-  it('le linguette laterali non intralciano niente', () => {
-    for (const s of terminals) expect(s.balanceTab!.blockedBy).toBeNull();
+  it('nessuna linguetta è intralciata', () => {
     expect(strips.every((s) => tabsOf(s).every((x) => x.blockedBy === null))).toBe(true);
   });
 
@@ -483,27 +483,18 @@ describe('linguette dei terminali: potenza e bilanciamento separate', () => {
     for (const s of series) expect(s.holes.length).toBe(plain.find((x) => x.id === s.id)!.holes.length + 1);
   });
 
-  it('il filo di B0 e BS esce di lato: ha un angolo ed è più lungo di un filo dal lato di uscita', () => {
+  it('i fili di bilanciamento partono tutti dal lato scelto: stesso percorso a tre punti', () => {
     const h = buildHarness(p, strips, 0.1)!;
-    for (const w of [h.wires[0]!, h.wires[h.wires.length - 1]!]) {
-      expect(w.points).toHaveLength(4);
-      const s = strips.find((x) => x.id === w.stripId)!;
-      const bend = s.balanceTab!.bend;
-      expect(w.points[0]!.x).toBeCloseTo((bend[0].x + bend[1].x) / 2, 6); // il foro scende sulla linea di piega laterale
-    }
-    for (const w of h.wires.slice(1, -1)) expect(w.points).toHaveLength(3);
+    for (const w of h.wires) expect(w.points).toHaveLength(3);
+    const first = h.wires[0]!;
+    const s0 = strips.find((x) => x.id === first.stripId)!;
+    const bend = s0.balanceTab!.bend;
+    expect(first.points[0]!.x).toBeCloseTo((bend[0].x + bend[1].x) / 2, 6);
   });
 
   it('una scanalatura per linguetta: i terminali ne hanno due', () => {
     const notches = tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26, powerAwg: 12 });
     expect(notches).toHaveLength(7);
     for (const s of terminals) expect(notches.filter((n) => n.stripId === s.id)).toHaveLength(2);
-  });
-
-  it('se i lati sono intralciati ripiega sulle due linguette affiancate', () => {
-    // una riga di due celle per gruppo: dal lato scelto 'left' il lato è occupato dalle altre celle della riga
-    const q = setBms(pack(3, 2), 'bms-4s-30a-li-ion');
-    const st = buildStrips(q, { tabs: { ...tabs, side: 'top' } });
-    for (const s of st.filter((x) => x.tab && x.kind !== 'series')) expect(tabsOf(s)).toHaveLength(2);
   });
 });

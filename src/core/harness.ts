@@ -80,7 +80,7 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const withTab = strips.filter((s) => s.tab && tabsOf(s).some((x) => x.balanceHole));
   if (!bms || withTab.length === 0 || project.cells.length === 0) return null;
   const mount = bmsMountOf(project);
-  const side = withTab[0]!.tab!.side;
+  const side = tabsOf(withTab[0]!).find((x) => x.balanceHole)!.side;
   const d = DIR[side];
   const perp = { x: -d.y, y: d.x };
 
