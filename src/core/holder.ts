@@ -261,8 +261,9 @@ export function buildHolder(
   const slabOpeningsPlain = openings;
   const wallPocketsCut = [...pockets, ...extra, ...through];
   const slabOpeningsCut = [...openings, ...through];
-  const wall = differenceRegions(outer, wallPocketsCut);
-  const slab = s.lockCells ? differenceRegions(outer, slabOpeningsCut) : [];
+  // Sagome di riferimento (disegno, divisione in pezzi): senza la tasca dell'NTC, che sta su una sola piastra e solo nelle fette.
+  const wall = differenceRegions(outer, wallPocketsPlain);
+  const slab = s.lockCells ? differenceRegions(outer, slabOpeningsPlain) : [];
 
   // Smusso a rampa: contorno arretrato e coppie di contorni da raccordare (se la topologia regge).
   let ramp: HolderModel['ramp'] = null;

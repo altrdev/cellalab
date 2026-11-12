@@ -289,9 +289,10 @@ describe('posto dell’NTC', () => {
     const site = ntcSite(p, 'top', 5, 0.15)!;
     const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true)!;
     const cut = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true, { extraPockets: [site.polygon] })!;
-    const area = (rs: typeof plain.wall) => rs.reduce((a, r) => a + regionArea(r), 0);
-    expect(area(cut.wall)).toBeLessThan(area(plain.wall));
-    expect(area(cut.slab)).toBeCloseTo(area(plain.slab), 3);
+    const vol = (m: typeof plain, inFloor: boolean) =>
+      m.layers.filter((l) => (inFloor ? l.z1 <= m.floorMm + 1e-9 : l.z0 >= m.floorMm - 1e-9)).reduce((a, l) => a + (l.z1 - l.z0) * l.regions.reduce((b, r) => b + regionArea(r), 0), 0);
+    expect(vol(cut, false)).toBeLessThan(vol(plain, false));
+    expect(vol(cut, true)).toBeCloseTo(vol(plain, true), 6);
   });
 });
 
@@ -302,8 +303,8 @@ describe('filo dell’NTC', () => {
     const site = ntcSite(p, 'top', 5, 0.15)!;
     const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true)!;
     const cut = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true, { extraPockets: [site.polygon], throughHoles: [site.wirePolygon] })!;
-    const area = (rs: typeof plain.wall) => rs.reduce((a, r) => a + regionArea(r), 0);
-    expect(area(cut.slab)).toBeLessThan(area(plain.slab));
+    const floorVol = (m: typeof plain) => m.layers.filter((l) => l.z1 <= m.floorMm + 1e-9).reduce((a, l) => a + (l.z1 - l.z0) * l.regions.reduce((b, r) => b + regionArea(r), 0), 0);
+    expect(floorVol(cut)).toBeLessThan(floorVol(plain));
   });
 
   it('preferisce i vuoti non coperti da una lamella', () => {
