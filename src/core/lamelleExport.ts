@@ -6,7 +6,7 @@ import { labelPlacements } from './dxf';
 import type { Pt } from './polygon';
 import type { LamellaReport } from './lamelle';
 import { spotPositions } from './sizing';
-import { foldsOf, type Face, type Strip } from './strips';
+import { tabsOf, type Face, type Strip } from './strips';
 
 /**
  * Esportazioni delle lamelle per chi non ha un CAD: SVG in scala reale (si stampa al 100 % e diventa
@@ -56,7 +56,7 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
   out.push('<g fill="none" stroke-linejoin="round" font-family="sans-serif">');
   list.forEach((s, i) => {
     out.push(`<path d="${(rings[i] as Pt[][]).map(d).join(' ')}" fill-rule="evenodd" stroke="#d00" stroke-width="0.2"/>`);
-    for (const tb of foldsOf(s)) {
+    for (const tb of tabsOf(s)) {
       const [a, b] = tb.bend;
       out.push(`<path d="M${r3(a.x)} ${r3(a.y)} L${r3(b.x)} ${r3(b.y)}" stroke="#06c" stroke-width="0.15" stroke-dasharray="1.5 0.8"/>`);
     }

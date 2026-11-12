@@ -573,53 +573,6 @@ describe('cablaggio del BMS', () => {
   });
 });
 
-describe('presa del filo con un piccolo foro, senza linguetta', () => {
-  const tabs = { side: 'bottom', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, style: 'hole' } as const;
-  const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
-  const strips = buildStrips(p, { tabs });
-  const plain = buildStrips(p, {});
-  const withHole = strips.filter((x) => x.tab);
-
-  it('un foro per giunzione e il contorno della lamella non cambia', () => {
-    expect(withHole).toHaveLength(5);
-    for (const s of withHole) {
-      const base = plain.find((x) => x.id === s.id)!;
-      expect(s.tab!.flat).toBe(true);
-      expect(s.holes.length).toBe(base.holes.length + 1);
-      expect(s.outline.length).toBe(base.outline.length); // niente linguetta unita al contorno
-      expect(s.tab!.holeDiameterMm).toBeCloseTo(1.21, 6);
-    }
-  });
-
-  it('il foro sta dentro la lamella e fuori dal punto di saldatura', () => {
-    for (const s of withHole) {
-      const t = s.tab!;
-      expect(pointInRegions({ x: t.holeX, y: t.holeY }, [{ outline: s.outline, holes: plain.find((x) => x.id === s.id)!.holes }])).toBe(true);
-      for (const n of s.nodes) expect(Math.hypot(t.holeX - n.x, t.holeY - n.y) - t.holeDiameterMm / 2).toBeGreaterThanOrEqual(n.contactRadiusMm);
-    }
-  });
-
-  it('nessuna piega: né linea di piega nel DXF né scanalatura nel portacelle', () => {
-    const dxf = buildDxf(strips, { face: 'all', kerfMm: 0, includeContacts: false, includeLabels: false });
-    const bendLines = (dxf.match(/LINE\n8\nMARK/g) ?? []).length; // linee di piega (quelle di potenza non sono accese qui)
-    expect(bendLines).toBe(0);
-    expect(tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26, powerAwg: 10 })).toHaveLength(0);
-  });
-
-  it('il filo parte dal foro sul piano, va al bordo e poi come gli altri; senza toccarsi', () => {
-    const h = buildHarness(p, strips, 0.1)!;
-    expect(h.wires).toHaveLength(5);
-    for (const w of h.wires) {
-      const s = strips.find((x) => x.id === w.stripId)!;
-      // il primo punto è sul foro, alla quota del piano della lamella
-      const a0 = w.points[0]!;
-      const holeAlongD = s.tab!.holeX * 0 + s.tab!.holeY * 1; // lato 'bottom': d = (0, 1)
-      expect(a0.z).toBeCloseTo(holeAlongD, 6);
-      expect(w.points[0]!.y).toBeCloseTo(w.points[1]!.y, 6); // percorre il piano fino al bordo
-    }
-  });
-});
-
 describe('linguetta di potenza di P+ e P−', () => {
   const tabs = { side: 'bottom', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, power: { widthMm: 8, holeMm: 3.39 } } as const;
   const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');

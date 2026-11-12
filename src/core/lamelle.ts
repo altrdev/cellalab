@@ -63,8 +63,6 @@ export interface LamellaSettings {
   tabs: boolean;
   /** Lato del disegno verso cui sporgono (i fili escono tutti da lì); `auto` sceglie il primo lato libero (lo risolve l'interfaccia). */
   tabSide: TabSide | 'auto';
-  /** Presa del filo di bilanciamento: linguetta piegata o solo un piccolo foro nella lamella. */
-  tabStyle: 'tab' | 'hole';
   tabWidthMm: number;
   tabLengthMm: number;
   /** Sezione AWG del filo di bilanciamento. */
@@ -95,7 +93,6 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   widthMm: null,
   tabs: true,
   tabSide: 'auto',
-  tabStyle: 'tab',
   tabWidthMm: 6,
   tabLengthMm: 8,
   tabBendMm: 0.3,
@@ -107,7 +104,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
 export const stripOptionsOf = (s: LamellaSettings): StripOptions => ({
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
-  tabs: s.tabs ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), style: s.tabStyle, bendMm: s.tabBendMm, power: { widthMm: Math.max(s.tabWidthMm, holeForWireMm(s.powerAwg) + 4), holeMm: holeForWireMm(s.powerAwg) } } : null,
+  tabs: s.tabs ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), bendMm: s.tabBendMm, power: { widthMm: Math.max(s.tabWidthMm, holeForWireMm(s.powerAwg) + 4), holeMm: holeForWireMm(s.powerAwg) } } : null,
 });
 
 export type IssueSeverity = 'error' | 'warning' | 'info';

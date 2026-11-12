@@ -55,8 +55,6 @@ export interface StripTab {
   holeDiameterMm: number;
   /** Linea di piega consigliata (oltre il bordo del holder, prima del foro), da segnare e non da tagliare. */
   bend: [Pt, Pt];
-  /** Solo un foro nella lamella, senza linguetta né piega: il filo esce dal foro e va sul piano del holder verso il bordo. `rect` è il corridoio libero che deve percorrere. */
-  flat?: boolean;
   /** Cosa intralcia la linguetta: un'altra lamella della stessa faccia o una cella; null = libera. */
   blockedBy: 'strip' | 'cell' | null;
 }
@@ -113,8 +111,6 @@ export interface TabOptions {
   /** Lunghezza della parte piegata, oltre la linea di piega, mm. */
   lengthMm: number;
   holeMm: number;
-  /** 'tab' (linguetta piegata, default) o 'hole': nessuna linguetta, un piccolo foro nella lamella per il filo di bilanciamento. */
-  style?: 'tab' | 'hole';
   /** Linguetta del cavo di potenza su P+ e P−; assente = niente. */
   power?: { widthMm: number; holeMm: number } | null;
   /** Margine della piega oltre il bordo del holder, mm. */
@@ -329,7 +325,7 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holderOpt: St
     const bNode = frontNode(s, o.side);
     const plans: Plan[] = [];
     const bW = Math.min(o.widthMm, 2 * bNode.reachMm);
-    if (o.style !== 'hole') plans.push({ kind: 'balance', side: o.side, node: bNode, w: bW, holeWant: o.holeMm, lengthMm: Math.max(o.lengthMm, 1), rect: [] });
+    plans.push({ kind: 'balance', side: o.side, node: bNode, w: bW, holeWant: o.holeMm, lengthMm: Math.max(o.lengthMm, 1), rect: [] });
     if (o.power && s.kind !== 'series') {
       const pw = o.power;
       const lengthMm = Math.max(o.lengthMm, pw.holeMm + 4);
@@ -363,77 +359,6 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holderOpt: St
 
     let region: Region = { outline: s.outline, holes: s.holes };
     const holes: Pt[][] = [];
-    if (o.style === 'hole') {
-      // Niente linguetta: un piccolo foro nel corpo della lamella, il più vicino possibile al lato di uscita, fuori dai
-      // punti di saldatura e dalle finestre. Il filo ci si salda e scorre sul piano del holder fino al bordo, in un
-      // corridoio libero da altre lamelle e dalle aperture delle altre celle.
-      const dd = SIDE_VECTOR[o.side];
-      const pp = { x: -dd.y, y: dd.x };
-      const dH = Math.max(0.5, o.holeMm);
-      const regionNow: Region = { outline: s.outline, holes: s.holes };
-      const xs = s.outline.map((q) => q.x);
-      const ys = s.outline.map((q) => q.y);
-      const STEP = 0.75;
-      const fwd = (x: number, y: number) => x * dd.x + y * dd.y;
-      const cands: { x: number; y: number; score: number }[] = [];
-      for (let x = Math.min(...xs); x <= Math.max(...xs); x += STEP) {
-        for (let y = Math.min(...ys); y <= Math.max(...ys); y += STEP) {
-          // fuori dai punti di saldatura (e dal loro margine)
-          if (s.nodes.some((n) => Math.hypot(x - n.x, y - n.y) < n.contactRadiusMm + dH / 2 + 0.4)) continue;
-          cands.push({ x, y, score: fwd(x, y) });
-        }
-      }
-      cands.sort((u, v) => v.score - u.score);
-      let best: { x: number; y: number; rect: Pt[]; blocked: boolean; exitAbs: number } | null = null;
-      let tried = 0;
-      for (const c of cands) {
-        if (tried > 400) break;
-        // tutto il cerchio del foro (con margine) deve stare nella lamella, sul metallo
-        if (!circlePoints(c.x, c.y, dH / 2 + 0.5, 12).every((q) => pointInRegions(q, [regionNow]))) continue;
-        tried++;
-        // fin dove arriva il holder lungo l'uscita dal foro, e il corridoio da lì al bordo
-        let last = 0;
-        if (holder && holder.length > 0) {
-          for (let a = 0; a <= 80; a += 0.25) {
-            if (pointInRegions({ x: c.x + dd.x * a, y: c.y + dd.y * a }, holder)) last = a;
-          }
-        } else {
-          last = Math.max(0, bNode.cellRadiusMm + DEFAULT_HOLDER_EDGE_MM + (bNode.x * dd.x + bNode.y * dd.y) - fwd(c.x, c.y));
-        }
-        const reach = last + o.bendMm;
-        const corridor = convexHull([
-          { x: c.x + pp.x * 1.2, y: c.y + pp.y * 1.2 },
-          { x: c.x - pp.x * 1.2, y: c.y - pp.y * 1.2 },
-          { x: c.x - pp.x * 1.2 + dd.x * reach, y: c.y - pp.y * 1.2 + dd.y * reach },
-          { x: c.x + pp.x * 1.2 + dd.x * reach, y: c.y + pp.y * 1.2 + dd.y * reach },
-        ]);
-        const cand = { x: c.x, y: c.y, rect: corridor, blocked: blocked(s, corridor), exitAbs: fwd(c.x, c.y) + reach };
-        if (!cand.blocked) {
-          best = cand;
-          break;
-        }
-        best ??= cand;
-      }
-      if (best) {
-        const bAlong = best.exitAbs;
-        const at = (p: number): Pt => ({ x: pp.x * p + dd.x * bAlong, y: pp.y * p + dd.y * bAlong });
-        const pHole = best.x * pp.x + best.y * pp.y;
-        holes.push(circlePoints(best.x, best.y, dH / 2, circleSegments(dH / 2)));
-        s.tab = {
-          kind: 'balance',
-          flat: true,
-          side: o.side,
-          anchor: { x: bNode.x, y: bNode.y },
-          widthMm: 0,
-          rect: best.rect,
-          holeX: best.x,
-          holeY: best.y,
-          holeDiameterMm: dH,
-          bend: [at(pHole - 1.2), at(pHole + 1.2)],
-          blockedBy: null,
-        };
-      }
-    }
     for (const pl of plans) {
       const dd = SIDE_VECTOR[pl.side];
       const pp = { x: -dd.y, y: dd.x };
@@ -486,9 +411,6 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holderOpt: St
 
 /** Le linguette di una lamella: quella di bilanciamento e, su P+ e P−, quella di potenza. */
 export const tabsOf = (s: Strip): StripTab[] => [s.tab, s.powerTab].filter((t): t is StripTab => t !== undefined);
-
-/** Le linguette che si piegano davvero (senza i fori di sola uscita del filo): quelle che hanno una linea di piega, una scanalatura e una piega nel 3D. */
-export const foldsOf = (s: Strip): StripTab[] => tabsOf(s).filter((t) => !t.flat);
 
 /** Distanza di un punto da un rettangolo (poligono convesso); 0 se dentro. */
 function distToRect(p: Pt, rect: readonly Pt[]): number {

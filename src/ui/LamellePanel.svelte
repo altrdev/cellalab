@@ -137,13 +137,6 @@
           {/each}
         </select>
       </label>
-      <label>{t('lam.tabStyle')}
-        <select value={ui.lamella.tabStyle} onchange={(e) => (ui.lamella.tabStyle = e.currentTarget.value === 'hole' ? 'hole' : 'tab')}>
-          <option value="tab">{t('lam.tabStyle.tab')}</option>
-          <option value="hole">{t('lam.tabStyle.hole')}</option>
-        </select>
-      </label>
-      <Help label={t('lam.what')}>{t('lam.tabStyleHelp')}</Help>
       <div class="row">
         <label>{t('lam.tabWidth')}<UnitInput kind="len" min={2} max={30} step={0.5} value={ui.lamella.tabWidthMm} onchange={(v) => { if (v !== null) ui.lamella.tabWidthMm = v; }} /></label>
         <label>{t('lam.tabLength')}<UnitInput kind="len" min={2} max={60} step={0.5} value={ui.lamella.tabLengthMm} onchange={(v) => { if (v !== null) ui.lamella.tabLengthMm = v; }} /></label>
