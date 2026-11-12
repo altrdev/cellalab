@@ -12,18 +12,25 @@ import type { Project } from '../core/types';
 let last: { project: Project; key: string; model: HolderModel | null; report: HolderReport | null; split: HolderSplit | null } | null = null;
 
 /** `split` c'è solo se la piastra è più grande del piano di stampa e va divisa in pezzi da incollare. */
-/** Scanalature per i fili delle linguette: le calcola il pannello delle lamelle (qui non si può importare senza un giro). */
-let notchSource: (project: Project, settings: HolderSettings) => Pt[][] = () => [];
-export function bindHolderNotches(get: (project: Project, settings: HolderSettings) => Pt[][]): void {
-  notchSource = get;
+/** Tagli del portacelle legati al BMS: scanalature per i fili e tasca dell'NTC. Li calcola il pannello delle lamelle (qui non si può importare senza un giro). */
+export interface HolderCuts {
+  notches: Pt[][];
+  pockets: Pt[][];
+}
+const NO_CUTS: HolderCuts = { notches: [], pockets: [] };
+let cutsSource: (project: Project, settings: HolderSettings) => HolderCuts = () => NO_CUTS;
+export function bindHolderCuts(get: (project: Project, settings: HolderSettings) => HolderCuts): void {
+  cutsSource = get;
 }
 
 export function holderOf(project: Project, settings: HolderSettings): { model: HolderModel | null; report: HolderReport | null; split: HolderSplit | null } {
-  const notches = notchSource(project, settings);
-  const key = renderKey() + JSON.stringify(settings) + (notches.length > 0 ? JSON.stringify(notches) : ''); // i messaggi del rapporto dipendono da lingua e unità
+  const cuts = cutsSource(project, settings);
+  const hasCuts = cuts.notches.length > 0 || cuts.pockets.length > 0;
+  const key = renderKey() + JSON.stringify(settings) + (hasCuts ? JSON.stringify(cuts) : ''); // i messaggi del rapporto dipendono da lingua e unità
   if (last && last.project === project && last.key === key) return last;
-  const model = buildHolder(project, settings, true, { notches });
-  const split = model ? splitHolder(project, settings, { notches }) : null;
+  const build = { notches: cuts.notches, extraPockets: cuts.pockets };
+  const model = buildHolder(project, settings, true, build);
+  const split = model ? splitHolder(project, settings, build) : null;
   const report = model ? analyzeHolder(project, model, split) : null;
   last = { project, key, model, report, split };
   return last;

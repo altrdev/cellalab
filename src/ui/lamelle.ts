@@ -8,7 +8,9 @@ import { computeStats } from '../core/stats';
 import { buildStrips, type Strip, type TabSide } from '../core/strips';
 import { buildHolder } from '../core/holder';
 import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
-import { holderOf } from './holder';
+import { holderOf, type HolderCuts } from './holder';
+import { bmsOf } from '../core/bms';
+import { ntcSite, type NtcSite } from '../core/ntc';
 import { tabNotches } from '../core/tabNotches';
 import type { WelderProfile } from '../core/profiles';
 import type { Project } from '../core/types';
@@ -37,21 +39,31 @@ export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
   return strips;
 }
 
-const notchCache = new WeakMap<Project, { key: string; polygons: Pt[][] }>();
+const cutsCache = new WeakMap<Project, { key: string; cuts: HolderCuts }>();
+const NO_CUTS: HolderCuts = { notches: [], pockets: [] };
+
+/** Il posto dell'NTC (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle). */
+export function ntcSiteOf(project: Project, settings: LamellaSettings, holder: HolderSettings): NtcSite | null {
+  if (!settings.ntc || !bmsOf(project)?.ntc) return null;
+  return ntcSite(project, tabSideOf(project, settings), settings.ntcMm, holder.clearanceMm);
+}
 
 /**
- * Scanalature del portacelle per le linguette (con un BMS e le linguette accese): si ricavano dalle lamelle senza
- * holder, perché la posizione delle linguette non dipende da lui. Le usa `holderOf`.
+ * Tagli del portacelle legati al BMS: scanalature per le linguette (con un BMS e le linguette accese) e tasca dell'NTC.
+ * Le scanalature si ricavano dalle lamelle senza holder, perché la posizione delle linguette non dipende da lui.
+ * Li usa `holderOf`.
  */
-export function notchesOf(project: Project, settings: LamellaSettings, holder: HolderSettings): Pt[][] {
+export function holderCutsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): HolderCuts {
+  if (project.bmsId === undefined) return NO_CUTS;
   const opts = optionsOf(project, settings);
-  if (!opts.tabs || project.bmsId === undefined) return [];
-  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg]);
-  const hit = notchCache.get(project);
-  if (hit && hit.key === key) return hit.polygons;
-  const polygons = tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon);
-  notchCache.set(project, { key, polygons });
-  return polygons;
+  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg, settings.ntc, settings.ntcMm]);
+  const hit = cutsCache.get(project);
+  if (hit && hit.key === key) return hit.cuts;
+  const notches = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon) : [];
+  const site = ntcSiteOf(project, settings, holder);
+  const cuts = { notches, pockets: site ? [site.polygon] : [] };
+  cutsCache.set(project, { key, cuts });
+  return cuts;
 }
 
 const TAB_SIDES: readonly TabSide[] = ['top', 'bottom', 'left', 'right'];
@@ -143,7 +155,7 @@ export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
     } else if (typeof v === typeof def && (typeof v !== 'number' || Number.isFinite(v))) out[k] = v;
   }
   if (!['auto', 'top', 'bottom', 'left', 'right'].includes(base.tabSide)) base.tabSide = DEFAULT_LAMELLA_SETTINGS.tabSide;
-  for (const k of ['tabWidthMm', 'tabLengthMm', 'tabBendMm'] as const) {
+  for (const k of ['tabWidthMm', 'tabLengthMm', 'tabBendMm', 'ntcMm'] as const) {
     if (!(base[k] > 0)) base[k] = DEFAULT_LAMELLA_SETTINGS[k];
   }
   if (!AWG_TABLE.some((a) => a.awg === base.balanceAwg)) base.balanceAwg = DEFAULT_LAMELLA_SETTINGS.balanceAwg;

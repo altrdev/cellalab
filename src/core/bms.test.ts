@@ -8,6 +8,7 @@ import { computeStats } from './stats';
 import { pointInRegions, regionArea } from './clip';
 import { buildDxf } from './dxf';
 import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
+import { ntcSite } from './ntc';
 import { tabNotches } from './tabNotches';
 import { DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './lamelle';
 import { holeForWireMm } from './wire';
@@ -254,5 +255,41 @@ describe('fori dalle sezioni dei fili', () => {
     expect(holeForWireMm(12)).toBe(2.85);
     expect(stripOptionsOf({ ...DEFAULT_LAMELLA_SETTINGS, balanceAwg: 22 }).tabs?.holeMm).toBe(1.44);
     expect(stripOptionsOf({ ...DEFAULT_LAMELLA_SETTINGS, powerAwg: 10 }).tabs?.powerHoleMm).toBe(3.39);
+  });
+});
+
+describe('posto dell’NTC', () => {
+  const p = pack(4, 3);
+
+  it('sta nel vuoto tra tre celle, fuori dalle loro tasche', () => {
+    const site = ntcSite(p, 'top', 5, 0.15)!;
+    expect(site).not.toBeNull();
+    expect(site.cellIds).toHaveLength(3);
+    for (const id of site.cellIds) {
+      const c = p.cells.find((x) => x.id === id)!;
+      const dist = Math.hypot(c.x - site.x, c.y - site.y);
+      expect(dist).toBeGreaterThan(10.7 + 0.15 - 1e-6); // fuori dalla tasca
+      expect(dist - (10.7 + 0.15)).toBeLessThan(site.radiusMm); // ma il foro la tocca: si apre sulla cella
+    }
+  });
+
+  it('il lato di uscita sposta la scelta verso quel lato', () => {
+    const top = ntcSite(p, 'top', 5, 0.15)!;
+    const bottom = ntcSite(p, 'bottom', 5, 0.15)!;
+    expect(top.y).toBeLessThan(bottom.y);
+  });
+
+  it('con meno di tre celle o tutte in fila non c’è', () => {
+    expect(ntcSite(pack(2, 1), 'top', 5, 0.15)).toBeNull();
+    expect(ntcSite(replaceCells(createProject(), generateGrid({ typeId: T, diameterMm: 21.4, series: 4, parallel: 1, kind: 'square', gapMm: 1 })), 'top', 5, 0.15)).toBeNull();
+  });
+
+  it('la tasca apre le pareti ma non il fondo', () => {
+    const site = ntcSite(p, 'top', 5, 0.15)!;
+    const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true)!;
+    const cut = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true, { extraPockets: [site.polygon] })!;
+    const area = (rs: typeof plain.wall) => rs.reduce((a, r) => a + regionArea(r), 0);
+    expect(area(cut.wall)).toBeLessThan(area(plain.wall));
+    expect(area(cut.slab)).toBeCloseTo(area(plain.slab), 3);
   });
 });
