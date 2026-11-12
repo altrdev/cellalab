@@ -53,6 +53,8 @@ export interface StripTab {
   holeX: number;
   holeY: number;
   holeDiameterMm: number;
+  /** Foro dove si salda il filo di bilanciamento: sulle linguette in serie è il foro stesso, su quelle dei terminali è un foro piccolo a parte dal cavo di potenza. */
+  balanceHole: { x: number; y: number; diameterMm: number };
   /** Linea di piega consigliata (oltre il bordo del holder, prima del foro), da segnare e non da tagliare. */
   bend: [Pt, Pt];
   /** Cosa intralcia la linguetta: un'altra lamella della stessa faccia o una cella; null = libera. */
@@ -294,7 +296,9 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
     const power = s.kind !== 'series';
     const holeWant = power ? o.powerHoleMm : o.holeMm;
     const w = Math.min(power ? Math.max(o.widthMm, holeWant + 4) : o.widthMm, 2 * node.reachMm);
-    const lengthMm = Math.max(o.lengthMm, power ? holeWant + 3 : 1);
+    // I terminali hanno due fori in fila lungo la linguetta: filo di bilanciamento (vicino alla piega) e cavo di potenza.
+    const balWant = Math.min(o.holeMm, w - 1);
+    const lengthMm = Math.max(o.lengthMm, power ? balWant + holeWant + 4.5 : 1);
     // Fin dove arriva il holder lungo la linguetta (controllando il centro e i due bordi): la piega sta oltre.
     let exit = node.cellRadiusMm + DEFAULT_HOLDER_EDGE_MM;
     if (holder && holder.length > 0) {
@@ -309,15 +313,20 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
     const at = (a: number, p: number): Pt => ({ x: node.x + d.x * a + perp.x * p, y: node.y + d.y * a + perp.y * p });
     const rect = convexHull([at(0, -w / 2), at(0, w / 2), at(reach, w / 2), at(reach, -w / 2)]);
     const hole = Math.min(holeWant, w - 1, lengthMm - 1);
-    const hc = at(bendAlong + lengthMm / 2, 0);
+    // Posizione dei fori lungo la linguetta, dalla piega: la linguetta in serie ne ha uno al centro; il terminale due in fila.
+    const balAt = power ? bendAlong + 1.5 + balWant / 2 : bendAlong + lengthMm / 2;
+    const powAt = power ? bendAlong + 1.5 + balWant + 1.5 + hole / 2 : bendAlong + lengthMm / 2;
+    const hc = at(powAt, 0);
+    const bc = at(balAt, 0);
     const region: Region = unionPolygons([s.outline, rect]);
     const holes = [...s.holes];
     if (hole >= 0.5) holes.push(circlePoints(hc.x, hc.y, hole / 2, circleSegments(hole / 2)));
+    if (power && balWant >= 0.5) holes.push(circlePoints(bc.x, bc.y, balWant / 2, circleSegments(balWant / 2)));
     s.outline = region.outline;
     s.holes = holes;
     s.areaMm2 = regionArea({ outline: s.outline, holes });
     const bend: [Pt, Pt] = [at(bendAlong, -w / 2), at(bendAlong, w / 2)];
-    s.tab = { side: o.side, power, anchor: { x: node.x, y: node.y }, widthMm: w, rect, holeX: hc.x, holeY: hc.y, holeDiameterMm: hole >= 0.5 ? hole : 0, bend, blockedBy: null };
+    s.tab = { side: o.side, power, anchor: { x: node.x, y: node.y }, widthMm: w, rect, holeX: hc.x, holeY: hc.y, holeDiameterMm: hole >= 0.5 ? hole : 0, balanceHole: { x: bc.x, y: bc.y, diameterMm: power ? (balWant >= 0.5 ? balWant : 0) : hole >= 0.5 ? hole : 0 }, bend, blockedBy: null };
   }
   // Intralci: celle dell'altra parte e lamelle della stessa faccia (con le loro linguette).
   for (const s of strips) {

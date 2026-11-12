@@ -430,3 +430,54 @@ describe('cablaggio del BMS', () => {
     expect(setBmsMount(p, { along: 3, slackMm: -5 }).bmsMount).toMatchObject({ along: 1, slackMm: 0 });
   });
 });
+
+describe('fori sulle linguette dei terminali', () => {
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, powerHoleMm: 2.85 } as const;
+  const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
+  const strips = buildStrips(p, { tabs });
+
+  it('i terminali hanno due fori: bilanciamento vicino alla piega, potenza più in fuori', () => {
+    const plain = buildStrips(p, {});
+    for (const s of strips.filter((x) => x.tab)) {
+      const base = plain.find((x) => x.id === s.id)!.holes.length;
+      const bh = s.tab!.balanceHole;
+      if (s.kind === 'series') {
+        expect(s.holes.length).toBe(base + 1);
+        expect(bh.x).toBeCloseTo(s.tab!.holeX, 6);
+        expect(bh.diameterMm).toBeCloseTo(1.21, 6);
+      } else {
+        expect(s.holes.length).toBe(base + 2);
+        expect(s.tab!.holeDiameterMm).toBeCloseTo(2.85, 6);
+        expect(bh.diameterMm).toBeCloseTo(1.21, 6);
+        // il foro piccolo sta più vicino alla piega (verso l'alto del disegno, y minore, il foro grande più in fuori)
+        expect(Math.hypot(bh.x - s.tab!.holeX, bh.y - s.tab!.holeY)).toBeGreaterThan((1.21 + 2.85) / 2);
+        const bend = s.tab!.bend;
+        const dist = (x: number, y: number) => Math.hypot(x - (bend[0].x + bend[1].x) / 2, y - (bend[0].y + bend[1].y) / 2);
+        expect(dist(bh.x, bh.y)).toBeLessThan(dist(s.tab!.holeX, s.tab!.holeY));
+      }
+    }
+  });
+
+  it('la linguetta del terminale è lunga abbastanza per i due fori', () => {
+    for (const s of strips.filter((x) => x.tab && x.kind !== 'series')) {
+      const bend = s.tab!.bend;
+      const mid = { x: (bend[0].x + bend[1].x) / 2, y: (bend[0].y + bend[1].y) / 2 };
+      const far = Math.hypot(s.tab!.holeX - mid.x, s.tab!.holeY - mid.y) + s.tab!.holeDiameterMm / 2;
+      expect(far).toBeLessThanOrEqual(Math.max(...s.tab!.rect.map((q) => Math.hypot(q.x - mid.x, q.y - mid.y))) + 1e-6);
+    }
+  });
+
+  it('il filo di bilanciamento di B0 e BS parte dall’altezza del foro piccolo, non da quella del cavo', () => {
+    const h = buildHarness(p, strips, 0.1)!;
+    for (const w of [h.wires[0]!, h.wires[h.wires.length - 1]!]) {
+      const s = strips.find((x) => x.id === w.stripId)!;
+      const bend = s.tab!.bend;
+      const midY = (bend[0].y + bend[1].y) / 2;
+      const uBal = midY - s.tab!.balanceHole.y; // lato alto del disegno: la linguetta esce verso y minore
+      const uPow = midY - s.tab!.holeY;
+      expect(uPow).toBeGreaterThan(uBal);
+      const expected = w.face === 'top' ? 70.4 + 1.1 + 0.1 - uBal : -1.1 - 0.1 + uBal;
+      expect(w.points[0].y).toBeCloseTo(expected, 6);
+    }
+  });
+});

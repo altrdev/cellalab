@@ -119,9 +119,10 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
       const tab = s.tab!;
       const node = last - s.joint;
       const bend = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
-      const u = (tab.holeX - bend.x) * d.x + (tab.holeY - bend.y) * d.y; // dal piegamento al foro, lungo la linguetta
+      const bh = tab.balanceHole; // il filo di bilanciamento sta nel suo foro, non in quello del cavo di potenza
+      const u = (bh.x - bend.x) * d.x + (bh.y - bend.y) * d.y; // dal piegamento al foro, lungo la linguetta
       const aBend = bend.x * d.x + bend.y * d.y;
-      const pHole = tab.holeX * perp.x + tab.holeY * perp.y;
+      const pHole = bh.x * perp.x + bh.y * perp.y;
       const yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
       const pPin = pc + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
       const p0 = to3(aBend, pHole, yHole);
