@@ -592,7 +592,7 @@ export const en: Record<keyof typeof it, string> = {
   'exp.harnessCol.from': 'From',
   'exp.harnessCol.path': 'Path',
   'exp.harnessCol.cut': 'Cut',
-  'exp.harnessHelp': 'The wire leaves the tab hole, goes down or up the edge to mid height and on to the connector: no wire crosses from one plate to the other. B0 is the pack negative. Power cables (common-port BMS): P+ goes straight to the connector, B− carries the pack negative into the BMS and P− leaves the BMS for the connector.',
+  'exp.harnessHelp': 'The wire leaves the tab hole, goes down or up into a lane above or below the BMS and runs along the side to the balance connector on the BMS end: nothing passes between the BMS and the cells. B0 is the pack negative. Power cables (common-port BMS): P+ goes straight to the connector, B− carries the pack negative into the BMS and P− leaves the BMS for the connector.',
   'exp.cutList': 'Cut list',
   'exp.refs': 'Include the references in the DXF',
   'exp.refsHint': 'Weld areas, spots and labels (layers MARK, SPOTS, TEXT): they must not be cut.',

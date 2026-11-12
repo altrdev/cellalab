@@ -531,7 +531,6 @@ export class PackScene {
     };
     if (h.box) {
       const geo = new THREE.BoxGeometry(h.box.size.x, h.box.size.y, h.box.size.z);
-      // Un po' trasparente, così si vedono i fili che arrivano al connettore dietro la scheda.
       const boxMat = mat(0x1f7a4a, 0.6) as THREE.MeshStandardMaterial;
       boxMat.transparent = true;
       boxMat.opacity = 0.55;
@@ -540,6 +539,10 @@ export class PackScene {
       mesh.position.set(h.box.center.x, h.box.center.y, h.box.center.z);
       mesh.renderOrder = 2;
       this.harnessRoot.add(mesh);
+      // Connettore di bilanciamento sulla testata: i fili entrano da lì.
+      const hg = new THREE.Mesh(new THREE.BoxGeometry(h.header.size.x, h.header.size.y, h.header.size.z), mat(0xe8e4d8, 0.6));
+      hg.position.set(h.header.center.x, h.header.center.y, h.header.center.z);
+      this.harnessRoot.add(hg);
     }
     for (const w of h.wires) {
       const path = new THREE.CurvePath<THREE.Vector3>();

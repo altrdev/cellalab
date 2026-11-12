@@ -8,9 +8,10 @@ import { findAwg } from './wire';
 /**
  * Cablaggio del BMS: dove sta il BMS sul fianco del pacco e quanto è lungo ogni filo di bilanciamento.
  *
- * Il BMS (o il punto di uscita del fascio) sta sul fianco dal lato delle linguette, a metà altezza, tra le due piastre.
- * Ogni filo parte dal foro della sua linguetta piegata, scende (o sale) lungo il bordo fino a metà altezza e va al
- * connettore: nessun filo attraversa da una piastra all'altra. Il nodo B0 è il meno del pacco, BS il più.
+ * Il BMS (o il punto di uscita del fascio) sta a filo del fianco dal lato delle linguette, a metà altezza, tra le due
+ * piastre. Niente passa tra lui e le celle: i fili e i cavi corrono in corsie sopra e sotto la scatola (secondo la faccia
+ * della lamella) e arrivano ai connettori oltre le sue testate. Il connettore di bilanciamento sta su una testata, i pad di
+ * potenza sull'altra. Il nodo B0 è il meno del pacco, BS il più.
  *
  * Coordinate della scena: il disegno (x, y) diventa (X, Z), l'altezza è Y.
  */
@@ -86,6 +87,8 @@ export interface Harness {
   side: TabSide;
   /** Punto del connettore (centro delle prese), mm. */
   connector: Pt3;
+  /** L'involucro del connettore di bilanciamento sulla testata del BMS. */
+  header: BmsBox;
   /** Versori nel disegno: uscita (d) e lungo il lato (perp). */
   axes: { d: Pt; perp: Pt };
   /** La scatola del BMS (solo montato sul pacco e con l'ingombro noto). */
@@ -103,6 +106,11 @@ export const CONNECTOR_PITCH_MM = 2.5;
 export const CABLE_GAP_MM = 0.25;
 /** Distanza tra il fianco delle celle e il fascio, mm. */
 const WIRE_CLEARANCE_MM = 1.5;
+/** Distanza tra la scatola del BMS e la corsia dei fili sopra o sotto di lei, mm. */
+const LANE_GAP_MM = 1.5;
+/** Ingombro del connettore di bilanciamento sulla testata del BMS (profondità, larghezza), mm. */
+const HEADER_DEPTH_MM = 6;
+const HEADER_WIDTH_MM = 5;
 
 const DIR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
@@ -150,15 +158,24 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     pMax = Math.max(pMax, p + r);
   }
   const odMm = findAwg(awg.powerAwg).outerMm;
-  // Il cavo di potenza corre a filo del fianco, appoggiato alla cella (il fermacavo lo tiene lì); il BMS gli sta davanti.
   const cableOff = CABLE_GAP_MM + odMm / 2;
   const aCable = edge + cableOff;
   const aWire = edge + WIRE_CLEARANCE_MM;
   const size: BmsSize | undefined = bms.sizeMm;
   const box = mount.mode === 'pack' && size !== undefined;
-  // La faccia del BMS verso il pacco, con il connettore di bilanciamento, sta oltre i cavi di potenza.
-  const aConn = Math.max(aWire, edge + CABLE_GAP_MM + odMm + 0.6);
+  // Il BMS sta a filo del fianco: niente passa tra lui e le celle. Fili e cavi corrono in corsie sopra o sotto la scatola.
+  const aBox = edge + CABLE_GAP_MM;
+  const boxT = box && size ? size.thicknessMm : 6;
+  const aHdr = aBox + boxT / 2;
   const pc = pMin + mount.along * (pMax - pMin);
+  const halfL = box && size ? size.lengthMm / 2 : 15;
+  const halfW = box && size ? size.widthMm / 2 : 0;
+  const high = mount.cablesEnd === 'high';
+  const dirEnd = high ? 1 : -1; // verso l'estremità del BMS da cui escono i cavi di potenza
+  const yHi = yMid + halfW;
+  const yLo = yMid - halfW;
+  const yWireHi = yHi + LANE_GAP_MM;
+  const yWireLo = yLo - LANE_GAP_MM;
 
   const to3 = (a: number, p: number, y: number): Pt3 => ({ x: d.x * a + perp.x * p, y, z: d.y * a + perp.y * p });
 
@@ -166,6 +183,15 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const joints = withTab.map((s) => s.joint);
   const last = Math.max(...joints);
   const n = last + 1;
+  // Il connettore di bilanciamento sta sulla testata del BMS opposta ai cavi di potenza, con i contatti in colonna.
+  const pBal = pc - dirEnd * halfL;
+  const pFace = pBal - dirEnd * HEADER_DEPTH_MM; // faccia esterna del connettore, dove entrano i fili
+  const pFar = pFace - dirEnd * 2;
+  const lengthOf = (pts: Pt3[]) => {
+    let l = 0;
+    for (let k = 0; k + 1 < pts.length; k++) l += Math.hypot(pts[k + 1]!.x - pts[k]!.x, pts[k + 1]!.y - pts[k]!.y, pts[k + 1]!.z - pts[k]!.z);
+    return l;
+  };
   const wires: HarnessWire[] = withTab
     .map((s): HarnessWire => {
       // La linguetta che porta il filo di bilanciamento: quella in serie, o la piccola dei terminali (non quella del cavo).
@@ -176,19 +202,17 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
       const bh = tab.balanceHole!;
       const u = (bh.x - bend.x) * td.x + (bh.y - bend.y) * td.y; // dal piegamento al foro, lungo la linguetta
       const yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
-      const pPin = pc + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
+      const yLane = s.face === 'top' ? yWireHi : yWireLo;
+      const yPin = yMid + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
       // Con la piega il foro scende sulla linea di piega: la sua posizione in pianta è il foro riportato su quella retta.
       const hx = bh.x - td.x * u;
       const hy = bh.y - td.y * u;
-      const p0: Pt3 = { x: hx, y: yHole, z: hy };
-      const p1: Pt3 = { x: hx, y: yMid, z: hy };
-      const p2 = to3(aConn, pPin, yMid);
+      // Il filo scende (o sale) fino alla corsia sopra (sotto) la scatola, corre lungo il fianco oltre la testata e entra nel connettore.
+      const pts: Pt3[] = [{ x: hx, y: yHole, z: hy }, { x: hx, y: yLane, z: hy }];
       // Una linguetta che esce di lato porta il filo lungo il fianco laterale fino all'angolo, poi sul fianco di uscita.
-      const lateral = tab.side !== side;
-      const pts: Pt3[] = lateral ? [p0, p1, to3(aWire, hx * perp.x + hy * perp.y, yMid), p2] : [p0, p1, p2];
-      const len = (a: Pt3, b: Pt3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-      let lengthMm = 0;
-      for (let i = 0; i + 1 < pts.length; i++) lengthMm += len(pts[i]!, pts[i + 1]!);
+      if (tab.side !== side) pts.push(to3(aWire, hx * perp.x + hy * perp.y, yLane));
+      pts.push(to3(aWire, pFar, yLane), to3(aWire, pFar, yPin), to3(aHdr, pFace, yPin));
+      const lengthMm = lengthOf(pts);
       const extra = mount.slackMm + (mount.mode === 'external' ? mount.tailMm : 0);
       return {
         node,
@@ -202,23 +226,24 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     })
     .sort((a, b) => a.node - b.node);
 
-  const connector = to3(aConn, pc, yMid);
+  const connector = to3(aHdr, pFace, yMid);
+  const header: BmsBox = {
+    center: to3(aHdr, pBal - dirEnd * HEADER_DEPTH_MM / 2, yMid),
+    size: d.x === 0 ? { x: HEADER_DEPTH_MM, y: n * CONNECTOR_PITCH_MM + 2, z: HEADER_WIDTH_MM } : { x: HEADER_WIDTH_MM, y: n * CONNECTOR_PITCH_MM + 2, z: HEADER_DEPTH_MM },
+  };
 
-  // Cavi di potenza: dalla linguetta larga di ciascun terminale (di lato) giù o su fino a metà altezza, lungo il fianco
-  // laterale, poi sul fianco di uscita fino all'estremità scelta del BMS. P+ non entra nel BMS: passa oltre e prosegue
-  // nella coda. Il negativo entra nel BMS (B−) e ne esce (P−): i due cavi di uscita, P+ e P−, vanno insieme al connettore.
+  // Cavi di potenza: dalla linguetta larga di ciascun terminale (di lato) giù o su fino alla corsia sopra la scatola, lungo il
+  // fianco laterale e il fianco di uscita fin oltre l'estremità del BMS; qui scendono davanti ai suoi pad. P+ non entra nel BMS
+  // e prosegue nella coda; il negativo entra nel BMS (B−) e ne esce (P−): P+ e P− vanno insieme al connettore.
   const terminals = withTab.filter((s) => s.kind !== 'series' && tabsOf(s).some((x) => x.power));
-  const high = mount.cablesEnd === 'high';
-  const pEnd = pc + (high ? 1 : -1) * ((box && size ? size.lengthMm : 30) / 2); // estremità del BMS verso l'uscita dei cavi
-  const pTail = pEnd + (high ? 1 : -1) * mount.tailMm;
-  const dyStep = odMm + 0.4; // tre cavi uno sopra l'altro: P+ sopra, B− al centro, P− sotto
+  const pEnd = pc + dirEnd * halfL; // estremità del BMS verso l'uscita dei cavi
+  const pB = pEnd + dirEnd * (odMm / 2 + 0.5); // discesa del cavo che entra nel BMS (B−)
+  const pP = pB + dirEnd * (odMm + 0.8); // discesa di P+, più in fuori
+  const pTail = pP + dirEnd * mount.tailMm;
+  const dyStep = odMm + 0.4; // P+ sopra, B− al centro, P− sotto
+  const yCable = yWireHi + 0.5 + odMm / 2 + 0.4; // corsia dei cavi, sopra quella dei fili
   const cables: HarnessCable[] = [];
   const connKind = mount.powerConnector === 'none' ? null : mount.powerConnector;
-  const lengthOf = (pts: Pt3[]) => {
-    let l = 0;
-    for (let k = 0; k + 1 < pts.length; k++) l += Math.hypot(pts[k + 1]!.x - pts[k]!.x, pts[k + 1]!.y - pts[k]!.y, pts[k + 1]!.z - pts[k]!.z);
-    return l;
-  };
   const cutOf = (l: number) => Math.ceil((l + mount.slackMm) / 5 - 1e-9) * 5;
   for (const s of terminals) {
     const tab = tabsOf(s).find((x) => x.power)!;
@@ -232,17 +257,18 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     const aBend = hx * d.x + hy * d.y;
     const pLat = pHole <= pc ? pMin - cableOff : pMax + cableOff; // fianco laterale più vicino al foro
     const plus = s.kind === 'terminal-plus';
-    const y = yMid + (plus ? dyStep : 0);
-    const toEnd: Pt3[] = [{ x: hx, y: yHole, z: hy }, { x: hx, y, z: hy }, to3(aBend, pLat, y), to3(aCable, pLat, y), to3(aCable, pEnd, y)];
+    const yLane = yCable + (plus ? dyStep : 0);
+    const lane: Pt3[] = [{ x: hx, y: yHole, z: hy }, { x: hx, y: yLane, z: hy }, to3(aBend, pLat, yLane), to3(aCable, pLat, yLane)];
     if (plus) {
-      // passa davanti all'estremità del BMS e prosegue nella coda
-      const pts = [...toEnd, to3(aCable, pTail, y)];
+      // scende oltre il cavo che entra nel BMS e prosegue nella coda
+      const pts = [...lane, to3(aCable, pP, yLane), to3(aCable, pP, yMid + dyStep), to3(aCable, pTail, yMid + dyStep)];
       const lengthMm = lengthOf(pts);
-      cables.push({ label: 'P+', stripId: s.id, face: s.face, points: pts, lengthMm, cutMm: cutOf(lengthMm), odMm, tailFrom: toEnd.length - 1 });
+      cables.push({ label: 'P+', stripId: s.id, face: s.face, points: pts, lengthMm, cutMm: cutOf(lengthMm), odMm, tailFrom: lane.length + 1 });
     } else {
-      // il negativo del pacco entra nel BMS (B−) ed esce da P−, a un livello più basso, verso il connettore
-      const lengthIn = lengthOf(toEnd);
-      cables.push({ label: 'B−', stripId: s.id, face: s.face, points: toEnd, lengthMm: lengthIn, cutMm: cutOf(lengthIn), odMm, tailFrom: toEnd.length - 1 });
+      // il negativo del pacco scende davanti al BMS ed entra nel pad B−; P− esce dal pad P−, più in basso
+      const pts = [...lane, to3(aCable, pB, yLane), to3(aCable, pB, yMid), to3(aCable, pEnd, yMid)];
+      const lengthIn = lengthOf(pts);
+      cables.push({ label: 'B−', stripId: s.id, face: s.face, points: pts, lengthMm: lengthIn, cutMm: cutOf(lengthIn), odMm, tailFrom: pts.length - 1 });
       const out = [to3(aCable, pEnd, yMid - dyStep), to3(aCable, pTail, yMid - dyStep)];
       const lengthOut = lengthOf(out);
       cables.push({ label: 'P−', stripId: s.id, face: s.face, points: out, lengthMm: lengthOut, cutMm: cutOf(lengthOut), odMm, tailFrom: 0 });
@@ -251,7 +277,7 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const connectors: HarnessConnector[] = [];
   if (connKind && cables.length > 0) {
     const cs = CONNECTOR_SIZES[connKind];
-    const axis = to3(0, high ? 1 : -1, 0); // lungo il lato, verso fuori dal pacco
+    const axis = to3(0, dirEnd, 0); // lungo il lato, verso fuori dal pacco
     const place = (cable: HarnessConnector['cable'], y: number, size: { lengthMm: number; widthMm: number; heightMm: number }) => {
       const end = to3(aCable, pTail, y);
       connectors.push({
@@ -268,10 +294,9 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   }
   let boxOut: BmsBox | null = null;
   if (box && size) {
-    // Lunghezza lungo il lato, larghezza in altezza, spessore verso l'esterno; la faccia verso il pacco è quella del connettore.
+    // Lunghezza lungo il lato, larghezza in altezza, spessore verso l'esterno; la faccia verso il pacco tocca il fianco.
     const along = d.x === 0 ? { x: size.lengthMm, z: size.thicknessMm } : { x: size.thicknessMm, z: size.lengthMm };
-    const out = to3(aConn + size.thicknessMm / 2, pc, yMid);
-    boxOut = { center: out, size: { x: along.x, y: size.widthMm, z: along.z } };
+    boxOut = { center: to3(aBox + size.thicknessMm / 2, pc, yMid), size: { x: along.x, y: size.widthMm, z: along.z } };
   }
-  return { mount, side, connector, axes: { d, perp }, box: boxOut, wires, cables, connectors, totalCutMm: wires.reduce((a, w) => a + w.cutMm, 0) + cables.reduce((a, c) => a + c.cutMm, 0) };
+  return { mount, side, connector, header, axes: { d, perp }, box: boxOut, wires, cables, connectors, totalCutMm: wires.reduce((a, w) => a + w.cutMm, 0) + cables.reduce((a, c) => a + c.cutMm, 0) };
 }

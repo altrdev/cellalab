@@ -398,13 +398,30 @@ describe('cablaggio del BMS', () => {
     expect(strips.find((s) => s.id === h.wires[4]!.stripId)!.kind).toBe('terminal-plus');
   });
 
-  it('nessun filo attraversa da una piastra all’altra: ogni filo arriva a metà altezza', () => {
+  it('nessun filo attraversa da una piastra all’altra: corre in una corsia fuori dalla scatola', () => {
+    const top = h.box!.center.y + h.box!.size.y / 2;
+    const bottom = h.box!.center.y - h.box!.size.y / 2;
     for (const w of h.wires) {
-      const [p0, p1] = [w.points[0]!, w.points[1]!];
-      expect(p1.y).toBeCloseTo(35.2, 6); // metà dell'altezza delle celle (70,4)
-      for (const q of w.points.slice(1)) expect(q.y).toBeCloseTo(p1.y, 6);
-      const above = p0.y > p1.y;
-      expect(above).toBe(w.face === 'top');
+      const lane = w.points[1]!;
+      if (w.face === 'top') expect(lane.y).toBeGreaterThan(top);
+      else expect(lane.y).toBeLessThan(bottom);
+      expect(w.points[0]!.y > lane.y).toBe(w.face === 'top');
+    }
+  });
+
+  it('niente passa sotto il BMS: né i fili né i cavi entrano nel volume della scatola', () => {
+    const b = h.box!;
+    const inside = (q: { x: number; y: number; z: number }, m: number) =>
+      Math.abs(q.x - b.center.x) < b.size.x / 2 + m - 1e-6 && Math.abs(q.y - b.center.y) < b.size.y / 2 + m - 1e-6 && Math.abs(q.z - b.center.z) < b.size.z / 2 + m - 1e-6;
+    const paths = [...h.wires.map((w) => w.points), ...h.cables.map((c) => c.points)];
+    for (const pts of paths) {
+      for (let i = 0; i + 1 < pts.length; i++) {
+        for (let k = 0; k <= 40; k++) {
+          const t = k / 40;
+          const q = { x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t, y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t, z: pts[i]!.z + (pts[i + 1]!.z - pts[i]!.z) * t };
+          expect(inside(q, -0.01)).toBe(false);
+        }
+      }
     }
   });
 
@@ -418,9 +435,13 @@ describe('cablaggio del BMS', () => {
     }
   });
 
-  it('i contatti del connettore sono ordinati e a passo fisso', () => {
-    const xs = h.wires.map((w) => w.points[w.points.length - 1]!.x);
-    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeCloseTo(2.5, 6);
+  it('i contatti del connettore sono su una testata, in colonna e a passo fisso', () => {
+    const ys = h.wires.map((w) => w.points[w.points.length - 1]!.y);
+    for (let i = 1; i < ys.length; i++) expect(ys[i]! - ys[i - 1]!).toBeCloseTo(2.5, 6);
+    const pin = h.wires[0]!.points[h.wires[0]!.points.length - 1]!;
+    // la testata è quella opposta ai cavi di potenza (alta di default): il connettore sta dal lato basso
+    expect(pin.x).toBeLessThan(h.box!.center.x - h.box!.size.x / 2);
+    expect(h.header.center.x).toBeLessThan(h.box!.center.x - h.box!.size.x / 2);
   });
 
   it('la posizione lungo il lato sposta il connettore; esterno aggiunge la coda e toglie la scatola', () => {
@@ -430,7 +451,7 @@ describe('cablaggio del BMS', () => {
     expect(h.box).not.toBeNull();
     const ext = buildHarness(setBmsMount(p, { mode: 'external', tailMm: 100 }), strips, 0.1)!;
     expect(ext.box).toBeNull();
-    expect(ext.wires[0]!.cutMm).toBeGreaterThan(h.wires[0]!.cutMm + 90);
+    expect(ext.wires[0]!.cutMm).toBeGreaterThanOrEqual(ext.wires[0]!.lengthMm + h.mount.slackMm + 100);
   });
 
   it('senza BMS o senza linguette non c’è cablaggio', () => {
@@ -494,7 +515,7 @@ describe('linguette dei terminali: potenza e bilanciamento separate', () => {
 
   it('i fili di bilanciamento partono tutti dal lato scelto: stesso percorso a tre punti', () => {
     const h = buildHarness(p, strips, 0.1)!;
-    for (const w of h.wires) expect(w.points).toHaveLength(3);
+    for (const w of h.wires) expect(w.points).toHaveLength(5);
     const first = h.wires[0]!;
     const s0 = strips.find((x) => x.id === first.stripId)!;
     const bend = s0.balanceTab!.bend;
@@ -529,6 +550,7 @@ describe('cavi di potenza (BMS a porta comune)', () => {
     const pOut = cable('P−');
     const end = bIn.points[bIn.points.length - 1]!;
     expect(end.x).toBeCloseTo(h.box!.center.x + h.box!.size.x / 2, 6); // estremità alta del BMS (default)
+    expect(bIn.points[bIn.points.length - 2]!.y).toBeCloseTo(end.y, 6); // entra orizzontale nel pad, dopo essere sceso
     expect(pOut.points[0]!.x).toBeCloseTo(end.x, 6);
     expect(pOut.points[0]!.z).toBeCloseTo(end.z, 6);
     expect(pOut.points[0]!.y).toBeLessThan(end.y); // P− sta sotto B−
@@ -538,7 +560,7 @@ describe('cavi di potenza (BMS a porta comune)', () => {
     const plus = cable('P+');
     const pOut = cable('P−');
     const e = plus.points[plus.tailFrom]!;
-    expect(e.x).toBeCloseTo(cable('B−').points[cable('B−').points.length - 1]!.x, 6);
+    expect(e.x).toBeGreaterThan(cable('B−').points[cable('B−').points.length - 1]!.x); // scende più in fuori di B−
     const tailP = plus.points[plus.points.length - 1]!;
     const tailM = pOut.points[pOut.points.length - 1]!;
     expect(tailP.x).toBeCloseTo(tailM.x, 6);
