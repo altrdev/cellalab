@@ -1,11 +1,11 @@
 import { t } from '../i18n';
-import type { BmsType, Chemistry, Project } from './types';
+import type { BmsSize, BmsType, Chemistry, Project } from './types';
 
 /**
  * Catalogo BMS predefinito: solo profili GENERICI (nessun modello commerciale). I valori sono tipici per la
  * classe: verificare sempre la scheda tecnica del BMS che si compra davvero.
  */
-function generic(series: number, maxCurrentA: number, chemistry: Chemistry): BmsType {
+function generic(series: number, maxCurrentA: number, chemistry: Chemistry, sizeMm: BmsSize): BmsType {
   const chem = chemistry === 'li-ion' ? 'Li-ion' : 'LiFePO4';
   return {
     id: `bms-${series}s-${maxCurrentA}a-${chemistry}`,
@@ -17,20 +17,24 @@ function generic(series: number, maxCurrentA: number, chemistry: Chemistry): Bms
     maxCurrentA,
     chemistries: [chemistry],
     ntc: true,
+    sizeMm,
     generic: true,
   };
 }
 
+const size = (lengthMm: number, widthMm: number, thicknessMm: number): BmsSize => ({ lengthMm, widthMm, thicknessMm });
+
+/** Gli ingombri sono stime per classe, non misure: sul BMS vero vanno sovrascritti. */
 export const BUILTIN_BMS_TYPES: readonly BmsType[] = [
-  generic(4, 30, 'li-ion'),
-  generic(7, 40, 'li-ion'),
-  generic(10, 40, 'li-ion'),
-  generic(13, 40, 'li-ion'),
-  generic(14, 60, 'li-ion'),
-  generic(20, 60, 'li-ion'),
-  generic(4, 100, 'lifepo4'),
-  generic(8, 100, 'lifepo4'),
-  generic(16, 100, 'lifepo4'),
+  generic(4, 30, 'li-ion', size(60, 20, 4)),
+  generic(7, 40, 'li-ion', size(70, 30, 5)),
+  generic(10, 40, 'li-ion', size(80, 40, 5)),
+  generic(13, 40, 'li-ion', size(90, 45, 6)),
+  generic(14, 60, 'li-ion', size(100, 45, 8)),
+  generic(20, 60, 'li-ion', size(120, 55, 10)),
+  generic(4, 100, 'lifepo4', size(100, 50, 12)),
+  generic(8, 100, 'lifepo4', size(120, 60, 12)),
+  generic(16, 100, 'lifepo4', size(150, 70, 14)),
 ];
 
 export function allBmsTypes(project: Pick<Project, 'customBmsTypes'>): BmsType[] {
@@ -58,6 +62,10 @@ export interface BmsDraft {
   maxCurrentA: number;
   chemistry: Chemistry;
   ntc: boolean;
+  /** Ingombro: tutti e tre a zero (o vuoti) = non indicato. */
+  lengthMm: number;
+  widthMm: number;
+  thicknessMm: number;
 }
 
 /** Messaggi di errore (vuoto se i dati vanno bene) per un BMS personalizzato. */
@@ -67,6 +75,9 @@ export function validateBms(d: BmsDraft): string[] {
   const isInt = (n: number) => Number.isInteger(n) && n >= 1;
   if (!isInt(d.minSeries) || !isInt(d.maxSeries) || d.maxSeries < d.minSeries) errors.push(t('bms.err.series'));
   if (!(Number.isFinite(d.maxCurrentA) && d.maxCurrentA > 0)) errors.push(t('bms.err.current'));
+  const dims = [d.lengthMm, d.widthMm, d.thicknessMm];
+  const some = dims.some((v) => v > 0);
+  if (some && !dims.every((v) => Number.isFinite(v) && v > 0)) errors.push(t('bms.err.size'));
   return errors;
 }
 
@@ -86,5 +97,6 @@ export function bmsFromDraft(project: Pick<Project, 'customBmsTypes'>, d: BmsDra
     maxCurrentA: d.maxCurrentA,
     chemistries: [d.chemistry],
     ntc: d.ntc,
+    ...(d.lengthMm > 0 && d.widthMm > 0 && d.thicknessMm > 0 && { sizeMm: size(d.lengthMm, d.widthMm, d.thicknessMm) }),
   };
 }

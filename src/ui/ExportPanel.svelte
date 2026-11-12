@@ -1,13 +1,14 @@
 <script lang="ts">
   import { t } from '../i18n';
+  import { len } from '../units';
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
   import UnitInput from './UnitInput.svelte';
   import { history } from '../state';
-  import { exportCutList, exportDxf, exportHolderPiece, exportHolderZip, exportStl, exportSvg, exportToleranceTest } from './exports';
+  import { exportCutList, exportDxf, exportHarness, exportHolderPiece, exportHolderZip, exportStl, exportSvg, exportToleranceTest } from './exports';
   import { DEFAULT_TEST_CLEARANCES_MM } from '../core/holder';
   import { holderOf } from './holder';
-  import { reportOf } from './lamelle';
+  import { harnessOf, reportOf, stripsOf } from './lamelle';
   import { ui } from './ui.svelte';
 
   let { onSave, onOpen }: { onSave: () => void; onOpen: (e: Event) => void } = $props();
@@ -15,6 +16,8 @@
   const project = $derived($history.present);
   const empty = $derived(project.cells.length === 0);
 
+  const harness = $derived(harnessOf(project, ui.lamella));
+  const labelOf = $derived(new Map(stripsOf(project, ui.lamella).map((s) => [s.id, s.label] as const)));
   const stripStatus = $derived(empty ? 'empty' : reportOf(project, ui.lamella).status);
   const holderReport = $derived(holderOf(project, ui.holder).report);
   /** Piastra troppo grande per il piano: pezzi da stampare e incollare. */
@@ -64,6 +67,26 @@
     {/if}
   </section>
 
+  {#if project.bmsId !== undefined}
+    <section class="sec">
+      <h3><Icon name="bolt" /> {t('exp.harness')}</h3>
+      {#if harness}
+        <table class="wires">
+          <thead><tr><th>{t('exp.harnessCol.node')}</th><th>{t('exp.harnessCol.from')}</th><th>{t('exp.harnessCol.path')}</th><th>{t('exp.harnessCol.cut')}</th></tr></thead>
+          <tbody>
+            {#each harness.wires as w (w.node)}
+              <tr><td><b>{w.label}</b></td><td>{labelOf.get(w.stripId) ?? ''} · {w.face === 'top' ? t('face.top') : t('face.bottom')}</td><td>{len(w.lengthMm, 0)}</td><td>{len(w.cutMm, 0)}</td></tr>
+            {/each}
+          </tbody>
+        </table>
+        <div class="exp"><button onclick={() => exportHarness(project)}>{t('exp.harnessList')}</button></div>
+        <Help label={t('exp.filesLabel')}>{t('exp.harnessHelp')}</Help>
+      {:else}
+        <p class="note">{t('exp.harnessEmpty')}</p>
+      {/if}
+    </section>
+  {/if}
+
   <section class="sec">
     <h3><Icon name="box" /> {t('exp.holder')} <span class="pill {holderStatus}">{holderStatus === 'ok' ? t('exp.badge.ok') : holderStatus === 'warning' ? t('exp.badge.warning') : holderStatus === 'error' ? t('exp.badge.error') : ''}</span></h3>
     <p class="status {holderStatus}">{text[holderStatus]}</p>
@@ -106,6 +129,21 @@
 </div>
 
 <style>
+  .wires {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+  }
+  .wires th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 2px 6px 4px 0;
+  }
+  .wires td {
+    padding: 3px 6px 3px 0;
+    border-top: 1px solid var(--line);
+  }
   .stack {
     display: flex;
     flex-direction: column;

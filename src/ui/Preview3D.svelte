@@ -5,7 +5,7 @@
   import { onMount } from 'svelte';
   import { history } from '../state';
   import { holderOf } from './holder';
-  import { reportOf, stripsOf } from './lamelle';
+  import { harnessOf, reportOf, stripsOf } from './lamelle';
   import { PackScene, type ViewPreset } from './scene3d';
   import { ui } from './ui.svelte';
 
@@ -17,6 +17,7 @@
   let showCells = $state(true);
   let showPlane = $state(true);
   let showBus = $state(true);
+  let showHarness = $state(true);
   let preset = $state<ViewPreset>('iso');
 
   onMount(() => {
@@ -51,6 +52,7 @@
       holderTop: ui.holderView.showTop,
       holderBottom: ui.holderView.showBottom,
       holderColor: ui.holderView.color,
+      harness: showHarness && showBus ? harnessOf(project, ui.lamella) : null,
     });
   });
 
@@ -71,6 +73,9 @@
     <label class="check"><input type="checkbox" bind:checked={showCells} /> {t('preview.cells')}</label>
     <label class="check" title={t('preview.holderTitle')}><input type="checkbox" bind:checked={ui.showHolder} /> Holder</label>
     <label class="check" title={t('preview.busbarsTitle')}><input type="checkbox" bind:checked={showBus} /> {t('preview.busbars')}</label>
+    {#if $history.present.bmsId !== undefined}
+      <label class="check" title={t('preview.harnessTitle')}><input type="checkbox" bind:checked={showHarness} /> {t('preview.harness')}</label>
+    {/if}
     <label class="check"><input type="checkbox" bind:checked={showPlane} /> {t('preview.plane')}</label>
     <label class="check">
       {t('preview.view')}

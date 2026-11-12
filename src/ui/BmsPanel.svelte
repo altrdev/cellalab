@@ -1,15 +1,19 @@
 <script lang="ts">
   import { t } from '../i18n';
   import { allBmsTypes, bmsFromDraft, bmsOf, seriesLabel, validateBms, type BmsDraft } from '../core/bms';
-  import { addCustomBms, removeCustomBms, setBms } from '../core/ops';
+  import { addCustomBms, removeCustomBms, setBms, setBmsMount } from '../core/ops';
+  import { bmsMountOf } from '../core/harness';
+  import UnitInput from './UnitInput.svelte';
   import { history } from '../state';
   import Help from './Help.svelte';
+  import { rangeFill } from './rangeFill';
 
   const project = $derived($history.present);
   const bms = $derived(bmsOf(project));
+  const mount = $derived(bmsMountOf(project));
   const isCustom = $derived(bms !== undefined && (project.customBmsTypes ?? []).some((b) => b.id === bms.id));
 
-  const blank = (): BmsDraft => ({ name: '', minSeries: 13, maxSeries: 13, maxCurrentA: 30, chemistry: 'li-ion', ntc: true });
+  const blank = (): BmsDraft => ({ name: '', minSeries: 13, maxSeries: 13, maxCurrentA: 30, chemistry: 'li-ion', ntc: true, lengthMm: 0, widthMm: 0, thicknessMm: 0 });
   let draft = $state<BmsDraft | null>(null);
   let errors = $state<string[]>([]);
 
@@ -61,6 +65,11 @@
         </select>
       </label>
     </div>
+    <div class="row">
+      <label>{t('bms.sizeLength')}<UnitInput kind="len" min={0} max={400} step={1} value={draft.lengthMm} onchange={(v) => { if (draft && v !== null) draft.lengthMm = v; }} /></label>
+      <label>{t('bms.sizeWidth')}<UnitInput kind="len" min={0} max={400} step={1} value={draft.widthMm} onchange={(v) => { if (draft && v !== null) draft.widthMm = v; }} /></label>
+      <label>{t('bms.sizeThickness')}<UnitInput kind="len" min={0} max={100} step={0.5} value={draft.thicknessMm} onchange={(v) => { if (draft && v !== null) draft.thicknessMm = v; }} /></label>
+    </div>
     <label class="check"><input type="checkbox" bind:checked={draft.ntc} />{t('bms.ntc')}</label>
     {#if errors.length > 0}
       <ul class="errs">{#each errors as err (err)}<li>{err}</li>{/each}</ul>
@@ -70,6 +79,33 @@
       <button type="button" onclick={() => (draft = null)}>{t('side.draft.cancel')}</button>
     </div>
   </form>
+{/if}
+{#if bms}
+  <label>{t('bms.mount')}
+    <select value={mount.mode} onchange={(e) => history.commit((p) => setBmsMount(p, { mode: e.currentTarget.value === 'external' ? 'external' : 'pack' }))}>
+      <option value="pack">{t('bms.mountPack')}</option>
+      <option value="external">{t('bms.mountExternal')}</option>
+    </select>
+  </label>
+  <label>
+    <span class="top"><span>{t('bms.along')}</span><b>{Math.round(mount.along * 100)}%</b></span>
+    <input
+      use:rangeFill={mount.along * 100}
+      type="range"
+      min="0"
+      max="100"
+      step="1"
+      value={mount.along * 100}
+      oninput={(e) => history.commit((p) => setBmsMount(p, { along: e.currentTarget.valueAsNumber / 100 }))}
+    />
+  </label>
+  <div class="row">
+    <label>{t('bms.slack')}<UnitInput kind="len" min={0} max={200} step={5} value={mount.slackMm} onchange={(v) => { if (v !== null) history.commit((p) => setBmsMount(p, { slackMm: v })); }} /></label>
+    {#if mount.mode === 'external'}
+      <label>{t('bms.tail')}<UnitInput kind="len" min={0} max={2000} step={10} value={mount.tailMm} onchange={(v) => { if (v !== null) history.commit((p) => setBmsMount(p, { tailMm: v })); }} /></label>
+    {/if}
+  </div>
+  {#if mount.mode === 'pack' && !bms.sizeMm}<p class="note">{t('bms.noSize')}</p>{/if}
 {/if}
 <Help label={t('help.how')}>{t('bms.help')}</Help>
 
@@ -95,6 +131,10 @@
   .row {
     display: flex;
     gap: 10px;
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
   }
   .note {
     margin: 0;

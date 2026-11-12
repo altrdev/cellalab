@@ -8,6 +8,7 @@ import type { HolderModel } from '../core/holder';
 import { explodeOffsets } from '../core/explode';
 import { intersectRegions, type Region } from '../core/clip';
 import { boundsOfCells } from '../core/geometry';
+import type { Harness } from '../core/harness';
 import type { Strip, TabSide } from '../core/strips';
 import type { Project } from '../core/types';
 import { groupHue } from './colors';
@@ -40,6 +41,8 @@ export interface SceneOptions {
   holderTop?: boolean;
   holderBottom?: boolean;
   holderColor?: string;
+  /** BMS e fili da disegnare (null = nascosti). Spariscono nella vista esplosa. */
+  harness?: Harness | null;
 }
 
 const RING_COLOR = 0xc9382f; // anello isolante sul lato positivo
@@ -136,6 +139,9 @@ export class PackScene {
   private frame = 0;
   private disposed = false;
   private busRoot = new THREE.Group();
+  private harnessRoot = new THREE.Group();
+  private harnessShown: Harness | null = null;
+  private harnessMats: THREE.Material[] = [];
   private holderRoot = new THREE.Group();
   private holderShown: HolderModel | null = null;
   private holderMat = new THREE.MeshStandardMaterial({ color: 0x353b41, roughness: 0.62, metalness: 0.05 });
@@ -172,6 +178,7 @@ export class PackScene {
     this.scene.add(this.sun, this.sun.target);
     this.scene.add(this.cellsRoot);
     this.scene.add(this.busRoot);
+    this.scene.add(this.harnessRoot);
     this.scene.add(this.holderRoot);
 
     this.buildGround(300, 10);
@@ -336,6 +343,7 @@ export class PackScene {
     for (const id of [...this.nodes.keys()]) if (!seen.has(id)) this.removeNode(id);
 
     this.updateBus(project, options);
+    this.updateHarness(options);
     this.updateHolder(options);
     this.cellsRoot.visible = options.showCells;
     this.plane.visible = options.showPlane;
@@ -475,6 +483,49 @@ export class PackScene {
     this.busKey = { strips, thickness, height, lift };
   }
 
+  /** BMS come scatola contro il fianco e fili come tubi sottili dalle linguette al connettore. */
+  private updateHarness(options: SceneOptions) {
+    const h = options.harness ?? null;
+    this.harnessRoot.visible = !!h && options.explosionMm === 0;
+    if (h === this.harnessShown) return;
+    for (const m of [...this.harnessRoot.children] as THREE.Mesh[]) {
+      m.geometry.dispose();
+      this.harnessRoot.remove(m);
+    }
+    for (const m of this.harnessMats) m.dispose();
+    this.harnessMats = [];
+    this.harnessShown = h;
+    if (!h) return;
+    const mat = (color: number, rough = 0.5) => {
+      const m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.05 });
+      this.harnessMats.push(m);
+      return m;
+    };
+    if (h.box) {
+      const geo = new THREE.BoxGeometry(h.box.size.x, h.box.size.y, h.box.size.z);
+      // Un po' trasparente, così si vedono i fili che arrivano al connettore dietro la scheda.
+      const boxMat = mat(0x1f7a4a, 0.6) as THREE.MeshStandardMaterial;
+      boxMat.transparent = true;
+      boxMat.opacity = 0.55;
+      boxMat.depthWrite = false;
+      const mesh = new THREE.Mesh(geo, boxMat);
+      mesh.position.set(h.box.center.x, h.box.center.y, h.box.center.z);
+      mesh.renderOrder = 2;
+      this.harnessRoot.add(mesh);
+    }
+    for (const w of h.wires) {
+      const path = new THREE.CurvePath<THREE.Vector3>();
+      const pts = w.points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
+      path.add(new THREE.LineCurve3(pts[0]!, pts[1]!));
+      path.add(new THREE.LineCurve3(pts[1]!, pts[2]!));
+      const geo = new THREE.TubeGeometry(path, 24, 0.45, 6, false);
+      const color = w.node === 0 ? 0x1b1b1b : new THREE.Color().setHSL(groupHue(w.node) / 360, 0.75, 0.5).getHex();
+      const mesh = new THREE.Mesh(geo, mat(color, 0.55));
+      mesh.castShadow = true;
+      this.harnessRoot.add(mesh);
+    }
+  }
+
   /** Il sole segue il pacco e la sua ombra copre esattamente l'area utile (più nitida). */
   private aimSun(cx: number, cz: number, extent: number) {
     const reach = Math.max(extent, 60) * 0.85;
@@ -548,6 +599,8 @@ export class PackScene {
     this.ringMat.dispose();
     for (const m of this.busRoot.children as THREE.Mesh[]) m.geometry.dispose();
     for (const m of this.holderRoot.children as THREE.Mesh[]) m.geometry.dispose();
+    for (const m of this.harnessRoot.children as THREE.Mesh[]) m.geometry.dispose();
+    for (const m of this.harnessMats) m.dispose();
     this.holderMat.dispose();
     this.busMat.dispose();
     this.envTexture?.dispose();

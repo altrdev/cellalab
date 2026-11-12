@@ -32,7 +32,8 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 - [x] NTC pocket: a round hole in the holder walls in the gap between three cells (central cell, towards the wire exit side), setting on/off + sensor diameter, plus a 2 mm wire hole through the floor (gaps not covered by busbars preferred). On both plates.
 - [x] NTC wire groove (1.6 mm wide, half the floor deep) on the outer face from the wire hole to the exit edge, avoiding the busbars of the face; the plate with a free path is suggested.
 - [ ] Still open: balance-wire routing along the pack between the two faces, warning when the wall is too thin for the wire, (NTC pocket, hole and groove are now on the suggested plate only).
-- [ ] BMS mounted on the pack (pocket + spacers) or external (wire exit with strain relief).
+- [x] BMS position and wiring: BMS on the flank at mid height (or external exit point), position along the side, wire lengths B0..BS in the Export tab, BMS box and wires in the 3D view. Generic BMS sizes are class estimates.
+- [ ] BMS mounting hardware in the holder (pocket + spacers, strain relief) and the BMS's real holes/connector/B-/P-/P+ positions in the catalogue.
 
 ## Polish (phase 6)
 

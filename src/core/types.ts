@@ -26,6 +26,26 @@ export interface CellType {
   generic?: boolean;
 }
 
+/** Ingombro di un BMS (scheda con i componenti), mm. */
+export interface BmsSize {
+  lengthMm: number;
+  widthMm: number;
+  thicknessMm: number;
+}
+
+/** Dove sta il BMS rispetto al pacco: sul fianco dal lato delle linguette (a metà altezza) o fuori, solo come punto di uscita dei fili. */
+export interface BmsMount {
+  mode: 'pack' | 'external';
+  /** Posizione lungo il lato di uscita: 0 = un'estremità, 1 = l'altra. */
+  along: number;
+  /** Scorta su ogni filo (saldatura e crimpatura del connettore), mm. */
+  slackMm: number;
+  /** Solo esterno: lunghezza di filo oltre il punto di uscita, mm. */
+  tailMm: number;
+}
+
+export const DEFAULT_BMS_MOUNT: BmsMount = { mode: 'pack', along: 0.5, slackMm: 20, tailMm: 100 };
+
 /** BMS: quante celle in serie regge, quanta corrente continua e con quale chimica. */
 export interface BmsType {
   id: string;
@@ -38,6 +58,8 @@ export interface BmsType {
   chemistries: Chemistry[];
   /** Ha l'ingresso per il sensore di temperatura (NTC). */
   ntc: boolean;
+  /** Ingombro, se noto (nei generici è una stima per classe). */
+  sizeMm?: BmsSize;
   /** Valori generici del catalogo: da verificare sulla scheda tecnica del BMS reale. */
   generic?: boolean;
 }
@@ -75,6 +97,8 @@ export interface Project {
   customBmsTypes?: BmsType[];
   /** BMS scelto per il pacco (catalogo o personalizzato); assente = nessun BMS. */
   bmsId?: string;
+  /** Posizione di montaggio del BMS; assente = quella di default. */
+  bmsMount?: BmsMount;
   cells: PlacedCell[];
   /** Presente solo se il pacco è stato generato in automatico e le celle sono ancora sul suo reticolo. */
   generator?: PackGenerator;

@@ -7,7 +7,8 @@ import { buildToleranceTest } from '../core/holder';
 import { holderOf } from './holder';
 import { zipStore } from '../core/zip';
 import { holderStl, type HolderHalf } from './holderMesh';
-import { reportOf, stripsOf } from './lamelle';
+import { buildHarnessCsv, buildHarnessSummary } from '../core/harnessExport';
+import { harnessOf, reportOf, stripsOf } from './lamelle';
 import { ui } from './ui.svelte';
 
 /** Esportazioni dei file (taglio lamelle, stampa 3D): usate dalla scheda «Esporta». */
@@ -66,6 +67,13 @@ export function exportCutList(project: Project) {
   const report = reportOf(project, ui.lamella);
   const text = buildCutSummary(report, project.name) + '\n' + buildCutListCsv(stripsOf(project, ui.lamella), report);
   save(text, `${slug(project.name)}-${t('file.cutList')}.txt`, 'text/plain');
+}
+
+export function exportHarness(project: Project) {
+  const h = harnessOf(project, ui.lamella);
+  if (!h) return;
+  const text = buildHarnessSummary(h, project.name) + '\n' + buildHarnessCsv(h, stripsOf(project, ui.lamella));
+  save(text, `${slug(project.name)}-${t('file.harness')}.txt`, 'text/plain');
 }
 
 export function exportStl(project: Project, half: HolderHalf) {

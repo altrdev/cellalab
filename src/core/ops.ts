@@ -1,6 +1,6 @@
 import { slotIndexOf, slotPosition } from './lattice';
 import { findBmsType } from './bms';
-import type { BmsType, CellType, PackGenerator, PlacedCell, Project } from './types';
+import { DEFAULT_BMS_MOUNT, type BmsMount, type BmsType, type CellType, type PackGenerator, type PlacedCell, type Project } from './types';
 import { t } from '../i18n';
 
 /** Operazioni pure sul progetto: ricevono un Project e ne restituiscono uno nuovo. */
@@ -216,6 +216,16 @@ export function setBms(project: Project, id: string | undefined): Project {
     return rest;
   }
   return project.bmsId === id ? project : { ...project, bmsId: id };
+}
+
+/** Cambia la posizione di montaggio del BMS (valori fuori misura si riportano nei limiti). */
+export function setBmsMount(project: Project, mount: Partial<BmsMount>): Project {
+  const cur = { ...DEFAULT_BMS_MOUNT, ...project.bmsMount, ...mount };
+  const clamp = (v: number, lo: number, hi: number) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo);
+  return {
+    ...project,
+    bmsMount: { mode: cur.mode, along: clamp(cur.along, 0, 1), slackMm: clamp(cur.slackMm, 0, 200), tailMm: clamp(cur.tailMm, 0, 2000) },
+  };
 }
 
 export function addCustomBms(project: Project, type: BmsType): Project {

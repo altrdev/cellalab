@@ -1,6 +1,6 @@
 import { findBmsType } from './bms';
 import { findCellType } from './catalog';
-import type { BmsType, CellType, Chemistry, PackGenerator, PlacedCell, Project } from './types';
+import { DEFAULT_BMS_MOUNT, type BmsType, type CellType, type Chemistry, type PackGenerator, type PlacedCell, type Project } from './types';
 import { t } from '../i18n';
 
 export class ProjectParseError extends Error {
@@ -99,7 +99,18 @@ function parseBms(raw: unknown): BmsType | undefined {
   if (!Array.isArray(chemistries)) return undefined;
   const chems = chemistries.filter((c): c is Chemistry => c === 'li-ion' || c === 'lifepo4');
   if (chems.length === 0) return undefined;
-  return { id, name, minSeries, maxSeries, maxCurrentA, chemistries: chems, ntc: ntc === true };
+  const sz = raw.sizeMm;
+  const okSize = isObj(sz) && [sz.lengthMm, sz.widthMm, sz.thicknessMm].every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  return {
+    id,
+    name,
+    minSeries,
+    maxSeries,
+    maxCurrentA,
+    chemistries: chems,
+    ntc: ntc === true,
+    ...(okSize && { sizeMm: { lengthMm: (sz as Obj).lengthMm as number, widthMm: (sz as Obj).widthMm as number, thicknessMm: (sz as Obj).thicknessMm as number } }),
+  };
 }
 
 function parseCell(raw: unknown, index: number): PlacedCell {
@@ -159,6 +170,16 @@ export function parseProject(json: string): Project {
   if (Array.isArray(raw.customBmsTypes)) {
     const list = raw.customBmsTypes.map(parseBms).filter((b): b is BmsType => b !== undefined);
     if (list.length > 0) project.customBmsTypes = list;
+  }
+  if (isObj(raw.bmsMount)) {
+    const m = raw.bmsMount;
+    const num = (v: unknown, lo: number, hi: number, def: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def);
+    project.bmsMount = {
+      mode: m.mode === 'external' ? 'external' : 'pack',
+      along: num(m.along, 0, 1, DEFAULT_BMS_MOUNT.along),
+      slackMm: num(m.slackMm, 0, 200, DEFAULT_BMS_MOUNT.slackMm),
+      tailMm: num(m.tailMm, 0, 2000, DEFAULT_BMS_MOUNT.tailMm),
+    };
   }
   // Un BMS scelto che non esiste più (file modificato a mano) si ignora.
   if (typeof raw.bmsId === 'string' && findBmsType(project, raw.bmsId)) project.bmsId = raw.bmsId;

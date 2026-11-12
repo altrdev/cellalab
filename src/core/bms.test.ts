@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { allBmsTypes, bmsFromDraft, bmsOf, BUILTIN_BMS_TYPES, validateBms } from './bms';
 import { runDrc } from './drc';
 import { generateGrid } from './layout';
-import { addCustomBms, removeCustomBms, replaceCells, setBms, setCurrentLimit } from './ops';
+import { addCustomBms, removeCustomBms, replaceCells, setBms, setBmsMount, setCurrentLimit } from './ops';
 import { createProject, parseProject, serializeProject } from './project';
 import { computeStats } from './stats';
 import { pointInRegions, regionArea, unionPolygons } from './clip';
 import { buildDxf } from './dxf';
 import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
+import { buildHarness } from './harness';
 import { ntcSite, ntcSites } from './ntc';
 import { ntcRoute } from './ntcRoute';
 import { tabNotches } from './tabNotches';
@@ -39,7 +40,7 @@ describe('scelta del BMS', () => {
   });
 
   it('un BMS personalizzato si aggiunge e togliendolo il pacco resta senza', () => {
-    const type = bmsFromDraft(createProject(), { name: 'Mio 6S', minSeries: 6, maxSeries: 6, maxCurrentA: 25, chemistry: 'li-ion', ntc: false });
+    const type = bmsFromDraft(createProject(), { name: 'Mio 6S', minSeries: 6, maxSeries: 6, maxCurrentA: 25, chemistry: 'li-ion', ntc: false, lengthMm: 0, widthMm: 0, thicknessMm: 0 });
     let p = setBms(addCustomBms(createProject(), type), type.id);
     expect(allBmsTypes(p)[0]!.id).toBe(type.id);
     expect(() => addCustomBms(p, type)).toThrow();
@@ -49,7 +50,7 @@ describe('scelta del BMS', () => {
   });
 
   it('validateBms', () => {
-    expect(validateBms({ name: '', minSeries: 5, maxSeries: 3, maxCurrentA: 0, chemistry: 'li-ion', ntc: true })).toHaveLength(3);
+    expect(validateBms({ name: '', minSeries: 5, maxSeries: 3, maxCurrentA: 0, chemistry: 'li-ion', ntc: true, lengthMm: 0, widthMm: 0, thicknessMm: 0 })).toHaveLength(3);
   });
 });
 
@@ -93,7 +94,7 @@ describe('verifiche BMS', () => {
 
 describe('salvataggio', () => {
   it('BMS scelto e personalizzato sopravvivono al giro JSON', () => {
-    const type = bmsFromDraft(createProject(), { name: 'Mio', minSeries: 4, maxSeries: 8, maxCurrentA: 20, chemistry: 'lifepo4', ntc: true });
+    const type = bmsFromDraft(createProject(), { name: 'Mio', minSeries: 4, maxSeries: 8, maxCurrentA: 20, chemistry: 'lifepo4', ntc: true, lengthMm: 0, widthMm: 0, thicknessMm: 0 });
     const p = setBms(addCustomBms(createProject(), type), type.id);
     const back = parseProject(serializeProject(p));
     expect(back.bmsId).toBe(type.id);
@@ -370,5 +371,62 @@ describe('solco del filo dell’NTC', () => {
     expect(plain.totalMm).toBeCloseTo(cut.totalMm, 6);
     const flat = regionArea(unionPolygons(route.polygons));
     expect(volume(plain) - volume(cut)).toBeLessThanOrEqual(flat * settings.floorMm / 2 + 1e-6);
+  });
+});
+
+describe('cablaggio del BMS', () => {
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.2, bendMm: 0.3, powerHoleMm: 2.85 } as const;
+  const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
+  const strips = buildStrips(p, { tabs });
+  const h = buildHarness(p, strips, 0.1)!;
+
+  it('un filo per nodo, da B0 a BS', () => {
+    expect(h.wires.map((w) => w.label)).toEqual(['B0', 'B1', 'B2', 'B3', 'B4']);
+    // B0 è il meno del pacco: la lamella P−
+    expect(strips.find((s) => s.id === h.wires[0]!.stripId)!.kind).toBe('terminal-minus');
+    expect(strips.find((s) => s.id === h.wires[4]!.stripId)!.kind).toBe('terminal-plus');
+  });
+
+  it('nessun filo attraversa da una piastra all’altra: ogni filo arriva a metà altezza', () => {
+    for (const w of h.wires) {
+      expect(w.points[1].y).toBeCloseTo(35.2, 6); // metà dell'altezza delle celle (70,4)
+      expect(w.points[2].y).toBeCloseTo(w.points[1].y, 6);
+      const above = w.points[0].y > w.points[1].y;
+      expect(above).toBe(w.face === 'top');
+    }
+  });
+
+  it('i fili partono da giunzioni sulle due facce e le lunghezze sono ragionevoli', () => {
+    expect(new Set(h.wires.map((w) => w.face)).size).toBe(2);
+    for (const w of h.wires) {
+      expect(w.lengthMm).toBeGreaterThan(20);
+      expect(w.lengthMm).toBeLessThan(120);
+      expect(w.cutMm).toBeGreaterThanOrEqual(w.lengthMm + h.mount.slackMm - 1e-6);
+      expect(w.cutMm % 5).toBe(0);
+    }
+  });
+
+  it('i contatti del connettore sono ordinati e a passo fisso', () => {
+    const xs = h.wires.map((w) => w.points[2].x);
+    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeCloseTo(2.5, 6);
+  });
+
+  it('la posizione lungo il lato sposta il connettore; esterno aggiunge la coda e toglie la scatola', () => {
+    const left = buildHarness(setBmsMount(p, { along: 0 }), strips, 0.1)!;
+    const right = buildHarness(setBmsMount(p, { along: 1 }), strips, 0.1)!;
+    expect(right.connector.x).toBeGreaterThan(left.connector.x + 50);
+    expect(h.box).not.toBeNull();
+    const ext = buildHarness(setBmsMount(p, { mode: 'external', tailMm: 100 }), strips, 0.1)!;
+    expect(ext.box).toBeNull();
+    expect(ext.wires[0]!.cutMm).toBeGreaterThan(h.wires[0]!.cutMm + 90);
+  });
+
+  it('senza BMS o senza linguette non c’è cablaggio', () => {
+    expect(buildHarness(pack(4, 3), buildStrips(pack(4, 3), { tabs }), 0.1)).toBeNull();
+    expect(buildHarness(p, buildStrips(p, {}), 0.1)).toBeNull();
+  });
+
+  it('setBmsMount tiene i valori nei limiti', () => {
+    expect(setBmsMount(p, { along: 3, slackMm: -5 }).bmsMount).toMatchObject({ along: 1, slackMm: 0 });
   });
 });

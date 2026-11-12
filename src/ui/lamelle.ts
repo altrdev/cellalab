@@ -10,6 +10,7 @@ import { buildHolder } from '../core/holder';
 import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
 import { holderOf, type HolderCuts } from './holder';
 import { bmsOf } from '../core/bms';
+import { buildHarness, type Harness } from '../core/harness';
 import { ntcSites, type NtcSite } from '../core/ntc';
 import { ntcRoute, type NtcRoute } from '../core/ntcRoute';
 import { tabNotches } from '../core/tabNotches';
@@ -153,6 +154,13 @@ export function tabSideOf(project: Project, settings: LamellaSettings): TabSide 
 function optionsOf(project: Project, settings: LamellaSettings): StripOptions {
   const o = stripOptionsOf(settings);
   return o.tabs ? { ...o, tabs: { ...o.tabs, side: tabSideOf(project, settings) } } : o;
+}
+
+/** Cablaggio del BMS (posizione e lunghezza dei fili), con lo spessore delle lamelle che si vede nella scena. */
+export function harnessOf(project: Project, settings: LamellaSettings): Harness | null {
+  if (project.bmsId === undefined) return null;
+  const report = reportOf(project, settings);
+  return buildHarness(project, stripsOf(project, settings), Math.max(0.3, report.totalThicknessMm ?? report.requiredMm ?? 0.3));
 }
 
 let last: { project: Project; key: string; report: LamellaReport } | null = null;
