@@ -1,5 +1,5 @@
 import { fmtNum as fmt, t, tn } from '../i18n';
-import { findMaterial, LAMELLA_MATERIALS, resistivityAt, volumetricHeat, type LamellaMaterial } from './materials';
+import { findMaterial, BUSBAR_MATERIALS, resistivityAt, volumetricHeat, type BusbarMaterial } from './materials';
 import { regionDistance } from './clip';
 import {
   CUTTER_PROFILES,
@@ -31,7 +31,7 @@ import { len, tempDelta } from '../units';
  * sheet of one thickness is used.
  */
 
-export interface LamellaSettings {
+export interface BusbarSettings {
   materialId: string;
   /** Thickness of a single layer, mm; null = automatic (the thinnest that is enough). */
   thicknessMm: number | null;
@@ -75,7 +75,7 @@ export interface LamellaSettings {
   tabBendMm: number;
 }
 
-export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
+export const DEFAULT_BUSBAR_SETTINGS: BusbarSettings = {
   materialId: 'nichel-puro',
   thicknessMm: null,
   layers: 1,
@@ -104,7 +104,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
 };
 
 /** Strip shape parameters derived from the settings. */
-export const stripOptionsOf = (s: LamellaSettings, wireHoles = false): StripOptions => ({
+export const stripOptionsOf = (s: BusbarSettings, wireHoles = false): StripOptions => ({
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
   tabs: { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), style: s.tabs ? 'tab' : 'none', bendMm: s.tabBendMm, power: s.powerTabs ? { widthMm: Math.max(s.tabWidthMm, holeForWireMm(s.powerAwg) + 4), holeMm: holeForWireMm(s.powerAwg) } : null },
@@ -112,7 +112,7 @@ export const stripOptionsOf = (s: LamellaSettings, wireHoles = false): StripOpti
 
 export type IssueSeverity = 'error' | 'warning' | 'info';
 
-export interface LamellaIssue {
+export interface BusbarIssue {
   severity: IssueSeverity;
   message: string;
   stripIds: string[];
@@ -146,10 +146,10 @@ export interface StripReport {
   contactRadiusMm: number;
 }
 
-export interface LamellaReport {
+export interface BusbarReport {
   status: 'empty' | 'ok' | 'warning' | 'error';
   currentA: number;
-  material: LamellaMaterial;
+  material: BusbarMaterial;
   welder: WelderProfile;
   cutter: CutterProfile;
   /** Thickness of a single layer, mm; null if none is enough. */
@@ -160,7 +160,7 @@ export interface LamellaReport {
   /** Total thickness required by the most critical strip, mm. */
   requiredMm: number;
   strips: StripReport[];
-  issues: LamellaIssue[];
+  issues: BusbarIssue[];
   alternatives: string[];
   /** Total area of the strips and mass of material, for the order. */
   totalAreaCm2: number;
@@ -176,7 +176,7 @@ interface Requirement {
   requiredMm: number;
 }
 
-function requirementFor(strip: Strip, material: LamellaMaterial, s: LamellaSettings, currentA: number): Requirement {
+function requirementFor(strip: Strip, material: BusbarMaterial, s: BusbarSettings, currentA: number): Requirement {
   const neck = neckWidthMm(strip);
   const neckCurrent =
     strip.kind === 'series' ? currentA / strip.parallelCount : currentA / 2;
@@ -203,25 +203,25 @@ function requirementFor(strip: Strip, material: LamellaMaterial, s: LamellaSetti
 }
 
 /** Total thickness required by the worst case with a given material. */
-export function worstRequiredMm(strips: readonly Strip[], material: LamellaMaterial, s: LamellaSettings, currentA: number): number {
+export function worstRequiredMm(strips: readonly Strip[], material: BusbarMaterial, s: BusbarSettings, currentA: number): number {
   let worst = 0;
   for (const strip of strips) worst = Math.max(worst, requirementFor(strip, material, s, currentA).requiredMm);
   return worst;
 }
 
 /** The thinnest commercial thickness such that layers·thickness ≥ required. */
-function smallestThickness(material: LamellaMaterial, layers: number, requiredMm: number): number | null {
+function smallestThickness(material: BusbarMaterial, layers: number, requiredMm: number): number | null {
   for (const t of material.thicknessesMm) if (t * layers >= requiredMm - 1e-9) return t;
   return null;
 }
 
-export function analyzeLamelle(
+export function analyzeBusbars(
   project: Project,
   strips: readonly Strip[],
-  settings: LamellaSettings,
+  settings: BusbarSettings,
   packCurrentA: number,
-): LamellaReport {
-  const material = findMaterial(settings.materialId) ?? LAMELLA_MATERIALS[0]!;
+): BusbarReport {
+  const material = findMaterial(settings.materialId) ?? BUSBAR_MATERIALS[0]!;
   const profile = findWelder(settings.welderId) ?? WELDER_PROFILES[0]!;
   const welder: WelderProfile = {
     ...profile,
@@ -231,7 +231,7 @@ export function analyzeLamelle(
   const cutter = findCutter(settings.cutterId) ?? CUTTER_PROFILES[0]!;
   const currentA = packCurrentA;
   const layers = Math.max(1, Math.floor(settings.layers));
-  const issues: LamellaIssue[] = [];
+  const issues: BusbarIssue[] = [];
   const alternatives: string[] = [];
 
   const base = {
@@ -251,23 +251,23 @@ export function analyzeLamelle(
       totalThicknessMm: null,
       requiredMm: 0,
       strips: [],
-      issues: [{ severity: 'info', message: t('lamelle.issue.assign'), stripIds: [] }],
+      issues: [{ severity: 'info', message: t('busbar.issue.assign'), stripIds: [] }],
       alternatives,
       totalAreaCm2: 0,
       massG: null,
     };
   }
   if (!(currentA > 0)) {
-    issues.push({ severity: 'error', message: t('lamelle.issue.currentZero'), stripIds: [] });
+    issues.push({ severity: 'error', message: t('busbar.issue.currentZero'), stripIds: [] });
   } else if (powerAmpacityA(settings.powerAwg) < currentA) {
     const need = powerAwgFor(currentA);
     issues.push({
       severity: 'warning',
-      message: t('lamelle.issue.powerCable', {
+      message: t('busbar.issue.powerCable', {
         awg: settings.powerAwg,
         cap: powerAmpacityA(settings.powerAwg),
         current: fmt(currentA, 0),
-        hint: need === null ? t('lamelle.issue.powerCableMore') : t('lamelle.issue.powerCableAwg', { need }),
+        hint: need === null ? t('busbar.issue.powerCableMore') : t('busbar.issue.powerCableAwg', { need }),
       }),
       stripIds: [],
     });
@@ -342,9 +342,9 @@ export function analyzeLamelle(
     thicknessProblem = true;
     issues.push({
       severity: 'error',
-      message: t('lamelle.issue.noThickness', {
+      message: t('busbar.issue.noThickness', {
         material: material.name,
-        layers: tn('lamelle.layers', layers),
+        layers: tn('busbar.layers', layers),
         required: len(requiredMm, 2),
         current: fmt(currentA, 0),
         strip: critical.label,
@@ -358,13 +358,13 @@ export function analyzeLamelle(
     const hot = reports.filter((r) => (r.deltaTK ?? 0) > settings.deltaTK + 1e-9);
     issues.push({
       severity: 'error',
-      message: t('lamelle.issue.tooThin', {
+      message: t('busbar.issue.tooThin', {
         thickness: len(totalThicknessMm!, 2),
         current: fmt(currentA, 0),
         required: len(requiredMm, 2),
         why: hot.length
-          ? t('lamelle.issue.tooThinHot', { rise: tempDelta(Math.max(...hot.map((r) => r.deltaTK ?? 0)), 0), allowed: tempDelta(settings.deltaTK, 0) })
-          : t('lamelle.issue.tooThinPeak'),
+          ? t('busbar.issue.tooThinHot', { rise: tempDelta(Math.max(...hot.map((r) => r.deltaTK ?? 0)), 0), allowed: tempDelta(settings.deltaTK, 0) })
+          : t('busbar.issue.tooThinPeak'),
       }),
       stripIds: hot.length ? hot.map((r) => r.stripId) : [critical.stripId],
     });
@@ -374,7 +374,7 @@ export function analyzeLamelle(
   if (layers > welder.maxLayers) {
     issues.push({
       severity: 'warning',
-      message: t('lamelle.issue.welderLayers', { layers, welder: welder.name, max: welder.maxLayers }),
+      message: t('busbar.issue.welderLayers', { layers, welder: welder.name, max: welder.maxLayers }),
       stripIds: [],
     });
   }
@@ -382,32 +382,32 @@ export function analyzeLamelle(
     thicknessProblem = true;
     issues.push({
       severity: 'warning',
-      message: t('lamelle.issue.welderThickness', { total: len(totalThicknessMm, 2), max: len(welder.maxThicknessMm, 2), welder: welder.name }),
+      message: t('busbar.issue.welderThickness', { total: len(totalThicknessMm, 2), max: len(welder.maxThicknessMm, 2), welder: welder.name }),
       stripIds: [],
     });
   }
   if (material.weldability === 'poor') {
     issues.push({
       severity: 'warning',
-      message: t('lamelle.issue.weldPoor', { material: material.name, note: material.note }),
+      message: t('busbar.issue.weldPoor', { material: material.name, note: material.note }),
       stripIds: [],
     });
   } else if (material.weldability === 'fair') {
     issues.push({
       severity: 'info',
-      message: t('lamelle.issue.weldFair', { material: material.name }),
+      message: t('busbar.issue.weldFair', { material: material.name }),
       stripIds: [],
     });
   }
   const fixedSpots = settings.spotsPerTerminal !== null;
   for (const r of reports) {
-    const where = t('lamelle.where', { strip: r.label, face: faceName(r.face) });
+    const where = t('busbar.where', { strip: r.label, face: faceName(r.face) });
     if (r.spotCapacity < r.spotsNeeded) {
       // says why: what the weld area is like and how much is needed for the wanted spots
       const need = minRadiusForSpots(r.spotsNeeded, welder.spotDiameterMm, welder.spotSpacingMm);
       const needR = Math.ceil(need * 10) / 10;
       const how = Number.isFinite(need)
-        ? t('lamelle.issue.spotsHow', {
+        ? t('busbar.issue.spotsHow', {
             radius: len(r.contactRadiusMm, 1),
             diameter: len(2 * r.contactRadiusMm, 1),
             count: r.spotsNeeded,
@@ -420,8 +420,8 @@ export function analyzeLamelle(
       issues.push({
         severity: 'error',
         message: fixedSpots
-          ? t('lamelle.issue.spotsChosen', { where, count: r.spotsNeeded, capacity: r.spotCapacity, how })
-          : t('lamelle.issue.spotsNeeded', {
+          ? t('busbar.issue.spotsChosen', { where, count: r.spotsNeeded, capacity: r.spotCapacity, how })
+          : t('busbar.issue.spotsNeeded', {
               where,
               count: r.spotsForCurrent,
               cell: fmt(r.cellCurrentA, 1),
@@ -434,7 +434,7 @@ export function analyzeLamelle(
     } else if (fixedSpots && r.spotsNeeded < r.spotsForCurrent) {
       issues.push({
         severity: 'error',
-        message: t('lamelle.issue.spotsWeak', {
+        message: t('busbar.issue.spotsWeak', {
           where,
           count: r.spotsNeeded,
           carry: fmt(r.spotsCarryA, 0),
@@ -452,7 +452,7 @@ export function analyzeLamelle(
     if (s.partial) {
       issues.push({
         severity: 'warning',
-        message: t('lamelle.issue.partial', { strip: s.label, face: faceName(s.face) }),
+        message: t('busbar.issue.partial', { strip: s.label, face: faceName(s.face) }),
         stripIds: [s.id],
       });
     }
@@ -463,13 +463,13 @@ export function analyzeLamelle(
       for (let j = i + 1; j < list.length; j++) {
         const d = regionDistance(list[i]!, list[j]!);
         const pair = [list[i]!.id, list[j]!.id];
-        const names = t('lamelle.names', { a: list[i]!.label, b: list[j]!.label, face: faceName(face) });
+        const names = t('busbar.names', { a: list[i]!.label, b: list[j]!.label, face: faceName(face) });
         if (d <= 0) {
-          issues.push({ severity: 'error', message: t('lamelle.issue.touch', { names }), stripIds: pair });
+          issues.push({ severity: 'error', message: t('busbar.issue.touch', { names }), stripIds: pair });
         } else if (d < cutter.minGapMm) {
           issues.push({
             severity: 'warning',
-            message: t('lamelle.issue.gap', { names, gap: len(d, 1), min: len(cutter.minGapMm, 1), cutter: cutter.name }),
+            message: t('busbar.issue.gap', { names, gap: len(d, 1), min: len(cutter.minGapMm, 1), cutter: cutter.name }),
             stripIds: pair,
           });
         }
@@ -480,7 +480,7 @@ export function analyzeLamelle(
   // A tab over a cell of another joint would short it (if it touches another strip the check above already says so).
   for (const s of strips) {
     if (tabsOf(s).some((tb) => tb.blockedBy === 'cell')) {
-      issues.push({ severity: 'warning', message: t('lamelle.issue.tabCell', { strip: s.label, face: faceName(s.face) }), stripIds: [s.id] });
+      issues.push({ severity: 'warning', message: t('busbar.issue.tabCell', { strip: s.label, face: faceName(s.face) }), stripIds: [s.id] });
     }
   }
 
@@ -489,21 +489,21 @@ export function analyzeLamelle(
     for (let l = Math.max(2, layers + 1); l <= welder.maxLayers; l++) {
       const th = smallestThickness(material, l, requiredMm);
       if (th !== null && th * l <= welder.maxThicknessMm + 1e-9) {
-        alternatives.push(t('lamelle.alt.layers', { layers: l, material: material.name, thickness: len(th, 2) }));
+        alternatives.push(t('busbar.alt.layers', { layers: l, material: material.name, thickness: len(th, 2) }));
         break;
       }
     }
-    for (const m of LAMELLA_MATERIALS) {
+    for (const m of BUSBAR_MATERIALS) {
       if (m.id === material.id) continue;
       const need = worstRequiredMm(strips, m, settings, currentA);
       const th = smallestThickness(m, 1, need);
       if (th !== null && th <= welder.maxThicknessMm + 1e-9) {
-        const note = m.weldability === 'poor' ? t('lamelle.alt.noteWeldPoor') : m.weldability === 'fair' ? t('lamelle.alt.noteWeldFair') : '';
-        alternatives.push(t('lamelle.alt.material', { material: m.name, thickness: len(th, 2), note }));
+        const note = m.weldability === 'poor' ? t('busbar.alt.noteWeldPoor') : m.weldability === 'fair' ? t('busbar.alt.noteWeldFair') : '';
+        alternatives.push(t('busbar.alt.material', { material: m.name, thickness: len(th, 2), note }));
       }
     }
-    alternatives.push(t('lamelle.alt.twoLevel'));
-    alternatives.push(t('lamelle.alt.lowerCurrent', { delta: tempDelta(settings.deltaTK, 0) }));
+    alternatives.push(t('busbar.alt.twoLevel'));
+    alternatives.push(t('busbar.alt.lowerCurrent', { delta: tempDelta(settings.deltaTK, 0) }));
   }
 
   const totalAreaMm2 = strips.reduce((a, s) => a + s.areaMm2, 0);

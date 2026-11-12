@@ -12,9 +12,9 @@
   import { ui } from './ui.svelte';
 
   const project = $derived($history.present);
-  const ntcPlan = $derived(ntcPlanOf(project, ui.lamella, ui.holder));
+  const ntcPlan = $derived(ntcPlanOf(project, ui.busbar, ui.holder));
   const ntcSite = $derived(ntcPlan.site);
-  const wireExits = $derived(wireExitsOf(project, ui.lamella, ui.holder));
+  const wireExits = $derived(wireExitsOf(project, ui.busbar, ui.holder));
   const built = $derived(holderOf(project, ui.holder));
   const model = $derived(built.model);
   const report = $derived(built.report);
@@ -152,7 +152,7 @@
   {#if bmsOf(project)}
   <section class="sec">
     <h3><Icon name="ruler" /> {t('hold.wireHolesSection')}</h3>
-    <label><span><input type="checkbox" bind:checked={ui.holder.wireHoles} onchange={() => { if (ui.holder.wireHoles) ui.lamella.tabs = false; }} /> {t('hold.wireHoles')}</span></label>
+    <label><span><input type="checkbox" bind:checked={ui.holder.wireHoles} onchange={() => { if (ui.holder.wireHoles) ui.busbar.tabs = false; }} /> {t('hold.wireHoles')}</span></label>
     {#if ui.holder.wireHoles}
       <p class="note">{t('hold.wireHolesNote', { n: wireExits.filter((e) => e.hole).length })}</p>
       {#if wireExits.some((e) => (e.bossMm ?? 0) > 0)}<p class="note">{t('hold.wireHolesBoss', { n: wireExits.filter((e) => (e.bossMm ?? 0) > 0).length })}</p>{/if}

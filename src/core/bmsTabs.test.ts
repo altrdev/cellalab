@@ -5,7 +5,7 @@ import { buildDxf } from './dxf';
 import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { buildHarness } from './harness';
 import { tabNotches } from './tabNotches';
-import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './busbar';
+import { analyzeBusbars, DEFAULT_BUSBAR_SETTINGS, stripOptionsOf } from './busbar';
 import { holeForWireMm, powerAmpacityA, powerAwgFor } from './wire';
 import { buildSvg } from './busbarExport';
 import { buildStrips } from './strips';
@@ -154,7 +154,7 @@ describe('holes from the wire gauges', () => {
   it('the hole of the series tabs follows the AWG of the balance wire', () => {
     expect(holeForWireMm(26)).toBe(1.21);
     expect(holeForWireMm(12)).toBe(2.85);
-    expect(stripOptionsOf({ ...DEFAULT_LAMELLA_SETTINGS, balanceAwg: 22 }).tabs?.holeMm).toBe(1.44);
+    expect(stripOptionsOf({ ...DEFAULT_BUSBAR_SETTINGS, balanceAwg: 22 }).tabs?.holeMm).toBe(1.44);
   });
 });
 
@@ -172,7 +172,7 @@ describe('power cables', () => {
   it('the report warns if the cable cannot carry the design current', () => {
     const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
     const strips = buildStrips(p, {});
-    const warn = (awg: number) => analyzeLamelle(p, strips, { ...DEFAULT_LAMELLA_SETTINGS, powerAwg: awg }, 30).issues.some((i) => i.message.includes(`AWG ${awg}`) && i.message.includes('30'));
+    const warn = (awg: number) => analyzeBusbars(p, strips, { ...DEFAULT_BUSBAR_SETTINGS, powerAwg: awg }, 30).issues.some((i) => i.message.includes(`AWG ${awg}`) && i.message.includes('30'));
     expect(warn(16)).toBe(true);
     expect(warn(12)).toBe(true);
     expect(warn(10)).toBe(false); // regge 30 A
@@ -181,8 +181,8 @@ describe('power cables', () => {
 
 describe('optional power tabs', () => {
   const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
-  const withTabs = (over: Partial<typeof DEFAULT_LAMELLA_SETTINGS>, wireHoles = false) => {
-    const o = stripOptionsOf({ ...DEFAULT_LAMELLA_SETTINGS, ...over }, wireHoles);
+  const withTabs = (over: Partial<typeof DEFAULT_BUSBAR_SETTINGS>, wireHoles = false) => {
+    const o = stripOptionsOf({ ...DEFAULT_BUSBAR_SETTINGS, ...over }, wireHoles);
     return { o, strips: buildStrips(p, o) };
   };
 

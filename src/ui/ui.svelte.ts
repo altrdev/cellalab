@@ -3,13 +3,13 @@ import { loadLocale, saveLocale, setLocale, type Locale } from '../i18n';
 import { getPrefs, setPrefs, type Prefs } from '../prefs';
 import { getTheme, setTheme, type Theme } from '../theme';
 import type { HolderSettings } from '../core/holder';
-import type { LamellaSettings } from '../core/busbar';
+import type { BusbarSettings } from '../core/busbar';
 import type { LatticeKind } from '../core/lattice';
 import type { Face } from '../core/strips';
 import type { Project } from '../core/types';
 import { bindHolderCuts, loadHolderSettings, loadHolderView, type HolderView } from './holder';
 import { bindHolderSettings, holderCutsOf } from './busbar';
-import { loadLamellaSettings } from './busbarSettings';
+import { loadBusbarSettings } from './busbarSettings';
 
 export type ViewMode = 'draw' | 'split' | '3d';
 export type Tool = 'select' | 'add' | 'series';
@@ -76,7 +76,7 @@ class UiState {
   dxfReferences = $state(false);
   /** Opacity of the strips drawing in 2D (0.2–1). */
   stripOpacity = $state(0.85);
-  lamella = $state<LamellaSettings>(loadLamellaSettings());
+  busbar = $state<BusbarSettings>(loadBusbarSettings());
   /** Draws the holder (dark outline around the cells). */
   showHolder = $state(true);
   holder = $state<HolderSettings>(loadHolderSettings());
@@ -137,4 +137,4 @@ class UiState {
 
 export const ui = new UiState();
 bindHolderSettings(() => ui.holder);
-bindHolderCuts((project, settings) => holderCutsOf(project, ui.lamella, settings));
+bindHolderCuts((project, settings) => holderCutsOf(project, ui.busbar, settings));

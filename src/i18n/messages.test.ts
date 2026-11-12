@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS } from '../core/busbar';
+import { analyzeBusbars, DEFAULT_BUSBAR_SETTINGS } from '../core/busbar';
 import { buildCutSummary } from '../core/busbarExport';
 import { runDrc } from '../core/drc';
 import { buildHolder, analyzeHolder, DEFAULT_HOLDER_SETTINGS } from '../core/holder';
@@ -38,7 +38,7 @@ describe('messages in English', () => {
     const p = pack(4, 3);
     const strips = buildStrips(p);
     setLocale('en');
-    const r = analyzeLamelle(p, strips, { ...DEFAULT_LAMELLA_SETTINGS, thicknessMm: 0.1 }, 90);
+    const r = analyzeBusbars(p, strips, { ...DEFAULT_BUSBAR_SETTINGS, thicknessMm: 0.1 }, 90);
     const text = r.issues.map((i) => i.message).join(' ');
     expect(text).toMatch(/Thickness|thickness/);
     expect(text).not.toMatch(/Spessore|lamella/);
@@ -67,7 +67,7 @@ describe('messages in English', () => {
   it('cut summary, file read errors and default name', () => {
     const p = pack(4, 3);
     const strips = buildStrips(p);
-    const report = analyzeLamelle(p, strips, DEFAULT_LAMELLA_SETTINGS, 30);
+    const report = analyzeBusbars(p, strips, DEFAULT_BUSBAR_SETTINGS, 30);
     setLocale('en');
     const summary = buildCutSummary(report, 'My pack');
     expect(summary).toMatch(/Busbars - My pack/);
@@ -82,7 +82,7 @@ describe('messages with the chosen units', () => {
     const p = pack(4, 3);
     const strips = buildStrips(p);
     setPrefs({ length: 'in', temp: 'F' });
-    const r = analyzeLamelle(p, strips, { ...DEFAULT_LAMELLA_SETTINGS, thicknessMm: 0.1 }, 90);
+    const r = analyzeBusbars(p, strips, { ...DEFAULT_BUSBAR_SETTINGS, thicknessMm: 0.1 }, 90);
     const text = r.issues.map((i) => i.message).join(' ');
     expect(text).toMatch(/\d,\d+ in\b/);
     expect(text).toMatch(/°F/);
@@ -111,7 +111,7 @@ describe('messages with the chosen units', () => {
 describe('language change with the interface open', () => {
   it('the cached strip report is recomputed in the new language', () => {
     const p = pack(4, 3);
-    const settings = { ...DEFAULT_LAMELLA_SETTINGS, layers: 5 }; // more layers than the welder can weld
+    const settings = { ...DEFAULT_BUSBAR_SETTINGS, layers: 5 }; // more layers than the welder can weld
     const itText = reportOf(p, settings).issues.map((i) => i.message).join(' ');
     expect(itText).toMatch(/strati/);
     setLocale('en');

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bmsOf } from '../core/bms';
 import { generateGrid } from '../core/layout';
-import { DEFAULT_LAMELLA_SETTINGS } from '../core/busbar';
+import { DEFAULT_BUSBAR_SETTINGS } from '../core/busbar';
 import { replaceCells, setBms } from '../core/ops';
 import { createProject } from '../core/project';
 import { buildStrips } from '../core/strips';
@@ -18,24 +18,24 @@ describe('tab sides', () => {
   it('in a column pack left and right are blocked, top and bottom free', () => {
     const p = pack(4, 3);
     expect(bmsOf(p)).toBeDefined();
-    expect(freeTabSides(p, DEFAULT_LAMELLA_SETTINGS)).toEqual({ top: true, bottom: true, left: false, right: false });
+    expect(freeTabSides(p, DEFAULT_BUSBAR_SETTINGS)).toEqual({ top: true, bottom: true, left: false, right: false });
   });
 
   it('automatic picks the first free side; the side chosen by hand stays', () => {
     const p = pack(4, 3);
-    expect(tabSideOf(p, DEFAULT_LAMELLA_SETTINGS)).toBe('top');
-    expect(tabSideOf(p, { ...DEFAULT_LAMELLA_SETTINGS, tabSide: 'left' })).toBe('left');
+    expect(tabSideOf(p, DEFAULT_BUSBAR_SETTINGS)).toBe('top');
+    expect(tabSideOf(p, { ...DEFAULT_BUSBAR_SETTINGS, tabSide: 'left' })).toBe('left');
   });
 
   it('without a BMS all the sides are free', () => {
     const p = replaceCells(createProject(), generateGrid({ typeId: '21700-5000-10a', diameterMm: 21.4, series: 4, parallel: 3, kind: 'hex', gapMm: 1 }));
-    expect(Object.values(freeTabSides(p, DEFAULT_LAMELLA_SETTINGS))).toEqual([true, true, true, true]);
+    expect(Object.values(freeTabSides(p, DEFAULT_BUSBAR_SETTINGS))).toEqual([true, true, true, true]);
   });
 });
 
 describe('NTC under the strips', () => {
   const p = pack(4, 3);
-  const plan = ntcPlanOf(p, DEFAULT_LAMELLA_SETTINGS, DEFAULT_HOLDER_SETTINGS);
+  const plan = ntcPlanOf(p, DEFAULT_BUSBAR_SETTINGS, DEFAULT_HOLDER_SETTINGS);
   const strips = buildStrips(p, { tabs: { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.2, bendMm: 0.3 } });
 
   it('there is a gap for the sensor', () => {
@@ -49,7 +49,7 @@ describe('NTC under the strips', () => {
   });
 
   it('stripsOf uses the same sides', () => {
-    expect(stripsOf(p, DEFAULT_LAMELLA_SETTINGS).some((s) => s.tab)).toBe(true);
+    expect(stripsOf(p, DEFAULT_BUSBAR_SETTINGS).some((s) => s.tab)).toBe(true);
   });
 });
 
@@ -65,11 +65,11 @@ describe('NTC settings in the holder', () => {
 describe('grooves only where the tabs pass', () => {
   const p = pack(4, 3);
   bindHolderSettings(() => DEFAULT_HOLDER_SETTINGS);
-  bindHolderCuts((pr, st) => holderCutsOf(pr, DEFAULT_LAMELLA_SETTINGS, st));
+  bindHolderCuts((pr, st) => holderCutsOf(pr, DEFAULT_BUSBAR_SETTINGS, st));
   const area = (m: { wall: { outline: { x: number; y: number }[]; holes: { x: number; y: number }[][] }[] }) => m.wall.reduce((a, r) => a + regionArea(r), 0);
 
   it('the plate without tabs has no grooves', () => {
-    const strips = stripsOf(p, DEFAULT_LAMELLA_SETTINGS);
+    const strips = stripsOf(p, DEFAULT_BUSBAR_SETTINGS);
     const facesWithTabs = new Set(strips.flatMap((st) => (tabsOf(st).length > 0 ? [st.face] : [])));
     const { model } = holderOf(p, DEFAULT_HOLDER_SETTINGS);
     expect(model).not.toBeNull();

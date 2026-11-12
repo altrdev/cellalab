@@ -4,7 +4,7 @@ import { getPrefs } from '../prefs';
 import { area, len, lenDigits, lenLabel, massSmall, toLen } from '../units';
 import { labelPlacements } from './dxf';
 import type { Pt } from './polygon';
-import type { LamellaReport } from './busbar';
+import type { BusbarReport } from './busbar';
 import { spotPositions } from './sizing';
 import { tabsOf, type Face, type Strip } from './strips';
 
@@ -89,7 +89,7 @@ const lenCsv = (mm: number | null, d: number) => (mm === null ? '' : toLen(mm).t
 const areaCsv = (mm2: number) => (getPrefs().length === 'in' ? (mm2 / 645.16).toFixed(3) : mm2.toFixed(0));
 
 /** Cut list as CSV (separator ';', decimals with a dot). */
-export function buildCutListCsv(strips: readonly Strip[], report: LamellaReport): string {
+export function buildCutListCsv(strips: readonly Strip[], report: BusbarReport): string {
   const rows = [t('export.csv.header', { a: getPrefs().length === 'in' ? 'in2' : 'mm2', l: lenLabel() })];
   for (const s of strips) {
     const r = report.strips.find((x) => x.stripId === s.id);
@@ -110,7 +110,7 @@ export function buildCutListCsv(strips: readonly Strip[], report: LamellaReport)
 }
 
 /** Readable summary to print with the template. */
-export function buildCutSummary(report: LamellaReport, projectName: string): string {
+export function buildCutSummary(report: BusbarReport, projectName: string): string {
   const th = report.thicknessMm;
   const thickness =
     th === null

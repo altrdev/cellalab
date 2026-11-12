@@ -7,7 +7,7 @@
   import PackBar from './ui/PackBar.svelte';
   import Toolbar from './ui/Toolbar.svelte';
   import { saveHolderSettings, saveHolderView } from './ui/holder';
-  import { saveLamellaSettings } from './ui/busbarSettings';
+  import { saveBusbarSettings } from './ui/busbarSettings';
   import { ui } from './ui/ui.svelte';
 
   // The page title and language follow the chosen language.
@@ -18,7 +18,7 @@
 
   // The busbar settings are remembered in the browser.
   $effect(() => {
-    saveLamellaSettings($state.snapshot(ui.lamella));
+    saveBusbarSettings($state.snapshot(ui.busbar));
   });
 
   $effect(() => {

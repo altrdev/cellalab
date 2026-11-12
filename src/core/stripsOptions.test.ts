@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateGrid } from './layout';
 import { replaceCells } from './ops';
 import { createProject } from './project';
-import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS } from './busbar';
+import { analyzeBusbars, DEFAULT_BUSBAR_SETTINGS } from './busbar';
 import { buildStrips } from './strips';
 
 const project = () =>
@@ -48,7 +48,7 @@ describe('strip shape', () => {
   });
   it("the neck is the band width and the analysis divides the current among the cells in parallel (I/P)", () => {
     const strips = buildStrips(p, { widthMm: 8 });
-    const r = analyzeLamelle(p, strips, DEFAULT_LAMELLA_SETTINGS, 30);
+    const r = analyzeBusbars(p, strips, DEFAULT_BUSBAR_SETTINGS, 30);
     const row = r.strips.find((x) => x.label.startsWith('S'))!;
     expect(row.neckMm).toBeCloseTo(8);
     expect(row.neckCurrentA).toBeCloseTo(30 / 2); // P = 2

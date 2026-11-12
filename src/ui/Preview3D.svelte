@@ -38,8 +38,8 @@
   // Redraws at every change of the pack, the selection or the panel controls.
   $effect(() => {
     const project = $history.present;
-    const strips = showBus ? stripsOf(project, ui.lamella) : null;
-    const report = showBus ? reportOf(project, ui.lamella) : null;
+    const strips = showBus ? stripsOf(project, ui.busbar) : null;
+    const report = showBus ? reportOf(project, ui.busbar) : null;
     scene?.update(project, {
       explosionMm: explosion,
       showCells,
@@ -52,7 +52,7 @@
       holderTop: ui.holderView.showTop,
       holderBottom: ui.holderView.showBottom,
       holderColor: ui.holderView.color,
-      harness: showHarness && showBus ? harnessOf(project, ui.lamella) : null,
+      harness: showHarness && showBus ? harnessOf(project, ui.busbar) : null,
     });
   });
 

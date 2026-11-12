@@ -13,7 +13,7 @@
   const project = $derived($history.present);
   const bms = $derived(bmsOf(project));
   const mount = $derived(bmsMountOf(project));
-  const fitIssues = $derived(bmsFitIssues(project, ui.lamella));
+  const fitIssues = $derived(bmsFitIssues(project, ui.busbar));
   const isCustom = $derived(bms !== undefined && (project.customBmsTypes ?? []).some((b) => b.id === bms.id));
 
   const blank = (): BmsDraft => ({ name: '', minSeries: 13, maxSeries: 13, maxCurrentA: 30, chemistry: 'li-ion', ntc: true, lengthMm: 0, widthMm: 0, thicknessMm: 0 });

@@ -11,7 +11,7 @@ import { t } from '../i18n';
 /** How easy it is to spot-weld the material with a hobby welder. */
 export type Weldability = 'good' | 'fair' | 'poor';
 
-export interface LamellaMaterial {
+export interface BusbarMaterial {
   id: string;
   name: string;
   /** Resistivity at 20 °C, Ω·m. */
@@ -31,7 +31,7 @@ export interface LamellaMaterial {
   colorHex: string;
 }
 
-export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
+export const BUSBAR_MATERIALS: readonly BusbarMaterial[] = [
   {
     id: 'nichel-puro',
     colorHex: '#c4c7ca',
@@ -136,16 +136,16 @@ export const LAMELLA_MATERIALS: readonly LamellaMaterial[] = [
   },
 ];
 
-export function findMaterial(id: string): LamellaMaterial | undefined {
-  return LAMELLA_MATERIALS.find((m) => m.id === id);
+export function findMaterial(id: string): BusbarMaterial | undefined {
+  return BUSBAR_MATERIALS.find((m) => m.id === id);
 }
 
 /** Resistivity at temperature `tempC` (linear model). */
-export function resistivityAt(m: LamellaMaterial, tempC: number): number {
+export function resistivityAt(m: BusbarMaterial, tempC: number): number {
   return m.resistivityOhmM * (1 + m.tempCoeffPerK * (tempC - 20));
 }
 
 /** Volumetric heat capacity, J/(m³·K). */
-export function volumetricHeat(m: LamellaMaterial): number {
+export function volumetricHeat(m: BusbarMaterial): number {
   return m.densityKgM3 * m.specificHeatJKgK;
 }

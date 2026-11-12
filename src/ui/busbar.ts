@@ -1,7 +1,7 @@
 import { renderKey, t } from '../i18n';
 import { len } from '../units';
 import type { StripOptions } from '../core/strips';
-import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf, type LamellaReport, type LamellaSettings } from '../core/busbar';
+import { analyzeBusbars, DEFAULT_BUSBAR_SETTINGS, stripOptionsOf, type BusbarReport, type BusbarSettings } from '../core/busbar';
 import type { Pt } from '../core/polygon';
 import { spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
@@ -29,7 +29,7 @@ export function bindHolderSettings(get: () => HolderSettings): void {
   holderSettings = get;
 }
 
-export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
+export function stripsOf(project: Project, settings: BusbarSettings): Strip[] {
   const opts = optionsOf(project, settings);
   const hs = opts.tabs && project.bmsId !== undefined ? holderSettings() : null;
   const key = JSON.stringify(opts) + (hs ? JSON.stringify(hs) : '');
@@ -62,7 +62,7 @@ const exitCache = new WeakMap<Project, { key: string; exits: WireExit[] }>();
  * Wire exits from the holder (only with holes in place of the balance tabs): for each joint the
  * solder point on the strip and the hole next to it. Empty if the option is off or there are tabs.
  */
-export function wireExitsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): WireExit[] {
+export function wireExitsOf(project: Project, settings: BusbarSettings, holder: HolderSettings): WireExit[] {
   if (settings.tabs || !bmsOf(project)) return []; // with tabs the wire starts from there
   const key = JSON.stringify([settings, holder]);
   const hit = exitCache.get(project);
@@ -82,7 +82,7 @@ export function wireExitsOf(project: Project, settings: LamellaSettings, holder:
  * The NTC place (if there is a BMS with NTC, the pocket is on and there is a gap between three cells). Prefers the gaps where the
  * wire hole does not end up under a strip of any face: for the strips it uses the shape without holder, which is enough here.
  */
-export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: HolderSettings): NtcPlan {
+export function ntcPlanOf(project: Project, settings: BusbarSettings, holder: HolderSettings): NtcPlan {
   if (!holder.ntc || !bmsOf(project)?.ntc) return { site: null };
   const side = tabSideOf(project, settings);
   const opts = optionsOf(project, settings);
@@ -100,7 +100,7 @@ export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: H
  * with its wire hole. The grooves come from the strips without holder, because the position of the
  * tabs does not depend on it. Used by `holderOf`.
  */
-export function holderCutsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): HolderCuts {
+export function holderCutsOf(project: Project, settings: BusbarSettings, holder: HolderSettings): HolderCuts {
   if (project.bmsId === undefined) return NO_CUTS;
   const opts = optionsOf(project, settings);
   const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg, holder.ntc, holder.ntcMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm, holder.wireHoles, settings.tabs, settings.tabSide]);
@@ -130,7 +130,7 @@ const blocksCache = new WeakMap<Project, { key: string; blocks: Record<TabSide, 
  * For each side, how many tabs would pass over other cells or strips (with the current holder, without grooves).
  * Used by the menu not to offer impossible sides and by the automatic choice.
  */
-function tabBlocks(project: Project, settings: LamellaSettings): Record<TabSide, number> {
+function tabBlocks(project: Project, settings: BusbarSettings): Record<TabSide, number> {
   const none: Record<TabSide, number> = { top: 0, bottom: 0, left: 0, right: 0 };
   const opts = stripOptionsOf(settings, holderSettings().wireHoles);
   if (!opts.tabs || project.bmsId === undefined) return none;
@@ -149,26 +149,26 @@ function tabBlocks(project: Project, settings: LamellaSettings): Record<TabSide,
 }
 
 /** Sides from which all the tabs exit freely. */
-export function freeTabSides(project: Project, settings: LamellaSettings): Record<TabSide, boolean> {
+export function freeTabSides(project: Project, settings: BusbarSettings): Record<TabSide, boolean> {
   const b = tabBlocks(project, settings);
   return { top: b.top === 0, bottom: b.bottom === 0, left: b.left === 0, right: b.right === 0 };
 }
 
 /** The side used: the chosen one, or automatically the first free one (top, bottom, left, right), otherwise the least obstructed. */
-export function tabSideOf(project: Project, settings: LamellaSettings): TabSide {
+export function tabSideOf(project: Project, settings: BusbarSettings): TabSide {
   if (settings.tabSide !== 'auto') return settings.tabSide;
   const b = tabBlocks(project, settings);
   return TAB_SIDES.reduce((best, s) => (b[s] < b[best] ? s : best), TAB_SIDES[0]!);
 }
 
 /** Strip shape options with the tab side already resolved. */
-function optionsOf(project: Project, settings: LamellaSettings): StripOptions {
+function optionsOf(project: Project, settings: BusbarSettings): StripOptions {
   const o = stripOptionsOf(settings, holderSettings().wireHoles);
   return o.tabs ? { ...o, tabs: { ...o.tabs, side: tabSideOf(project, settings) } } : o;
 }
 
 /** Warnings about the BMS board footprint: if it is larger than the space it has on the pack, it sticks out. */
-export function bmsFitIssues(project: Project, settings: LamellaSettings): { severity: 'warning'; message: string; cellIds: string[] }[] {
+export function bmsFitIssues(project: Project, settings: BusbarSettings): { severity: 'warning'; message: string; cellIds: string[] }[] {
   const fit = harnessOf(project, settings)?.fit;
   if (!fit) return [];
   const out: { severity: 'warning'; message: string; cellIds: string[] }[] = [];
@@ -187,19 +187,19 @@ export function bmsFitIssues(project: Project, settings: LamellaSettings): { sev
 }
 
 /** BMS harness (position and length of the wires), with the strip thickness seen in the scene. */
-export function harnessOf(project: Project, settings: LamellaSettings): Harness | null {
+export function harnessOf(project: Project, settings: BusbarSettings): Harness | null {
   if (project.bmsId === undefined) return null;
   const report = reportOf(project, settings);
   return buildHarness(project, stripsOf(project, settings), Math.max(0.3, report.totalThicknessMm ?? report.requiredMm ?? 0.3));
 }
 
-let last: { project: Project; key: string; report: LamellaReport } | null = null;
+let last: { project: Project; key: string; report: BusbarReport } | null = null;
 
-export function reportOf(project: Project, settings: LamellaSettings): LamellaReport {
+export function reportOf(project: Project, settings: BusbarSettings): BusbarReport {
   const key = renderKey() + JSON.stringify(settings); // the report messages depend on language and units
   if (last && last.project === project && last.key === key) return last.report;
   const packCurrentA = computeStats(project).maxCurrentA ?? 0;
-  const report = analyzeLamelle(project, stripsOf(project, settings), settings, packCurrentA);
+  const report = analyzeBusbars(project, stripsOf(project, settings), settings, packCurrentA);
   last = { project, key, report };
   return report;
 }

@@ -19,14 +19,14 @@ export function createProject(name = t('project.defaultName')): Project {
  * to be written. Whoever reads them cleans them up: here they are opaque.
  */
 export interface ProjectSettings {
-  lamella?: unknown;
+  busbar?: unknown;
   holder?: unknown;
 }
 
 export function serializeProject(project: Project, settings?: ProjectSettings): string {
   const out: Record<string, unknown> = { ...project };
-  if (settings && (settings.lamella !== undefined || settings.holder !== undefined)) {
-    out.settings = { ...(settings.lamella !== undefined && { lamella: settings.lamella }), ...(settings.holder !== undefined && { holder: settings.holder }) };
+  if (settings && (settings.busbar !== undefined || settings.holder !== undefined)) {
+    out.settings = { ...(settings.busbar !== undefined && { busbar: settings.busbar }), ...(settings.holder !== undefined && { holder: settings.holder }) };
   }
   return JSON.stringify(out, null, 2);
 }
@@ -37,7 +37,7 @@ export function parseProjectSettings(json: string): ProjectSettings {
     const raw: unknown = JSON.parse(json);
     if (!isObj(raw) || !isObj(raw.settings)) return {};
     const out: ProjectSettings = {};
-    if (isObj(raw.settings.lamella)) out.lamella = raw.settings.lamella;
+    if (isObj(raw.settings.busbar)) out.busbar = raw.settings.busbar;
     if (isObj(raw.settings.holder)) out.holder = raw.settings.holder;
     return out;
   } catch {

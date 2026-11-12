@@ -90,7 +90,7 @@ describe('field labels', () => {
     expect(t('side.gap')).toContain('(mm)');
     use({ length: 'in', temp: 'F', weight: 'imperial', currency: 'USD' });
     expect(t('side.gap')).toContain('(in)');
-    expect(t('lam.ambient')).toContain('(°F)');
+    expect(t('busbarPanel.ambient')).toContain('(°F)');
     expect(t('side.draft.weight')).toContain('(oz)');
     expect(t('side.draft.price')).toContain('($/');
   });

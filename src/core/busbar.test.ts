@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, worstRequiredMm, type LamellaSettings } from './busbar';
+import { analyzeBusbars, DEFAULT_BUSBAR_SETTINGS, worstRequiredMm, type BusbarSettings } from './busbar';
 import { generateGrid } from './layout';
 import { findMaterial } from './materials';
 import { replaceCells } from './ops';
@@ -17,18 +17,18 @@ function squeezed(series: number, parallel: number, fx: number, widthMm = 14) {
   const project = { ...base, cells: base.cells.map((c) => ({ ...c, x: c.x * fx })) };
   return { project, strips: buildStrips(project, { widthMm }) };
 }
-const cfg = (over: Partial<LamellaSettings> = {}): LamellaSettings => ({ ...DEFAULT_LAMELLA_SETTINGS, ...over });
+const cfg = (over: Partial<BusbarSettings> = {}): BusbarSettings => ({ ...DEFAULT_BUSBAR_SETTINGS, ...over });
 
-describe('analyzeLamelle', () => {
+describe('analyzeBusbars', () => {
   it('without strips: "empty" state with a hint', () => {
-    const r = analyzeLamelle(createProject(), [], cfg(), 20);
+    const r = analyzeBusbars(createProject(), [], cfg(), 20);
     expect(r.status).toBe('empty');
     expect(r.issues[0]!.severity).toBe('info');
   });
 
   it('low current: the thinnest nickel thickness is enough and the pack is ok', () => {
     const { project, strips } = setup(4, 3);
-    const r = analyzeLamelle(project, strips, cfg(), 5);
+    const r = analyzeBusbars(project, strips, cfg(), 5);
     expect(r.currentA).toBe(5);
     expect(r.thicknessMm).toBe(0.1);
     expect(r.status).toBe('ok');
@@ -38,12 +38,12 @@ describe('analyzeLamelle', () => {
 
   it('the design current is the pack current', () => {
     const { project, strips } = setup(4, 3);
-    expect(analyzeLamelle(project, strips, cfg(), 30).currentA).toBe(30);
+    expect(analyzeBusbars(project, strips, cfg(), 30).currentA).toBe(30);
   });
 
   it('high current with nickel and a hobby welder: error, with alternatives', () => {
     const { project, strips } = setup(4, 3);
-    const r = analyzeLamelle(project, strips, cfg(), 150);
+    const r = analyzeBusbars(project, strips, cfg(), 150);
     expect(r.status).toBe('error');
     expect(r.issues.some((i) => /spessore/i.test(i.message))).toBe(true);
     expect(r.alternatives.length).toBeGreaterThan(0);
@@ -54,7 +54,7 @@ describe('analyzeLamelle', () => {
     const cells = generateGrid({ typeId: '18650-3000-10a', diameterMm: 18.4, series: 3, parallel: 2, kind: 'hex', gapMm: 1.5 });
     const project = replaceCells(createProject(), cells);
     const strips = buildStrips(project);
-    const r = analyzeLamelle(project, strips, cfg(), 20);
+    const r = analyzeBusbars(project, strips, cfg(), 20);
     expect(r.status).toBe('ok');
     expect(r.thicknessMm).toBeLessThanOrEqual(0.15);
     // the bands are short (distance between cells minus the contact areas), not infinite
@@ -74,14 +74,14 @@ describe('analyzeLamelle', () => {
     const { project, strips } = setup(4, 3);
     const material = findMaterial('nichel-puro')!;
     const need = worstRequiredMm(strips, material, cfg(), 20);
-    const r = analyzeLamelle(project, strips, cfg({ layers: 2 }), 20);
+    const r = analyzeBusbars(project, strips, cfg({ layers: 2 }), 20);
     expect(r.totalThicknessMm).toBe(r.thicknessMm! * 2);
     expect(r.totalThicknessMm!).toBeGreaterThanOrEqual(need - 1e-9);
   });
 
   it('imposed thickness too thin: error with the expected ΔT', () => {
     const { project, strips } = setup(4, 3);
-    const r = analyzeLamelle(project, strips, cfg({ thicknessMm: 0.1 }), 90);
+    const r = analyzeBusbars(project, strips, cfg({ thicknessMm: 0.1 }), 90);
     expect(r.auto).toBe(false);
     expect(r.status).toBe('error');
     const worst = Math.max(...r.strips.map((s) => s.deltaTK ?? 0));
@@ -90,9 +90,9 @@ describe('analyzeLamelle', () => {
 
   describe('weld spots', () => {
     // 4S3P of 21700: 6 spots fit on the button (2 mm, 3 mm pitch); with 3 cells in parallel the current per cell is I/3
-    const spots = (over: Partial<LamellaSettings>, packA: number) => {
+    const spots = (over: Partial<BusbarSettings>, packA: number) => {
       const { project, strips } = setup(4, 3);
-      const r = analyzeLamelle(project, strips, cfg(over), packA);
+      const r = analyzeBusbars(project, strips, cfg(over), packA);
       return { r, s: r.strips[0]! };
     };
 
@@ -120,7 +120,7 @@ describe('analyzeLamelle', () => {
     it("the message says why 4 spots do not fit: weld area Ø 6 = radius 3", () => {
       const { project } = setup(4, 3);
       const strips = buildStrips(project, { contactDiameterMm: 6 });
-      const r = analyzeLamelle(project, strips, cfg({ spotsPerTerminal: 4, contactDiameterMm: 6 }), 30);
+      const r = analyzeBusbars(project, strips, cfg({ spotsPerTerminal: 4, contactDiameterMm: 6 }), 30);
       const msg = r.issues.find((i) => /hai scelto 4 punti/.test(i.message))!.message;
       expect(msg).toMatch(/raggio 3,0 mm/);
       expect(msg).toMatch(/almeno 3,2/);
@@ -131,7 +131,7 @@ describe('analyzeLamelle', () => {
       const { project } = setup(4, 3);
       const check = (contactDiameterMm: number, marginMm: number) => {
         const strips = buildStrips(project, { contactDiameterMm, marginMm });
-        return analyzeLamelle(project, strips, cfg({ spotsPerTerminal: 4, contactDiameterMm }), 30).strips[0]!.spotCapacity;
+        return analyzeBusbars(project, strips, cfg({ spotsPerTerminal: 4, contactDiameterMm }), 30).strips[0]!.spotCapacity;
       };
       expect(check(7, 1)).toBeGreaterThanOrEqual(4);
       expect(check(7, 4)).toBe(check(7, 1));
@@ -155,19 +155,19 @@ describe('analyzeLamelle', () => {
 
   it('above the welder\'s maximum thickness: warning', () => {
     const { project, strips } = setup(4, 3);
-    const r = analyzeLamelle(project, strips, cfg({ thicknessMm: 0.3 }), 5);
+    const r = analyzeBusbars(project, strips, cfg({ thicknessMm: 0.3 }), 5);
     expect(r.issues.some((i) => i.severity === 'warning' && /saldatrice/.test(i.message))).toBe(true);
   });
 
   it('bare copper: weldability warning', () => {
     const { project, strips } = setup(4, 3);
-    const r = analyzeLamelle(project, strips, cfg({ materialId: 'rame' }), 5);
+    const r = analyzeBusbars(project, strips, cfg({ materialId: 'rame' }), 5);
     expect(r.issues.some((i) => i.severity === 'warning' && /male/.test(i.message))).toBe(true);
   });
 
   it('weld spots: a lot of current per cell on the small button → capacity error', () => {
     const { project, strips } = setup(4, 1); // P=1: all the current on a single cell
-    const r = analyzeLamelle(project, strips, cfg(), 60);
+    const r = analyzeBusbars(project, strips, cfg(), 60);
     expect(r.issues.some((i) => i.severity === 'error' && /punti/.test(i.message))).toBe(true);
     const plus = r.strips.find((s) => s.spotsNeeded > s.spotCapacity)!;
     expect(plus.cellCurrentA).toBe(60);
@@ -176,23 +176,23 @@ describe('analyzeLamelle', () => {
   it('more cells in parallel → less current per cell and fewer spots needed', () => {
     const a = setup(4, 1);
     const b = setup(4, 4);
-    const ra = analyzeLamelle(a.project, a.strips, cfg(), 20);
-    const rb = analyzeLamelle(b.project, b.strips, cfg(), 20);
+    const ra = analyzeBusbars(a.project, a.strips, cfg(), 20);
+    const rb = analyzeBusbars(b.project, b.strips, cfg(), 20);
     expect(Math.max(...rb.strips.map((s) => s.cellCurrentA))).toBeLessThan(Math.max(...ra.strips.map((s) => s.cellCurrentA)));
   });
 
   it('strips that touch (very close columns): short-circuit error', () => {
     const { project, strips } = squeezed(4, 3, 0.55);
-    const r = analyzeLamelle(project, strips, cfg(), 5);
+    const r = analyzeBusbars(project, strips, cfg(), 5);
     expect(r.issues.some((i) => i.severity === 'error' && /cortocircuito/.test(i.message))).toBe(true);
   });
 
   it('milling cut (minimum 2 mm): warning if the strips are closer than that, without touching', () => {
     const { project, strips } = squeezed(4, 3, 0.7);
-    const cnc = analyzeLamelle(project, strips, cfg({ cutterId: 'cnc' }), 5);
+    const cnc = analyzeBusbars(project, strips, cfg({ cutterId: 'cnc' }), 5);
     expect(cnc.issues.some((i) => i.severity === 'warning' && /distano/.test(i.message))).toBe(true);
     expect(cnc.issues.some((i) => /cortocircuito/.test(i.message))).toBe(false);
-    const manual = analyzeLamelle(project, strips, cfg({ cutterId: 'manual' }), 5);
+    const manual = analyzeBusbars(project, strips, cfg({ cutterId: 'manual' }), 5);
     expect(manual.issues.some((i) => /distano/.test(i.message))).toBe(true); // 0.98 mm < 1 mm even by hand
   });
 

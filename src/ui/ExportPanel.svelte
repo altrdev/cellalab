@@ -16,9 +16,9 @@
   const project = $derived($history.present);
   const empty = $derived(project.cells.length === 0);
 
-  const harness = $derived(harnessOf(project, ui.lamella));
-  const labelOf = $derived(new Map(stripsOf(project, ui.lamella).map((s) => [s.id, s.label] as const)));
-  const stripStatus = $derived(empty ? 'empty' : reportOf(project, ui.lamella).status);
+  const harness = $derived(harnessOf(project, ui.busbar));
+  const labelOf = $derived(new Map(stripsOf(project, ui.busbar).map((s) => [s.id, s.label] as const)));
+  const stripStatus = $derived(empty ? 'empty' : reportOf(project, ui.busbar).status);
   const holderReport = $derived(holderOf(project, ui.holder).report);
   /** Plate too big for the bed: pieces to print and glue. */
   const split = $derived(holderOf(project, ui.holder).split);

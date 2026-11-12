@@ -35,7 +35,7 @@
   import BusbarPanel from './BusbarPanel.svelte';
   import SettingsMenu from './SettingsMenu.svelte';
   import { bmsFitIssues, reportOf } from './busbar';
-  import { sanitizeLamellaSettings } from './busbarSettings';
+  import { sanitizeBusbarSettings } from './busbarSettings';
   import { ui } from './ui.svelte';
 
   const project = $derived($history.present);
@@ -43,7 +43,7 @@
   let showGenericInfo = $state(false);
   /** Pack checks, plus the BMS board footprint (which depends on the position and the wire exit side). */
   type Row = { severity: 'error' | 'warning' | 'info'; message: string; cellIds: string[] };
-  const checkRows = $derived<Row[]>([...$drc, ...bmsFitIssues(project, ui.lamella)]);
+  const checkRows = $derived<Row[]>([...$drc, ...bmsFitIssues(project, ui.busbar)]);
   const sumErrors = $derived(checkRows.filter((i) => i.severity === 'error').length);
   const sumWarnings = $derived(checkRows.filter((i) => i.severity === 'warning').length);
   const sumTone = $derived(sumErrors > 0 ? 'error' : sumWarnings > 0 ? 'warning' : 'ok');
@@ -72,7 +72,7 @@
   ];
   // Dot on the tab when there is something to look at: 'error' red, 'warning' yellow.
   const tabFlag = $derived.by((): Record<Tab, 'error' | 'warning' | null> => {
-    const strips = project.cells.length > 0 ? reportOf(project, ui.lamella).status : 'empty';
+    const strips = project.cells.length > 0 ? reportOf(project, ui.busbar).status : 'empty';
     const issues = holderOf(project, ui.holder).report?.issues ?? [];
     return {
       pack: checkRows.some((i) => i.severity === 'error') ? 'error' : checkRows.some((i) => i.severity === 'warning') ? 'warning' : null,
@@ -290,7 +290,7 @@
       .toLowerCase() || 'pacco';
 
   function download() {
-    const blob = new Blob([serializeProject(project, { lamella: $state.snapshot(ui.lamella), holder: $state.snapshot(ui.holder) })], { type: 'application/json' });
+    const blob = new Blob([serializeProject(project, { busbar: $state.snapshot(ui.busbar), holder: $state.snapshot(ui.holder) })], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -314,13 +314,13 @@
       const saved = parseProjectSettings(text);
       history.reset(opened);
       // strips and holder: the file's settings are used; if there are none the current ones stay
-      if (saved.lamella !== undefined) Object.assign(ui.lamella, sanitizeLamellaSettings(saved.lamella));
+      if (saved.busbar !== undefined) Object.assign(ui.busbar, sanitizeBusbarSettings(saved.busbar));
       if (saved.holder !== undefined) Object.assign(ui.holder, sanitizeHolderSettings(saved.holder));
       ui.selected = new Set();
       ui.fit(history.get().present);
       message = {
         kind: 'ok',
-        text: t(saved.lamella !== undefined || saved.holder !== undefined ? 'side.msg.openedSettings' : 'side.msg.opened', { name: file.name }),
+        text: t(saved.busbar !== undefined || saved.holder !== undefined ? 'side.msg.openedSettings' : 'side.msg.opened', { name: file.name }),
       };
     } catch (err) {
       message = { kind: 'error', text: err instanceof ProjectParseError ? err.message : t('side.err.read') };

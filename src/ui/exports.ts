@@ -33,9 +33,9 @@ function save(content: BlobPart, name: string, type: string) {
 const faceName = (face: 'top' | 'bottom') => t(face === 'top' ? 'face.top' : 'face.bottom');
 
 export function exportDxf(project: Project, face: 'top' | 'bottom') {
-  const report = reportOf(project, ui.lamella);
+  const report = reportOf(project, ui.busbar);
   const spots = new Map(report.strips.map((r) => [r.stripId, r.spotsNeeded]));
-  const dxf = buildDxf(stripsOf(project, ui.lamella), {
+  const dxf = buildDxf(stripsOf(project, ui.busbar), {
     face,
     kerfMm: report.cutter.kerfMm,
     includeContacts: ui.dxfReferences,
@@ -49,9 +49,9 @@ export function exportDxf(project: Project, face: 'top' | 'bottom') {
 }
 
 export function exportSvg(project: Project, face: 'top' | 'bottom') {
-  const report = reportOf(project, ui.lamella);
+  const report = reportOf(project, ui.busbar);
   const spots = new Map(report.strips.map((r) => [r.stripId, r.spotsNeeded]));
-  const svg = buildSvg(stripsOf(project, ui.lamella), {
+  const svg = buildSvg(stripsOf(project, ui.busbar), {
     face,
     kerfMm: report.cutter.kerfMm,
     includeContacts: false,
@@ -64,15 +64,15 @@ export function exportSvg(project: Project, face: 'top' | 'bottom') {
 }
 
 export function exportCutList(project: Project) {
-  const report = reportOf(project, ui.lamella);
-  const text = buildCutSummary(report, project.name) + '\n' + buildCutListCsv(stripsOf(project, ui.lamella), report);
+  const report = reportOf(project, ui.busbar);
+  const text = buildCutSummary(report, project.name) + '\n' + buildCutListCsv(stripsOf(project, ui.busbar), report);
   save(text, `${slug(project.name)}-${t('file.cutList')}.txt`, 'text/plain');
 }
 
 export function exportHarness(project: Project) {
-  const h = harnessOf(project, ui.lamella);
+  const h = harnessOf(project, ui.busbar);
   if (!h) return;
-  const text = buildHarnessSummary(h, project.name) + '\n' + buildHarnessCsv(h, stripsOf(project, ui.lamella));
+  const text = buildHarnessSummary(h, project.name) + '\n' + buildHarnessCsv(h, stripsOf(project, ui.busbar));
   save(text, `${slug(project.name)}-${t('file.harness')}.txt`, 'text/plain');
 }
 

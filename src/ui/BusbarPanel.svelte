@@ -7,7 +7,7 @@
   import { rangeFill } from './rangeFill';
   import { COOLING, type CoolingId } from '../core/sizing';
   import { CUTTER_PROFILES, WELDER_PROFILES } from '../core/profiles';
-  import { LAMELLA_MATERIALS } from '../core/materials';
+  import { BUSBAR_MATERIALS } from '../core/materials';
   import { bmsOf } from '../core/bms';
   import { MIN_PRINT_WALL_MM } from '../core/holder';
   import { BALANCE_AWGS, POWER_AWGS, powerAmpacityA } from '../core/wire';
@@ -16,12 +16,12 @@
   import { ui } from './ui.svelte';
 
   const project = $derived($history.present);
-  const report = $derived(reportOf(project, ui.lamella));
-  const sides = $derived(freeTabSides(project, ui.lamella));
-  const sideName = { top: t('lam.tabSide.top'), bottom: t('lam.tabSide.bottom'), left: t('lam.tabSide.left'), right: t('lam.tabSide.right') } as const;
-  const tabSide = $derived(tabSideOf(project, ui.lamella));
+  const report = $derived(reportOf(project, ui.busbar));
+  const sides = $derived(freeTabSides(project, ui.busbar));
+  const sideName = { top: t('busbarPanel.tabSide.top'), bottom: t('busbarPanel.tabSide.bottom'), left: t('busbarPanel.tabSide.left'), right: t('busbarPanel.tabSide.right') } as const;
+  const tabSide = $derived(tabSideOf(project, ui.busbar));
   const material = $derived(report.material);
-  const weldLabel = { good: t('lam.weld.good'), fair: t('lam.weld.fair'), poor: t('lam.weld.poor') } as const;
+  const weldLabel = { good: t('busbarPanel.weld.good'), fair: t('busbarPanel.weld.fair'), poor: t('busbarPanel.weld.poor') } as const;
   const fmt = (n: number | null, d = 2) => (n === null ? '—' : fmtNum(n, d));
 
   function num(e: Event, min: number, max: number): number | null {
@@ -30,16 +30,16 @@
   }
 
   const PRESETS = [
-    { k: 15, label: t('lam.preset.careful'), hint: t('lam.preset.carefulHint', { d: tempDelta(15) }) },
-    { k: 25, label: t('lam.preset.normal'), hint: t('lam.preset.normalHint', { d: tempDelta(25) }) },
-    { k: 40, label: t('lam.preset.pushed'), hint: t('lam.preset.pushedHint', { d: tempDelta(40) }) },
+    { k: 15, label: t('busbarPanel.preset.careful'), hint: t('busbarPanel.preset.carefulHint', { d: tempDelta(15) }) },
+    { k: 25, label: t('busbarPanel.preset.normal'), hint: t('busbarPanel.preset.normalHint', { d: tempDelta(25) }) },
+    { k: 40, label: t('busbarPanel.preset.pushed'), hint: t('busbarPanel.preset.pushedHint', { d: tempDelta(40) }) },
   ] as const;
   const COOLING_TEXT: Record<CoolingId, string> = {
-    free: t('lam.cool.free'),
-    ventilated: t('lam.cool.ventilated'),
-    enclosed: t('lam.cool.enclosed'),
+    free: t('busbarPanel.cool.free'),
+    ventilated: t('busbarPanel.cool.ventilated'),
+    enclosed: t('busbarPanel.cool.enclosed'),
   };
-  const isPreset = $derived(PRESETS.some((p) => p.k === ui.lamella.deltaTK));
+  const isPreset = $derived(PRESETS.some((p) => p.k === ui.busbar.deltaTK));
 
   /** The outcome in one sentence, no jargon. */
   const verdict = $derived.by(() => {
@@ -47,48 +47,48 @@
     const name = r.material.name.replace(/\s*\(.*\)$/, '');
     if (r.status === 'empty') return '';
     if (r.thicknessMm === null) {
-      return t('lam.verdict.none', { name: name.toLowerCase(), required: len(r.requiredMm, 2) });
+      return t('busbarPanel.verdict.none', { name: name.toLowerCase(), required: len(r.requiredMm, 2) });
     }
-    const spess = `${len(r.thicknessMm, 2)}${r.layers > 1 ? t('lam.verdict.layers', { n: r.layers }) : ''}`;
-    if (r.status === 'error') return t('lam.verdict.error', { name, spec: spess });
-    if (r.status === 'warning') return t('lam.verdict.warning', { name, spec: spess, current: fmt(r.currentA, 0) });
-    return t('lam.verdict.ok', { name, spec: spess, current: fmt(r.currentA, 0) });
+    const spess = `${len(r.thicknessMm, 2)}${r.layers > 1 ? t('busbarPanel.verdict.layers', { n: r.layers }) : ''}`;
+    if (r.status === 'error') return t('busbarPanel.verdict.error', { name, spec: spess });
+    if (r.status === 'warning') return t('busbarPanel.verdict.warning', { name, spec: spess, current: fmt(r.currentA, 0) });
+    return t('busbarPanel.verdict.ok', { name, spec: spess, current: fmt(r.currentA, 0) });
   });
 </script>
 
 <div class="stack">
   {#if report.status === 'empty'}
-    <section class="sec"><h3><Icon name="layers" /> {t('lam.title')}</h3><p class="note">{t('lam.empty')}</p></section>
+    <section class="sec"><h3><Icon name="layers" /> {t('busbarPanel.title')}</h3><p class="note">{t('busbarPanel.empty')}</p></section>
   {:else}
     <div class="result {report.status}" role="status">
-      <div class="rhead"><Icon name="layers" size={15} /> {t('lam.title')} <span class="badge {report.status}">{report.status === 'ok' ? t('lam.badge.ok') : report.status === 'warning' ? t('lam.badge.warning') : t('lam.badge.error')}</span></div>
+      <div class="rhead"><Icon name="layers" size={15} /> {t('busbarPanel.title')} <span class="badge {report.status}">{report.status === 'ok' ? t('busbarPanel.badge.ok') : report.status === 'warning' ? t('busbarPanel.badge.warning') : t('busbarPanel.badge.error')}</span></div>
       <div class="big">{verdict}</div>
       <div class="small">
-        {t('lam.area', { area: area(report.totalAreaCm2, 1) })}{report.massG !== null ? ` · ${massSmall(report.massG, 0)}` : ''}
+        {t('busbarPanel.area', { area: area(report.totalAreaCm2, 1) })}{report.massG !== null ? ` · ${massSmall(report.massG, 0)}` : ''}
       </div>
     </div>
   {/if}
 
   <section class="sec">
-    <h3><Icon name="sliders" /> {t('lam.matSection')}</h3>
-  <label>{t('lam.material')}
-    <select bind:value={ui.lamella.materialId}>
-      {#each LAMELLA_MATERIALS as m (m.id)}<option value={m.id}>{m.name}</option>{/each}
+    <h3><Icon name="sliders" /> {t('busbarPanel.matSection')}</h3>
+  <label>{t('busbarPanel.material')}
+    <select bind:value={ui.busbar.materialId}>
+      {#each BUSBAR_MATERIALS as m (m.id)}<option value={m.id}>{m.name}</option>{/each}
     </select>
   </label>
-  <Help label={t('lam.materialHelp')}>{weldLabel[material.weldability]}. {material.note}</Help>
+  <Help label={t('busbarPanel.materialHelp')}>{weldLabel[material.weldability]}. {material.note}</Help>
 
   <div class="row">
-    <label>{t('lam.thickness')}
+    <label>{t('busbarPanel.thickness')}
       <select
-        value={ui.lamella.thicknessMm === null ? 'auto' : String(ui.lamella.thicknessMm)}
-        onchange={(e) => (ui.lamella.thicknessMm = e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value))}
+        value={ui.busbar.thicknessMm === null ? 'auto' : String(ui.busbar.thicknessMm)}
+        onchange={(e) => (ui.busbar.thicknessMm = e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value))}
       >
-        <option value="auto">{t('lam.thicknessAuto')}</option>
+        <option value="auto">{t('busbarPanel.thicknessAuto')}</option>
         {#each material.thicknessesMm as th (th)}<option value={String(th)}>{len(th, 2)}</option>{/each}
       </select>
     </label>
-    <label>{t('lam.linkWidth')}
+    <label>{t('busbarPanel.linkWidth')}
       <UnitInput
         kind="len"
         min={1}
@@ -96,118 +96,118 @@
         step={0.5}
         nullable
         placeholder={report.strips[0] ? report.strips[0].neckMm : 'auto'}
-        value={ui.lamella.widthMm}
-        onchange={(v) => (ui.lamella.widthMm = v)}
+        value={ui.busbar.widthMm}
+        onchange={(v) => (ui.busbar.widthMm = v)}
       />
     </label>
   </div>
   </section>
 
   <section class="sec">
-    <h3><Icon name="ruler" /> {t('lam.shape')}</h3>
+    <h3><Icon name="ruler" /> {t('busbarPanel.shape')}</h3>
   <label>
-    <span class="top"><span>{t('lam.widen')}</span><b>{ui.lamella.widthMm ? len(ui.lamella.widthMm, 1) : 'auto'}</b></span>
+    <span class="top"><span>{t('busbarPanel.widen')}</span><b>{ui.busbar.widthMm ? len(ui.busbar.widthMm, 1) : 'auto'}</b></span>
     <input
-      use:rangeFill={ui.lamella.widthMm}
+      use:rangeFill={ui.busbar.widthMm}
       type="range"
       min="0"
       max="26"
       step="0.5"
-      value={ui.lamella.widthMm ?? 0}
-      oninput={(e) => (ui.lamella.widthMm = e.currentTarget.valueAsNumber > 0 ? e.currentTarget.valueAsNumber : null)}
+      value={ui.busbar.widthMm ?? 0}
+      oninput={(e) => (ui.busbar.widthMm = e.currentTarget.valueAsNumber > 0 ? e.currentTarget.valueAsNumber : null)}
     />
   </label>
-  <Help label={t('lam.what')}>{t('lam.widenHelp')}</Help>
+  <Help label={t('busbarPanel.what')}>{t('busbarPanel.widenHelp')}</Help>
 
-  <label>{t('lam.weldArea')}
-    <UnitInput kind="len" min={1} max={30} step={0.5} nullable placeholder="auto" value={ui.lamella.contactDiameterMm} onchange={(v) => (ui.lamella.contactDiameterMm = v)} />
+  <label>{t('busbarPanel.weldArea')}
+    <UnitInput kind="len" min={1} max={30} step={0.5} nullable placeholder="auto" value={ui.busbar.contactDiameterMm} onchange={(v) => (ui.busbar.contactDiameterMm = v)} />
   </label>
-  <Help label={t('lam.what')}>{t('lam.weldAreaHelp', { edge: len(1, 0) })}</Help>
+  <Help label={t('busbarPanel.what')}>{t('busbarPanel.weldAreaHelp', { edge: len(1, 0) })}</Help>
 
   {#if bmsOf(project)}
-    <label><span><input type="checkbox" bind:checked={ui.lamella.tabs} onchange={() => { if (ui.lamella.tabs) ui.holder.wireHoles = false; }} /> {t('lam.tabs')}</span></label>
-    {#if ui.lamella.tabs}
-      <label>{t('lam.tabSide')}
-        <select value={ui.lamella.tabSide} onchange={(e) => (ui.lamella.tabSide = e.currentTarget.value as typeof ui.lamella.tabSide)}>
-          <option value="auto">{t('lam.tabSide.auto', { side: sideName[tabSide] })}</option>
+    <label><span><input type="checkbox" bind:checked={ui.busbar.tabs} onchange={() => { if (ui.busbar.tabs) ui.holder.wireHoles = false; }} /> {t('busbarPanel.tabs')}</span></label>
+    {#if ui.busbar.tabs}
+      <label>{t('busbarPanel.tabSide')}
+        <select value={ui.busbar.tabSide} onchange={(e) => (ui.busbar.tabSide = e.currentTarget.value as typeof ui.busbar.tabSide)}>
+          <option value="auto">{t('busbarPanel.tabSide.auto', { side: sideName[tabSide] })}</option>
           {#each ['top', 'bottom', 'left', 'right'] as const as side (side)}
-            {#if sides[side] || ui.lamella.tabSide === side}
-              <option value={side}>{sideName[side]}{sides[side] ? '' : ` ${t('lam.tabSide.blocked')}`}</option>
+            {#if sides[side] || ui.busbar.tabSide === side}
+              <option value={side}>{sideName[side]}{sides[side] ? '' : ` ${t('busbarPanel.tabSide.blocked')}`}</option>
             {/if}
           {/each}
         </select>
       </label>
       <div class="row">
-        <label>{t('lam.tabWidth')}<UnitInput kind="len" min={2} max={30} step={0.5} value={ui.lamella.tabWidthMm} onchange={(v) => { if (v !== null) ui.lamella.tabWidthMm = v; }} /></label>
-        <label>{t('lam.tabLength')}<UnitInput kind="len" min={2} max={60} step={0.5} value={ui.lamella.tabLengthMm} onchange={(v) => { if (v !== null) ui.lamella.tabLengthMm = v; }} /></label>
+        <label>{t('busbarPanel.tabWidth')}<UnitInput kind="len" min={2} max={30} step={0.5} value={ui.busbar.tabWidthMm} onchange={(v) => { if (v !== null) ui.busbar.tabWidthMm = v; }} /></label>
+        <label>{t('busbarPanel.tabLength')}<UnitInput kind="len" min={2} max={60} step={0.5} value={ui.busbar.tabLengthMm} onchange={(v) => { if (v !== null) ui.busbar.tabLengthMm = v; }} /></label>
       </div>
       <div class="row">
-        <label>{t('lam.balanceAwg')}
-          <select value={String(ui.lamella.balanceAwg)} onchange={(e) => (ui.lamella.balanceAwg = Number(e.currentTarget.value))}>
+        <label>{t('busbarPanel.balanceAwg')}
+          <select value={String(ui.busbar.balanceAwg)} onchange={(e) => (ui.busbar.balanceAwg = Number(e.currentTarget.value))}>
             {#each BALANCE_AWGS as a (a)}<option value={String(a)}>AWG {a}</option>{/each}
           </select>
         </label>
       </div>
-      <label>{t('lam.tabBend')}<UnitInput kind="len" min={0} max={20} step={0.1} value={ui.lamella.tabBendMm} onchange={(v) => { if (v !== null) ui.lamella.tabBendMm = v; }} /></label>
-      <Help label={t('lam.what')}>{t('lam.tabsHelp', { min: len(MIN_PRINT_WALL_MM, 1) })}</Help>
+      <label>{t('busbarPanel.tabBend')}<UnitInput kind="len" min={0} max={20} step={0.1} value={ui.busbar.tabBendMm} onchange={(v) => { if (v !== null) ui.busbar.tabBendMm = v; }} /></label>
+      <Help label={t('busbarPanel.what')}>{t('busbarPanel.tabsHelp', { min: len(MIN_PRINT_WALL_MM, 1) })}</Help>
     {:else}
-      <p class="note">{ui.holder.wireHoles ? t('lam.noTabsHoles') : t('lam.noTabsAround')}</p>
-      <label>{t('lam.tabSide')}
-        <select value={ui.lamella.tabSide} onchange={(e) => (ui.lamella.tabSide = e.currentTarget.value as typeof ui.lamella.tabSide)}>
-          <option value="auto">{t('lam.tabSide.auto', { side: sideName[tabSide] })}</option>
+      <p class="note">{ui.holder.wireHoles ? t('busbarPanel.noTabsHoles') : t('busbarPanel.noTabsAround')}</p>
+      <label>{t('busbarPanel.tabSide')}
+        <select value={ui.busbar.tabSide} onchange={(e) => (ui.busbar.tabSide = e.currentTarget.value as typeof ui.busbar.tabSide)}>
+          <option value="auto">{t('busbarPanel.tabSide.auto', { side: sideName[tabSide] })}</option>
           {#each ['top', 'bottom', 'left', 'right'] as const as side (side)}<option value={side}>{sideName[side]}</option>{/each}
         </select>
       </label>
-      <label>{t('lam.balanceAwg')}
-        <select value={String(ui.lamella.balanceAwg)} onchange={(e) => (ui.lamella.balanceAwg = Number(e.currentTarget.value))}>
+      <label>{t('busbarPanel.balanceAwg')}
+        <select value={String(ui.busbar.balanceAwg)} onchange={(e) => (ui.busbar.balanceAwg = Number(e.currentTarget.value))}>
           {#each BALANCE_AWGS as a (a)}<option value={String(a)}>AWG {a}</option>{/each}
         </select>
       </label>
     {/if}
   {/if}
 
-  <label>{t('lam.spotsPer')}
+  <label>{t('busbarPanel.spotsPer')}
     <select
-      value={ui.lamella.spotsPerTerminal ?? 'auto'}
-      onchange={(e) => (ui.lamella.spotsPerTerminal = e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value))}
+      value={ui.busbar.spotsPerTerminal ?? 'auto'}
+      onchange={(e) => (ui.busbar.spotsPerTerminal = e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value))}
     >
-      <option value="auto">{t('lam.spotsAuto')}</option>
-      {#each [2, 4, 6, 8] as n (n)}<option value={n}>{t('lam.spotsN', { n })}</option>{/each}
+      <option value="auto">{t('busbarPanel.spotsAuto')}</option>
+      {#each [2, 4, 6, 8] as n (n)}<option value={n}>{t('busbarPanel.spotsN', { n })}</option>{/each}
     </select>
   </label>
-  <Help label={t('lam.spotsHelpLabel')}>{t('lam.spotsHelp')}</Help>
+  <Help label={t('busbarPanel.spotsHelpLabel')}>{t('busbarPanel.spotsHelp')}</Help>
 
   <label>
-    <span class="top"><span>{t('lam.opacity')}</span><b>{Math.round((1 - ui.stripOpacity) * 100)}%</b></span>
+    <span class="top"><span>{t('busbarPanel.opacity')}</span><b>{Math.round((1 - ui.stripOpacity) * 100)}%</b></span>
     <input use:rangeFill={ui.stripOpacity} type="range" min="0.2" max="1" step="0.05" bind:value={ui.stripOpacity} style="direction: rtl" />
   </label>
 
   </section>
 
   <section class="sec">
-    <h3><Icon name="bolt" /> {t('lam.powerTitle')}</h3>
-    <label>{t('lam.powerAwg')}
-      <select value={String(ui.lamella.powerAwg)} onchange={(e) => (ui.lamella.powerAwg = Number(e.currentTarget.value))}>
+    <h3><Icon name="bolt" /> {t('busbarPanel.powerTitle')}</h3>
+    <label>{t('busbarPanel.powerAwg')}
+      <select value={String(ui.busbar.powerAwg)} onchange={(e) => (ui.busbar.powerAwg = Number(e.currentTarget.value))}>
         {#each POWER_AWGS as a (a)}<option value={String(a)}>AWG {a} · ~{powerAmpacityA(a)} A</option>{/each}
       </select>
     </label>
     {#if report.currentA > 0}
-      <p class="note" class:warn={powerAmpacityA(ui.lamella.powerAwg) < report.currentA}>{t('lam.powerCap', { cap: powerAmpacityA(ui.lamella.powerAwg), current: fmt(report.currentA, 0) })}</p>
+      <p class="note" class:warn={powerAmpacityA(ui.busbar.powerAwg) < report.currentA}>{t('busbarPanel.powerCap', { cap: powerAmpacityA(ui.busbar.powerAwg), current: fmt(report.currentA, 0) })}</p>
     {:else}
-      <p class="note">{t('lam.powerNone')}</p>
+      <p class="note">{t('busbarPanel.powerNone')}</p>
     {/if}
     {#if bmsOf(project)}
-      <label><span><input type="checkbox" bind:checked={ui.lamella.powerTabs} /> {t('lam.powerTabs')}</span></label>
-      {#if !ui.lamella.powerTabs}<p class="note">{t('lam.powerTabsOff')}</p>{/if}
+      <label><span><input type="checkbox" bind:checked={ui.busbar.powerTabs} /> {t('busbarPanel.powerTabs')}</span></label>
+      {#if !ui.busbar.powerTabs}<p class="note">{t('busbarPanel.powerTabsOff')}</p>{/if}
     {/if}
-    <Help label={t('lam.what')}>{t('lam.powerHelp')}</Help>
+    <Help label={t('busbarPanel.what')}>{t('busbarPanel.powerHelp')}</Help>
   </section>
 
   {#if report.status !== 'empty'}
-  <button type="button" class="gotoexp" onclick={() => (ui.sideTab = 'file')}><Icon name="download" /> {t('lam.gotoExport')}</button>
+  <button type="button" class="gotoexp" onclick={() => (ui.sideTab = 'file')}><Icon name="download" /> {t('busbarPanel.gotoExport')}</button>
 
     <details class="adv">
-      <summary>{t('lam.details')}</summary>
+      <summary>{t('busbarPanel.details')}</summary>
       {#if report.issues.length}
         <ul class="issues">
           {#each report.issues as issue (issue.message)}
@@ -216,15 +216,15 @@
         </ul>
       {/if}
       {#if report.alternatives.length}
-        <p class="alt-title">{t('lam.alternatives')}</p>
+        <p class="alt-title">{t('busbarPanel.alternatives')}</p>
         <ul class="alts">
           {#each report.alternatives as a (a)}<li>{a}</li>{/each}
         </ul>
       {/if}
       {#if report.strips.length}
-        <p class="alt-title">{t('lam.perStrip')}</p>
+        <p class="alt-title">{t('busbarPanel.perStrip')}</p>
         <table>
-          <thead><tr><th>{t('lam.th.strip')}</th><th>{t('lam.th.band')}</th><th>{t('lam.th.current')}</th><th>{t('lam.th.thickness')}</th><th>{t('lam.th.spots')}</th></tr></thead>
+          <thead><tr><th>{t('busbarPanel.th.strip')}</th><th>{t('busbarPanel.th.band')}</th><th>{t('busbarPanel.th.current')}</th><th>{t('busbarPanel.th.thickness')}</th><th>{t('busbarPanel.th.spots')}</th></tr></thead>
           <tbody>
             {#each report.strips as s (s.stripId)}
               <tr>
@@ -232,97 +232,97 @@
                 <td>{lenNum(s.neckMm, 1)}</td>
                 <td>{fmt(s.neckCurrentA, 0)}</td>
                 <td>{lenNum(s.requiredMm, 2)}</td>
-                <td class:low={s.spotCapacity < s.spotsNeeded || s.spotsCarryA < s.cellCurrentA} title={t('lam.spotsTitle', { n: s.spotsNeeded, carry: fmt(s.spotsCarryA, 0), cell: fmt(s.cellCurrentA, 1) })}>{s.spotsNeeded}/{s.spotCapacity} <small>({fmt(s.spotsCarryA, 0)} A)</small></td>
+                <td class:low={s.spotCapacity < s.spotsNeeded || s.spotsCarryA < s.cellCurrentA} title={t('busbarPanel.spotsTitle', { n: s.spotsNeeded, carry: fmt(s.spotsCarryA, 0), cell: fmt(s.cellCurrentA, 1) })}>{s.spotsNeeded}/{s.spotCapacity} <small>({fmt(s.spotsCarryA, 0)} A)</small></td>
               </tr>
             {/each}
           </tbody>
         </table>
-        <Help label={t('lam.tableHelpLabel')}>{t('lam.tableHelp', { u: lenLabel() })}</Help>
+        <Help label={t('busbarPanel.tableHelpLabel')}>{t('busbarPanel.tableHelp', { u: lenLabel() })}</Help>
       {/if}
     </details>
   {/if}
 
   <details class="adv">
-    <summary>{t('lam.advanced')}</summary>
+    <summary>{t('busbarPanel.advanced')}</summary>
 
-    <label>{t('lam.welder')}
-      <select bind:value={ui.lamella.welderId}>
+    <label>{t('busbarPanel.welder')}
+      <select bind:value={ui.busbar.welderId}>
         {#each WELDER_PROFILES as w (w.id)}<option value={w.id}>{w.name}</option>{/each}
       </select>
     </label>
-    <Help label={t('lam.explain')}>{t('lam.welderHelp')}</Help>
+    <Help label={t('busbarPanel.explain')}>{t('busbarPanel.welderHelp')}</Help>
 
     <div class="row">
-      <label>{t('lam.spotCurrent')}
+      <label>{t('busbarPanel.spotCurrent')}
         <input
           type="number"
           min="1"
           step="0.5"
           placeholder={fmt(report.welder.spotCurrentA, 0)}
-          value={ui.lamella.spotCurrentA ?? ''}
-          onchange={(e) => (ui.lamella.spotCurrentA = e.currentTarget.value === '' ? null : num(e, 1, 100))}
+          value={ui.busbar.spotCurrentA ?? ''}
+          onchange={(e) => (ui.busbar.spotCurrentA = e.currentTarget.value === '' ? null : num(e, 1, 100))}
         />
       </label>
-      <label>{t('lam.spotSpacing')}
-        <UnitInput kind="len" min={1} max={20} step={0.5} nullable placeholder={report.welder.spotSpacingMm} value={ui.lamella.spotSpacingMm} onchange={(v) => (ui.lamella.spotSpacingMm = v)} />
+      <label>{t('busbarPanel.spotSpacing')}
+        <UnitInput kind="len" min={1} max={20} step={0.5} nullable placeholder={report.welder.spotSpacingMm} value={ui.busbar.spotSpacingMm} onchange={(v) => (ui.busbar.spotSpacingMm = v)} />
       </label>
     </div>
-    <Help label={t('lam.explain')}>{t('lam.spotsNote')}</Help>
+    <Help label={t('busbarPanel.explain')}>{t('busbarPanel.spotsNote')}</Help>
 
-    <label>{t('lam.cutter')}
-      <select bind:value={ui.lamella.cutterId}>
+    <label>{t('busbarPanel.cutter')}
+      <select bind:value={ui.busbar.cutterId}>
         {#each CUTTER_PROFILES as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
       </select>
     </label>
 
     <div class="field">
-      <span class="lbl">{t('lam.where')}</span>
+      <span class="lbl">{t('busbarPanel.where')}</span>
       <div class="seg3">
         {#each Object.keys(COOLING) as id (id)}
-          <button class:on={ui.lamella.cooling === id} onclick={() => (ui.lamella.cooling = id as CoolingId)}>{COOLING_TEXT[id as CoolingId]}</button>
+          <button class:on={ui.busbar.cooling === id} onclick={() => (ui.busbar.cooling = id as CoolingId)}>{COOLING_TEXT[id as CoolingId]}</button>
         {/each}
       </div>
-      <span class="hint">{t('lam.whereHint')}</span>
+      <span class="hint">{t('busbarPanel.whereHint')}</span>
     </div>
 
     <div class="field">
-      <span class="lbl">{t('lam.howHot')}</span>
+      <span class="lbl">{t('busbarPanel.howHot')}</span>
       <div class="seg3">
         {#each PRESETS as p (p.k)}
-          <button class:on={ui.lamella.deltaTK === p.k} title={p.hint} onclick={() => (ui.lamella.deltaTK = p.k)}>{p.label}</button>
+          <button class:on={ui.busbar.deltaTK === p.k} title={p.hint} onclick={() => (ui.busbar.deltaTK = p.k)}>{p.label}</button>
         {/each}
       </div>
       <span class="hint">
-        {#if isPreset}{t('lam.steady', { hint: PRESETS.find((p) => p.k === ui.lamella.deltaTK)?.hint ?? '' })}{:else}{t('lam.custom', { delta: tempDelta(ui.lamella.deltaTK) })}{/if}
+        {#if isPreset}{t('busbarPanel.steady', { hint: PRESETS.find((p) => p.k === ui.busbar.deltaTK)?.hint ?? '' })}{:else}{t('busbarPanel.custom', { delta: tempDelta(ui.busbar.deltaTK) })}{/if}
       </span>
     </div>
 
-    <label>{t('lam.layers')}
-      <input type="number" min="1" max="4" step="1" value={ui.lamella.layers} onchange={(e) => (ui.lamella.layers = Math.round(num(e, 1, 4) ?? 1))} />
+    <label>{t('busbarPanel.layers')}
+      <input type="number" min="1" max="4" step="1" value={ui.busbar.layers} onchange={(e) => (ui.busbar.layers = Math.round(num(e, 1, 4) ?? 1))} />
     </label>
-    <Help label={t('lam.explain')}>{t('lam.layersHelp')}</Help>
+    <Help label={t('busbarPanel.explain')}>{t('busbarPanel.layersHelp')}</Help>
 
     <div class="row">
-      <label>{t('lam.ambient')}
-        <UnitInput kind="tempAbs" min={-20} max={60} step={1} value={ui.lamella.ambientC} onchange={(v) => (ui.lamella.ambientC = v ?? 25)} />
+      <label>{t('busbarPanel.ambient')}
+        <UnitInput kind="tempAbs" min={-20} max={60} step={1} value={ui.busbar.ambientC} onchange={(v) => (ui.busbar.ambientC = v ?? 25)} />
       </label>
-      <label>{t('lam.cellRise')}
-        <UnitInput kind="tempDelta" min={0} max={40} step={1} value={ui.lamella.cellRiseK} onchange={(v) => (ui.lamella.cellRiseK = v ?? 15)} />
+      <label>{t('busbarPanel.cellRise')}
+        <UnitInput kind="tempDelta" min={0} max={40} step={1} value={ui.busbar.cellRiseK} onchange={(v) => (ui.busbar.cellRiseK = v ?? 15)} />
       </label>
     </div>
-    <Help label={t('lam.cellRiseLabel')}>{t('lam.cellRiseHelp')}</Help>
+    <Help label={t('busbarPanel.cellRiseLabel')}>{t('busbarPanel.cellRiseHelp')}</Help>
 
     <div class="row">
-      <label>{t('lam.peak')}
-        <input type="number" step="0.1" min="1" value={ui.lamella.peakFactor} onchange={(e) => (ui.lamella.peakFactor = num(e, 1, 10) ?? 1.5)} />
+      <label>{t('busbarPanel.peak')}
+        <input type="number" step="0.1" min="1" value={ui.busbar.peakFactor} onchange={(e) => (ui.busbar.peakFactor = num(e, 1, 10) ?? 1.5)} />
       </label>
-      <label>{t('lam.peakSeconds')}
-        <input type="number" step="0.5" min="0.1" value={ui.lamella.peakSeconds} onchange={(e) => (ui.lamella.peakSeconds = num(e, 0.1, 60) ?? 1)} />
+      <label>{t('busbarPanel.peakSeconds')}
+        <input type="number" step="0.5" min="0.1" value={ui.busbar.peakSeconds} onchange={(e) => (ui.busbar.peakSeconds = num(e, 0.1, 60) ?? 1)} />
       </label>
     </div>
-    <Help label={t('lam.explain')}>{t('lam.peakHelp')}</Help>
+    <Help label={t('busbarPanel.explain')}>{t('busbarPanel.peakHelp')}</Help>
 
-    <label class="inline"><input type="checkbox" bind:checked={ui.showSpots} /> {t('lam.showSpots')}</label>
+    <label class="inline"><input type="checkbox" bind:checked={ui.showSpots} /> {t('busbarPanel.showSpots')}</label>
   </details>
 </div>
 

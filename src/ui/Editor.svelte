@@ -32,8 +32,8 @@
   const holderSplit = $derived(
     ui.showHolder && (ui.face === 'top' ? ui.holderView.showTop : ui.holderView.showBottom) ? holderOf(project, ui.holder).split : null,
   );
-  const strips = $derived(ui.showStrips ? stripsOf(project, ui.lamella).filter((s) => s.face === ui.face) : []);
-  const stripReport = $derived(ui.showStrips ? reportOf(project, ui.lamella) : null);
+  const strips = $derived(ui.showStrips ? stripsOf(project, ui.busbar).filter((s) => s.face === ui.face) : []);
+  const stripReport = $derived(ui.showStrips ? reportOf(project, ui.busbar) : null);
   const stripSeverity = $derived.by(() => {
     const m = new Map<string, 'error' | 'warning'>();
     for (const issue of stripReport?.issues ?? []) {

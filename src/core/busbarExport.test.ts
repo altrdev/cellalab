@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { generateGrid } from './layout';
-import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS } from './busbar';
+import { analyzeBusbars, DEFAULT_BUSBAR_SETTINGS } from './busbar';
 import { buildCutListCsv, buildCutSummary, buildSvg } from './busbarExport';
 import { resetPrefsForTests, setPrefs } from '../prefs';
 import { replaceCells } from './ops';
@@ -39,7 +39,7 @@ describe('strip export', () => {
     expect(Number(vb[2]) + Number(vb[4])).toBeGreaterThan(Math.max(...texts.map((t) => t.y)));
   });
   it('CSV: header + one row per strip', () => {
-    const rep = analyzeLamelle(p, strips, DEFAULT_LAMELLA_SETTINGS, 10);
+    const rep = analyzeBusbars(p, strips, DEFAULT_BUSBAR_SETTINGS, 10);
     const csv = buildCutListCsv(strips, rep).trim().split('\n');
     expect(csv.length).toBe(strips.length + 1);
     expect(buildCutSummary(rep, 'Prova')).toContain('Prova');
@@ -64,7 +64,7 @@ describe('exports in inches', () => {
   });
 
   it('CSV: header and values in the chosen unit', () => {
-    const rep = analyzeLamelle(p, strips, DEFAULT_LAMELLA_SETTINGS, 10);
+    const rep = analyzeBusbars(p, strips, DEFAULT_BUSBAR_SETTINGS, 10);
     const mm = buildCutListCsv(strips, rep).trim().split('\n');
     setPrefs({ length: 'in' });
     const inch = buildCutListCsv(strips, rep).trim().split('\n');
@@ -76,7 +76,7 @@ describe('exports in inches', () => {
   });
 
   it('summary: thickness, area and weight in the chosen units', () => {
-    const rep = analyzeLamelle(p, strips, DEFAULT_LAMELLA_SETTINGS, 10);
+    const rep = analyzeBusbars(p, strips, DEFAULT_BUSBAR_SETTINGS, 10);
     setPrefs({ length: 'in', weight: 'imperial' });
     const text = buildCutSummary(rep, 'Prova');
     expect(text).toMatch(/Spessore: [\d,]+ in x/);
