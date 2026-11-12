@@ -107,7 +107,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
 export const stripOptionsOf = (s: LamellaSettings, wireHoles = false): StripOptions => ({
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
-  tabs: s.tabs || s.powerTabs || wireHoles ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), style: s.tabs ? 'tab' : 'none', bendMm: s.tabBendMm, power: s.powerTabs ? { widthMm: Math.max(s.tabWidthMm, holeForWireMm(s.powerAwg) + 4), holeMm: holeForWireMm(s.powerAwg) } : null } : null,
+  tabs: { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), style: s.tabs ? 'tab' : 'none', bendMm: s.tabBendMm, power: s.powerTabs ? { widthMm: Math.max(s.tabWidthMm, holeForWireMm(s.powerAwg) + 4), holeMm: holeForWireMm(s.powerAwg) } : null },
 });
 
 export type IssueSeverity = 'error' | 'warning' | 'info';

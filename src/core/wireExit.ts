@@ -15,9 +15,12 @@ export interface WireExit {
   stripId: string;
   face: Face;
   side: TabSide;
-  /** Punto di saldatura sulla lamella e centro del foro nel portacelle, mm del disegno. */
+  /** Punto di saldatura sulla lamella e centro del foro nel portacelle, mm del disegno. Senza foro (giro esterno) il filo corre sul piano del portacelle fino a `edge`, il bordo della piastra, e scende lungo il fianco. */
   solder: Pt;
-  hole: Pt;
+  hole?: Pt;
+  edge?: Pt;
+  /** Il corridoio dal punto di saldatura al bordo passa sopra un'altra lamella o un'altra apertura di cella. */
+  blocked?: boolean;
   diameterMm: number;
   /** Spessore della piastra e del suo fondo, mm: il filo entra dalla faccia esterna ed esce dal bordo delle pareti. */
   plateMm: number;
@@ -110,6 +113,90 @@ export function findWireExits(
     // se il gioco verso il bordo non sta nel contorno, si aggiunge un rinforzo attorno al foro
     const room = circlePoints(best.p.x, best.p.y, rOut, 16).every((q) => pointInRegions(q, wall));
     out.push({ stripId: s.id, face: s.face, side, solder, hole: best.p, diameterMm: holeMm, plateMm, floorMm, bossMm: room ? 0 : rOut + 0.3 });
+  }
+  return out;
+}
+
+/** Distanza di un punto da un rettangolo convesso (0 se dentro). */
+function distToRect(p: Pt, rect: readonly Pt[]): number {
+  let inside = true;
+  let best = Infinity;
+  for (let i = 0; i < rect.length; i++) {
+    const a = rect[i]!;
+    const b = rect[(i + 1) % rect.length]!;
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    if (ex * (p.y - a.y) - ey * (p.x - a.x) < 0) inside = false;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * ex + (p.y - a.y) * ey) / (ex * ex + ey * ey)));
+    best = Math.min(best, Math.hypot(p.x - (a.x + t * ex), p.y - (a.y + t * ey)));
+  }
+  return inside ? 0 : best;
+}
+
+/**
+ * Giro esterno, senza foro né linguetta: il filo si salda sulla lamella, vicino al bordo dal lato di uscita, corre in
+ * linea retta sul piano del portacelle fino al bordo della piastra e da lì scende lungo il fianco, all'esterno. Il
+ * corridoio deve essere libero: nessun'altra lamella della faccia e nessuna apertura di un'altra cella.
+ */
+export function findAroundExits(
+  project: Project,
+  strips: readonly Strip[],
+  wall: readonly Region[],
+  side: TabSide,
+  plateMm: number,
+  floorMm: number,
+  bendMm = 0.5,
+): WireExit[] {
+  const d = SIDE[side];
+  const pp = { x: -d.y, y: d.x };
+  const outlines = wall.map((r) => ({ outline: r.outline, holes: [] as Pt[][] }));
+  const out: WireExit[] = [];
+  for (const s of chosenStrips(strips)) {
+    const own = new Set(s.nodes.map((n) => n.cellId));
+    const others = strips.filter((o) => o !== s && o.face === s.face).map((o) => ({ outline: o.outline, holes: o.holes }));
+    const nodes = [...s.nodes].sort((p, q) => q.x * d.x + q.y * d.y + q.reachMm - (p.x * d.x + p.y * d.y + p.reachMm));
+    let best: WireExit | null = null;
+    outer: for (const node of nodes.slice(0, 3)) {
+      for (const deg of [0, 25, -25, 50, -50]) {
+        const ang = Math.atan2(d.y, d.x) + (deg * Math.PI) / 180;
+        const solder = { x: node.x + Math.cos(ang) * (node.reachMm - 0.7), y: node.y + Math.sin(ang) * (node.reachMm - 0.7) };
+        // fin dove arriva il portacelle uscendo dal punto di saldatura in linea retta verso il lato di uscita
+        let last = 0;
+        for (let a = 0; a <= 80; a += 0.25) if (pointInRegions({ x: solder.x + d.x * a, y: solder.y + d.y * a }, outlines)) last = a;
+        const reach = last + bendMm;
+        const w = 1.2;
+        const corridor = [
+          { x: solder.x + pp.x * w, y: solder.y + pp.y * w },
+          { x: solder.x - pp.x * w, y: solder.y - pp.y * w },
+          { x: solder.x - pp.x * w + d.x * reach, y: solder.y - pp.y * w + d.y * reach },
+          { x: solder.x + pp.x * w + d.x * reach, y: solder.y + pp.y * w + d.y * reach },
+        ];
+        const cover = others.some((o) => intersectRegions(o, [corridor]).some((x) => regionArea(x) > 0.01));
+        const openings = project.cells.some((c) => {
+          if (own.has(c.id)) return false;
+          const r = (findCellType(project, c.typeId)?.diameterMm ?? 0) / 2;
+          return distToRect(c, corridor) < r - 0.8;
+        });
+        const cand: WireExit = {
+          stripId: s.id,
+          face: s.face,
+          side,
+          solder,
+          edge: { x: solder.x + d.x * reach, y: solder.y + d.y * reach },
+          blocked: cover || openings,
+          diameterMm: 0,
+          plateMm,
+          floorMm,
+          bossMm: 0,
+        };
+        if (!cand.blocked) {
+          best = cand;
+          break outer;
+        }
+        best ??= cand;
+      }
+    }
+    if (best) out.push(best);
   }
   return out;
 }

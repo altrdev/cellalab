@@ -463,6 +463,7 @@ export const en: Record<keyof typeof it, string> = {
   'hold.ntcOpen': 'Square grid: the sensor sits in the gap between four cells, which this shape leaves open, so the hole removes nothing. Fix it to a cell with silicone.',
   'hold.ntcCovered': 'Every free gap is under a busbar: the hole to insert the sensor would fall under a link. Change the exit side or widen the busbar windows.',
   'hold.ntcHelp': 'The temperature sensor sits in the gap between three cells, touching the sides of all three. The app picks a central cell (the hottest) and the gap nearest the wire exit side, and opens it with a round hole through the plate: the sensor goes in from outside, once the pack is assembled and the busbars are welded, and its wire comes out of the same hole. Gaps not covered by busbars are preferred. The hole is on both plates. Fix the sensor with silicone and the wire with a dab of glue.',
+  'lam.noTabsAround': 'No tabs and no holes: the wire is soldered on the busbar near its edge, runs on the holder plane to the edge of the plate and goes down the flank, on the outside.',
   'lam.noTabsHoles': 'No balance tabs: the wires leave through small holes in the holder (Holder tab).',
   'lam.tabWidth': 'Tab width (mm)',
   'lam.tabLength': 'Length after the bend (mm)',

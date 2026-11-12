@@ -7,7 +7,7 @@ import { COOLING, spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
 import { buildStrips, type Face, type Strip, type TabSide } from '../core/strips';
 import { buildHolder } from '../core/holder';
-import { findWireExits, type WireExit } from '../core/wireExit';
+import { findAroundExits, findWireExits, type WireExit } from '../core/wireExit';
 import { circlePoints } from '../core/polygon';
 import { holeForWireMm } from '../core/wire';
 import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
@@ -63,13 +63,17 @@ const exitCache = new WeakMap<Project, { key: string; exits: WireExit[] }>();
  * punto di saldatura sulla lamella e il foro accanto. Vuote se l'opzione è spenta o ci sono le linguette.
  */
 export function wireExitsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): WireExit[] {
-  if (!holder.wireHoles || settings.tabs || !bmsOf(project)) return [];
+  if (settings.tabs || !bmsOf(project)) return []; // con le linguette il filo parte da lì
   const key = JSON.stringify([settings, holder]);
   const hit = exitCache.get(project);
   if (hit && hit.key === key) return hit.exits;
   const plain = buildHolder(project, holder, false);
   const opts = optionsOf(project, settings);
-  const exits = plain && opts.tabs ? findWireExits(project, buildStrips(project, opts), plain.wall, opts.tabs.side, holeForWireMm(settings.balanceAwg), plain.totalMm, plain.floorMm, holder.chamferMm) : [];
+  const strips = plain && opts.tabs ? buildStrips(project, opts) : [];
+  // Con i fori nel portacelle il filo passa da lì; senza fori né linguette fa il giro esterno sul piano del portacelle.
+  const exits = !plain || !opts.tabs ? [] : holder.wireHoles
+    ? findWireExits(project, strips, plain.wall, opts.tabs.side, holeForWireMm(settings.balanceAwg), plain.totalMm, plain.floorMm, holder.chamferMm)
+    : findAroundExits(project, strips, plain.wall, opts.tabs.side, plain.totalMm, plain.floorMm, settings.tabBendMm);
   exitCache.set(project, { key, exits });
   return exits;
 }
@@ -106,13 +110,14 @@ export function holderCutsOf(project: Project, settings: LamellaSettings, holder
   const notches = { top: all.filter((n) => n.face === 'top').map((n) => n.polygon), bottom: all.filter((n) => n.face === 'bottom').map((n) => n.polygon) };
   const { site } = ntcPlanOf(project, settings, holder);
   const exits = wireExitsOf(project, settings, holder);
-  const holeOf = (e: WireExit) => circlePoints(e.hole.x, e.hole.y, e.diameterMm / 2, 16);
-  const bossOf = (e: WireExit) => circlePoints(e.hole.x, e.hole.y, e.bossMm, 24);
+  const holeOf = (e: WireExit) => circlePoints(e.hole!.x, e.hole!.y, e.diameterMm / 2, 16);
+  const bossOf = (e: WireExit) => circlePoints(e.hole!.x, e.hole!.y, e.bossMm, 24);
+  const holed = exits.filter((e) => e.hole); // il giro esterno non fa fori
   const wireBosses = {
-    top: exits.filter((e) => e.face === 'top' && e.bossMm > 0).map(bossOf),
-    bottom: exits.filter((e) => e.face === 'bottom' && e.bossMm > 0).map(bossOf),
+    top: holed.filter((e) => e.face === 'top' && e.bossMm > 0).map(bossOf),
+    bottom: holed.filter((e) => e.face === 'bottom' && e.bossMm > 0).map(bossOf),
   };
-  const wireHoles = { top: exits.filter((e) => e.face === 'top').map(holeOf), bottom: exits.filter((e) => e.face === 'bottom').map(holeOf) };
+  const wireHoles = { top: holed.filter((e) => e.face === 'top').map(holeOf), bottom: holed.filter((e) => e.face === 'bottom').map(holeOf) };
   const cuts = { notches, wireHoles, wireBosses, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
   cutsCache.set(project, { key, cuts });
   return cuts;

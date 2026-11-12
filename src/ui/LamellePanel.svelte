@@ -150,8 +150,8 @@
       </div>
       <label>{t('lam.tabBend')}<UnitInput kind="len" min={0} max={20} step={0.1} value={ui.lamella.tabBendMm} onchange={(v) => { if (v !== null) ui.lamella.tabBendMm = v; }} /></label>
       <Help label={t('lam.what')}>{t('lam.tabsHelp', { min: len(MIN_PRINT_WALL_MM, 1) })}</Help>
-    {:else if ui.holder.wireHoles}
-      <p class="note">{t('lam.noTabsHoles')}</p>
+    {:else}
+      <p class="note">{ui.holder.wireHoles ? t('lam.noTabsHoles') : t('lam.noTabsAround')}</p>
       <label>{t('lam.tabSide')}
         <select value={ui.lamella.tabSide} onchange={(e) => (ui.lamella.tabSide = e.currentTarget.value as typeof ui.lamella.tabSide)}>
           <option value="auto">{t('lam.tabSide.auto', { side: sideName[tabSide] })}</option>

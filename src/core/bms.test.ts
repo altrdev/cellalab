@@ -10,7 +10,7 @@ import { circlePoints } from './polygon';
 import { buildDxf } from './dxf';
 import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { buildHarness } from './harness';
-import { findWireExits } from './wireExit';
+import { findAroundExits, findWireExits } from './wireExit';
 import { ntcSite, ntcSites } from './ntc';
 import { tabNotches } from './tabNotches';
 import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './lamelle';
@@ -599,7 +599,8 @@ describe('linguette di potenza opzionali', () => {
     expect(withTabs({ tabs: false }).strips.filter((x) => x.tab)).toHaveLength(0);
     expect(withTabs({ tabs: false }).strips.filter((x) => x.powerTab)).toHaveLength(2);
     const none = withTabs({ tabs: false, powerTabs: false });
-    expect(none.o.tabs).toBeNull();
+    expect(none.o.tabs?.style).toBe('none'); // il lato di uscita serve comunque ai fili
+    expect(none.o.tabs?.power).toBeNull();
     expect(none.strips.some((x) => x.tab || x.powerTab)).toBe(false);
     // con i fori nel portacelle serve comunque il lato di uscita, senza nessuna linguetta
     const holes = withTabs({ tabs: false, powerTabs: false }, true);
@@ -623,10 +624,10 @@ describe('uscita dei fili dal portacelle, senza linguette', () => {
 
   it('il foro non sta in una tasca né sotto una lamella della sua faccia, ed è vicino al punto di saldatura', () => {
     for (const e of exits) {
-      for (const hole of plain.wall.flatMap((r) => r.holes)) expect(pointInRegions(e.hole, [{ outline: hole, holes: [] }])).toBe(false);
+      for (const hole of plain.wall.flatMap((r) => r.holes)) expect(pointInRegions(e.hole!, [{ outline: hole, holes: [] }])).toBe(false);
       const covering = strips.filter((x) => x.face === e.face).map((x) => ({ outline: x.outline, holes: x.holes }));
-      expect(covering.some((c) => pointInRegions(e.hole, [c]))).toBe(false);
-      expect(Math.hypot(e.hole.x - e.solder.x, e.hole.y - e.solder.y)).toBeLessThanOrEqual(24);
+      expect(covering.some((c) => pointInRegions(e.hole!, [c]))).toBe(false);
+      expect(Math.hypot(e.hole!.x - e.solder.x, e.hole!.y - e.solder.y)).toBeLessThanOrEqual(24);
     }
   });
 
@@ -636,20 +637,20 @@ describe('uscita dei fili dal portacelle, senza linguette', () => {
       const base = buildHolder(p, st, false)!;
       const ex = findWireExits(p, strips, base.wall, 'bottom', 1.21, base.totalMm, base.floorMm, chamferMm);
       expect(ex.length).toBe(5);
-      const model = buildHolder(p, st, false, { addOuter: ex.filter((e) => e.bossMm > 0).map((e) => circlePoints(e.hole.x, e.hole.y, e.bossMm, 24)) })!;
+      const model = buildHolder(p, st, false, { addOuter: ex.filter((e) => e.bossMm > 0).map((e) => circlePoints(e.hole!.x, e.hole!.y, e.bossMm, 24)) })!;
       for (const e of ex) {
         const r = e.diameterMm / 2 + Math.max(0.8, chamferMm + 0.5) - 0.05;
         for (let k = 0; k < 24; k++) {
           const a = (k / 24) * 2 * Math.PI;
           // dentro il contorno (le tasche delle celle contano a parte: il loro gioco è la parete minima, già controllata)
-          expect(pointInRegions({ x: e.hole.x + Math.cos(a) * r, y: e.hole.y + Math.sin(a) * r }, model.wall.map((rg) => ({ outline: rg.outline, holes: [] })))).toBe(true);
+          expect(pointInRegions({ x: e.hole!.x + Math.cos(a) * r, y: e.hole!.y + Math.sin(a) * r }, model.wall.map((rg) => ({ outline: rg.outline, holes: [] })))).toBe(true);
         }
       }
     }
   });
 
   it('i fori tolgono materiale alla piastra e il filo passa per il foro senza toccare gli altri', () => {
-    const holes = exits.map((e) => circlePoints(e.hole.x, e.hole.y, e.diameterMm / 2, 16));
+    const holes = exits.map((e) => circlePoints(e.hole!.x, e.hole!.y, e.diameterMm / 2, 16));
     const vol = (m: { layers: { z0: number; z1: number; regions: Parameters<typeof regionArea>[0][] }[] }) =>
       m.layers.reduce((a, l) => a + (l.z1 - l.z0) * l.regions.reduce((b, r) => b + regionArea(r), 0), 0);
     expect(vol(buildHolder(p, DEFAULT_HOLDER_SETTINGS, true)!) - vol(buildHolder(p, DEFAULT_HOLDER_SETTINGS, true, { throughHoles: holes })!)).toBeGreaterThan(0.5);
@@ -659,8 +660,8 @@ describe('uscita dei fili dal portacelle, senza linguette', () => {
     expect(h.wires).toHaveLength(5);
     for (const w of h.wires) {
       const ex = exits.find((e) => e.stripId === w.stripId)!;
-      expect(w.points[1]!.x).toBeCloseTo(ex.hole.x, 6); // dal punto di saldatura al foro…
-      expect(w.points[2]!.x).toBeCloseTo(ex.hole.x, 6); // …e attraverso la piastra
+      expect(w.points[1]!.x).toBeCloseTo(ex.hole!.x, 6); // dal punto di saldatura al foro…
+      expect(w.points[2]!.x).toBeCloseTo(ex.hole!.x, 6); // …e attraverso la piastra
       expect(Math.abs(w.points[2]!.y - w.points[1]!.y)).toBeGreaterThanOrEqual(ex.plateMm - 1e-6); // attraversa tutto lo spessore
     }
     const sample = (pts: { x: number; y: number; z: number }[]) => {
@@ -677,6 +678,59 @@ describe('uscita dei fili dal portacelle, senza linguette', () => {
     let closest = Infinity;
     for (let i = 0; i < paths.length; i++) for (let j = i + 1; j < paths.length; j++) for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
     expect(closest).toBeGreaterThanOrEqual(0.9 - 1e-6);
+  });
+});
+
+describe('giro esterno del portacelle, senza linguette né fori', () => {
+  const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
+  const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, false)!;
+  const strips = buildStrips(p, { tabs: { side: 'bottom', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, style: 'none' } });
+  const exits = findAroundExits(p, strips, plain.wall, 'bottom', plain.totalMm, plain.floorMm, 0.3);
+
+  it('ogni giunzione ha il suo punto di saldatura e il bordo da cui il filo scende, senza foro', () => {
+    expect(exits).toHaveLength(5);
+    for (const e of exits) {
+      expect(e.hole).toBeUndefined();
+      // lato 'bottom': d = (0, 1): il bordo sta oltre il punto di saldatura
+      expect(e.edge!.y).toBeGreaterThan(e.solder.y);
+      expect(e.edge!.x).toBeCloseTo(e.solder.x, 6); // in linea retta
+      // il punto di saldatura sta sulla lamella
+      const st = strips.find((x) => x.id === e.stripId)!;
+      expect(pointInRegions(e.solder, [{ outline: st.outline, holes: st.holes }])).toBe(true);
+    }
+  });
+
+  it('il corridoio è libero nel 4S3P: nessun filo passa sopra un’altra lamella', () => {
+    expect(exits.every((e) => !e.blocked)).toBe(true);
+  });
+
+  it('i fili partono dal piano, vanno al bordo e scendono; senza toccarsi né entrare nella scatola', () => {
+    for (const e of exits) strips.find((x) => x.id === e.stripId)!.wireExit = e;
+    const h = buildHarness(p, strips, 0.1)!;
+    expect(h.wires).toHaveLength(5);
+    for (const w of h.wires) {
+      expect(w.points[0]!.y).toBeCloseTo(w.points[1]!.y, 6); // sul piano della lamella fino al bordo
+      expect(w.points[2]!.y).not.toBeCloseTo(w.points[1]!.y, 3); // poi scende
+    }
+    const sample = (pts: { x: number; y: number; z: number }[]) => {
+      const out: { x: number; y: number; z: number }[] = [];
+      for (let k = 0; k + 1 < pts.length; k++) {
+        const a = pts[k]!;
+        const b = pts[k + 1]!;
+        const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 0.1));
+        for (let t = 0; t <= steps; t++) out.push({ x: a.x + ((b.x - a.x) * t) / steps, y: a.y + ((b.y - a.y) * t) / steps, z: a.z + ((b.z - a.z) * t) / steps });
+      }
+      return out;
+    };
+    const paths = h.wires.map((w) => sample(w.points));
+    let closest = Infinity;
+    for (let i = 0; i < paths.length; i++) for (let j = i + 1; j < paths.length; j++) for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
+    expect(closest).toBeGreaterThanOrEqual(0.9 - 1e-6);
+    const box = h.box!;
+    for (const path of paths) for (const q of path) {
+      const inside = Math.abs(q.x - box.center.x) < box.size.x / 2 - 1e-6 && Math.abs(q.y - box.center.y) < box.size.y / 2 - 1e-6 && Math.abs(q.z - box.center.z) < box.size.z / 2 - 1e-6;
+      expect(inside).toBe(false);
+    }
   });
 });
 
