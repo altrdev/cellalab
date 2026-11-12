@@ -41,9 +41,12 @@ export type TabSide = 'top' | 'bottom' | 'left' | 'right';
 
 /** Linguetta di presa per il filo di bilanciamento del BMS: sporge dalla lamella (e ne fa parte) ed è forata. */
 export interface StripTab {
+  /** Di bilanciamento (una per giunzione) o di potenza (cavo di P+ e P−). */
+  kind: 'balance' | 'power';
   side: TabSide;
-  /** Centro della cella da cui parte e larghezza effettiva, mm. */
+  /** Centro della cella da cui parte, spostamento laterale del centro della linguetta rispetto ad essa e larghezza effettiva, mm. */
   anchor: Pt;
+  offsetMm: number;
   widthMm: number;
   /** Rettangolo della linguetta, mm del disegno. */
   rect: Pt[];
@@ -66,6 +69,8 @@ export interface Strip {
   /** Indici dei gruppi collegati (1 per i terminali, 2 per le serie). */
   groups: number[];
   nodes: StripNode[];
+  /** Linguetta di potenza (solo P+ e P−, se accesa): accanto a quella di bilanciamento, con il foro per il cavo. */
+  powerTab?: StripTab;
   /** Contorno esterno, a area positiva, in mm del disegno (convesso se la forma è piena). */
   outline: Pt[];
   /** Finestre vuote tra le bande. */
@@ -106,6 +111,8 @@ export interface TabOptions {
   /** Lunghezza della parte piegata, oltre la linea di piega, mm. */
   lengthMm: number;
   holeMm: number;
+  /** Linguetta del cavo di potenza su P+ e P−; assente = niente. */
+  power?: { widthMm: number; holeMm: number } | null;
   /** Margine della piega oltre il bordo del holder, mm. */
   bendMm: number;
 }
@@ -275,49 +282,96 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
     if (better) byJoint.set(s.joint, s);
   }
   const chosen = new Set(byJoint.values());
+  const GAP_MM = 2; // tra la linguetta di bilanciamento e quella di potenza sulla stessa cella
   for (const s of strips) {
     if (!chosen.has(s)) continue;
     const along = (n: StripNode) => n.x * d.x + n.y * d.y;
     const side = (n: StripNode) => n.x * perp.x + n.y * perp.y;
+    const forward = (n: StripNode) => along(n) + n.reachMm;
     const meanSide = s.nodes.reduce((a, n) => a + side(n), 0) / s.nodes.length;
-    // Nodo più avanti verso il lato scelto (a parità, il più vicino al centro della lamella).
-    const node = s.nodes.reduce((a, b) => {
-      const ea = along(a) + a.reachMm;
-      const eb = along(b) + b.reachMm;
-      if (Math.abs(ea - eb) > 1e-6) return eb > ea ? b : a;
-      return Math.abs(side(b) - meanSide) < Math.abs(side(a) - meanSide) ? b : a;
+    // Nodi dal più avanti verso il lato scelto (a parità, il più vicino al centro della lamella).
+    const ranked = [...s.nodes].sort((a, b) => {
+      if (Math.abs(forward(a) - forward(b)) > 1e-6) return forward(b) - forward(a);
+      return Math.abs(side(a) - meanSide) - Math.abs(side(b) - meanSide);
     });
-    // Tutte le linguette sono uguali, anche P+ e P−: un foro per il filo di bilanciamento. Il cavo di potenza non passa di qui.
-    const w = Math.min(o.widthMm, 2 * node.reachMm);
-    const lengthMm = Math.max(o.lengthMm, 1);
-    // Fin dove arriva il holder lungo la linguetta (controllando il centro e i due bordi): la piega sta oltre.
-    let exit = node.cellRadiusMm + DEFAULT_HOLDER_EDGE_MM;
-    if (holder && holder.length > 0) {
-      let last = -1;
-      for (let a = 0; a <= 80; a += 0.25) {
-        if ([-w / 2, 0, w / 2].some((v) => pointInRegions({ x: node.x + d.x * a + perp.x * v, y: node.y + d.y * a + perp.y * v }, holder))) last = a;
-      }
-      if (last >= 0) exit = last;
+    const node = ranked[0]!;
+
+    // Linguette da fare: quella di bilanciamento e, su P+ e P−, quella di potenza (su un'altra cella della stessa fila
+    // avanzata se c'è, altrimenti accanto alla prima sulla stessa cella).
+    interface Plan {
+      kind: StripTab['kind'];
+      node: StripNode;
+      offset: number;
+      w: number;
+      holeWant: number;
+      lengthMm: number;
     }
-    const bendAlong = Math.max(exit + o.bendMm, node.reachMm);
-    const reach = bendAlong + lengthMm;
-    const at = (a: number, p: number): Pt => ({ x: node.x + d.x * a + perp.x * p, y: node.y + d.y * a + perp.y * p });
-    const rect = convexHull([at(0, -w / 2), at(0, w / 2), at(reach, w / 2), at(reach, -w / 2)]);
-    const hole = Math.min(o.holeMm, w - 1, lengthMm - 1);
-    const hc = at(bendAlong + lengthMm / 2, 0); // il foro sta a metà della parte piegata
-    const region: Region = unionPolygons([s.outline, rect]);
-    const holes = [...s.holes];
-    if (hole >= 0.5) holes.push(circlePoints(hc.x, hc.y, hole / 2, circleSegments(hole / 2)));
+    const balW = Math.min(o.widthMm, 2 * node.reachMm);
+    const plans: Plan[] = [{ kind: 'balance', node, offset: 0, w: balW, holeWant: o.holeMm, lengthMm: Math.max(o.lengthMm, 1) }];
+    if (o.power && s.kind !== 'series') {
+      const pw = o.power;
+      const partner = ranked.slice(1).find((n) => Math.abs(forward(n) - forward(node)) < 1);
+      if (partner) {
+        plans.push({ kind: 'power', node: partner, offset: 0, w: Math.min(pw.widthMm, 2 * partner.reachMm), holeWant: pw.holeMm, lengthMm: Math.max(o.lengthMm, pw.holeMm + 4) });
+      } else {
+        // stessa cella: la coppia di linguette sta centrata sulla cella (può sporgere dal lobo della lamella, ma non dalla
+        // cella), quella di potenza prende quello che resta
+        const room = 2 * node.cellRadiusMm - balW - GAP_MM;
+        const w = Math.min(pw.widthMm, room);
+        if (w >= 3) {
+          plans[0]!.offset = -(w + GAP_MM) / 2;
+          plans.push({ kind: 'power', node, offset: (balW + GAP_MM) / 2, w, holeWant: pw.holeMm, lengthMm: Math.max(o.lengthMm, pw.holeMm + 4) });
+        }
+      }
+    }
+    // Fin dove arriva il holder lungo la linguetta (centro e due bordi): la piega sta oltre. Per tutta la lamella c'è
+    // una sola linea di piega, la più lontana.
+    const exitOf = (pl: Plan): number => {
+      let exit = pl.node.cellRadiusMm + DEFAULT_HOLDER_EDGE_MM;
+      if (holder && holder.length > 0) {
+        let last = -1;
+        for (let a = 0; a <= 80; a += 0.25) {
+          if ([-pl.w / 2, 0, pl.w / 2].some((v) => pointInRegions({ x: pl.node.x + d.x * a + perp.x * (pl.offset + v), y: pl.node.y + d.y * a + perp.y * (pl.offset + v) }, holder))) last = a;
+        }
+        if (last >= 0) exit = last;
+      }
+      return Math.max(exit + o.bendMm, pl.node.reachMm);
+    };
+    const bendAbs = Math.max(...plans.map((pl) => along(pl.node) + exitOf(pl)));
+
+    let region: Region = { outline: s.outline, holes: s.holes };
+    const holes: Pt[][] = [];
+    for (const pl of plans) {
+      const bendAlong = bendAbs - along(pl.node);
+      const reach = bendAlong + pl.lengthMm;
+      const at = (a: number, p: number): Pt => ({ x: pl.node.x + d.x * a + perp.x * (pl.offset + p), y: pl.node.y + d.y * a + perp.y * (pl.offset + p) });
+      const rect = convexHull([at(0, -pl.w / 2), at(0, pl.w / 2), at(reach, pl.w / 2), at(reach, -pl.w / 2)]);
+      const hole = Math.min(pl.holeWant, pl.w - 1, pl.lengthMm - 1);
+      const hc = at(bendAlong + pl.lengthMm / 2, 0); // il foro sta a metà della parte piegata
+      region = unionPolygons([region.outline, rect]);
+      if (hole >= 0.5) holes.push(circlePoints(hc.x, hc.y, hole / 2, circleSegments(hole / 2)));
+      const tab: StripTab = {
+        kind: pl.kind,
+        side: o.side,
+        anchor: { x: pl.node.x, y: pl.node.y },
+        offsetMm: pl.offset,
+        widthMm: pl.w,
+        rect,
+        holeX: hc.x,
+        holeY: hc.y,
+        holeDiameterMm: hole >= 0.5 ? hole : 0,
+        bend: [at(bendAlong, -pl.w / 2), at(bendAlong, pl.w / 2)],
+        blockedBy: null,
+      };
+      if (pl.kind === 'balance') s.tab = tab;
+      else s.powerTab = tab;
+    }
     s.outline = region.outline;
-    s.holes = holes;
-    s.areaMm2 = regionArea({ outline: s.outline, holes });
-    const bend: [Pt, Pt] = [at(bendAlong, -w / 2), at(bendAlong, w / 2)];
-    s.tab = { side: o.side, anchor: { x: node.x, y: node.y }, widthMm: w, rect, holeX: hc.x, holeY: hc.y, holeDiameterMm: hole >= 0.5 ? hole : 0, bend, blockedBy: null };
+    s.holes = [...s.holes, ...holes];
+    s.areaMm2 = regionArea({ outline: s.outline, holes: s.holes });
   }
   // Intralci: celle dell'altra parte e lamelle della stessa faccia (con le loro linguette).
-  for (const s of strips) {
-    const tab = s.tab;
-    if (!tab) continue;
+  for (const s of strips) for (const tab of tabsOf(s)) {
     const own = new Set(s.nodes.map((n) => n.cellId));
     for (const c of project.cells) {
       if (own.has(c.id)) continue;
@@ -335,6 +389,9 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
     }
   }
 }
+
+/** Le linguette di una lamella: quella di bilanciamento e, su P+ e P−, quella di potenza. */
+export const tabsOf = (s: Strip): StripTab[] => [s.tab, s.powerTab].filter((t): t is StripTab => t !== undefined);
 
 /** Distanza di un punto da un rettangolo (poligono convesso); 0 se dentro. */
 function distToRect(p: Pt, rect: readonly Pt[]): number {

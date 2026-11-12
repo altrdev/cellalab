@@ -29,12 +29,11 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
   - The wire arrival on the BMS is a model choice (`bmsMount.connector`: top face with the wires wrapping round an end, or a connector past an end, from the chosen end); it is not taken from a real board yet.
 - [x] Checks: pack S = BMS S, current, chemistry, n+1 balance wires (info only).
 - [x] Balance-wire tabs on the busbars: one per joint (S+1), drilled, on a chosen side; part of the busbar outline, so cut and exported with it.
-- [x] Holder grooves for the tabs (depth from the chosen AWG, wall kept at 0.8 mm at least). All tabs are identical (P+ and P− too) and exit on one side. The power cable does not use a tab: it goes on the body of the P+/P− busbar (not drawn yet).
+- [x] Holder grooves for the tabs (depth from the chosen AWG, wall kept at 0.8 mm at least). All balance tabs are identical; P+ and P− also get a power tab (width and hole from the cable gauge) next to the balance one, folded on the same line, with its own holder groove. The pair sits on one cell, centred (it may overhang the busbar lobe, never the cell).
 - [x] NTC pocket: a round hole in the holder walls in the gap between three cells (central cell, towards the wire exit side), setting on/off + sensor diameter, plus a 2 mm wire hole through the floor (gaps not covered by busbars preferred).
 - [ ] Still open: balance-wire routing along the pack between the two faces, warning when the wall is too thin for the wire, (the NTC pocket and hole are on both plates; the floor groove for the NTC wire was dropped as over-engineered).
 - [x] BMS position and wiring: BMS on the flank at mid height (or external exit point), position along the side, wire lengths B0..BS in the Export tab, BMS box and wires in the 3D view. Generic BMS sizes are class estimates.
 - [x] "Positive and negative cables" section in the Busbars tab: gauge choice (AWG 16–8) with a prudent ampacity table (`POWER_AMPACITY_A`, 60-degree column, guide values) and a warning in the report when it does not carry the design current. Still open: cable lengths in the wire list, connector choice, pad drawing.
-- [ ] Mark a power-cable pad on the P+/P− busbars, wide enough and thick enough for the current (thin nickel at a tab neck would overheat at 30 A).
 - [ ] BMS mounting hardware in the holder (pocket + spacers, strain relief) and the BMS's real holes/connector/B-/P-/P+ positions in the catalogue.
 
 ## Polish (phase 6)

@@ -21,7 +21,7 @@ import {
   type CoolingId,
 } from './sizing';
 import { holeForWireMm, powerAmpacityA, powerAwgFor } from './wire';
-import { neckWidthMm, type Strip, type StripOptions, type TabSide } from './strips';
+import { neckWidthMm, tabsOf, type Strip, type StripOptions, type TabSide } from './strips';
 import type { Project } from './types';
 import { len, tempDelta } from '../units';
 
@@ -104,7 +104,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
 export const stripOptionsOf = (s: LamellaSettings): StripOptions => ({
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
-  tabs: s.tabs ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), bendMm: s.tabBendMm } : null,
+  tabs: s.tabs ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), bendMm: s.tabBendMm, power: { widthMm: Math.max(s.tabWidthMm, holeForWireMm(s.powerAwg) + 4), holeMm: holeForWireMm(s.powerAwg) } } : null,
 });
 
 export type IssueSeverity = 'error' | 'warning' | 'info';
@@ -476,7 +476,7 @@ export function analyzeLamelle(
 
   // Una linguetta sopra una cella di un'altra giunzione la metterebbe in corto (se tocca un'altra lamella lo dice già il controllo sopra).
   for (const s of strips) {
-    if (s.tab?.blockedBy === 'cell') {
+    if (tabsOf(s).some((tb) => tb.blockedBy === 'cell')) {
       issues.push({ severity: 'warning', message: t('lamelle.issue.tabCell', { strip: s.label, face: faceName(s.face) }), stripIds: [s.id] });
     }
   }

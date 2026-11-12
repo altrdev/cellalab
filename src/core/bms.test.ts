@@ -5,7 +5,7 @@ import { generateGrid } from './layout';
 import { addCustomBms, removeCustomBms, replaceCells, setBms, setBmsMount, setCurrentLimit } from './ops';
 import { createProject, parseProject, serializeProject } from './project';
 import { computeStats } from './stats';
-import { pointInRegions, regionArea, unionPolygons } from './clip';
+import { intersectRegions, pointInRegions, regionArea, unionPolygons } from './clip';
 import { buildDxf } from './dxf';
 import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { buildHarness } from './harness';
@@ -196,7 +196,7 @@ describe('piega oltre il holder', () => {
 
 describe('tacche del portacelle per le linguette', () => {
   const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 0.3 } as const;
-  const wires = { balanceAwg: 26 };
+  const wires = { balanceAwg: 26, powerAwg: 10 };
   const p = setBms(pack(4, 2), 'bms-4s-30a-li-ion');
   const settings = { ...DEFAULT_HOLDER_SETTINGS, wallMm: 2.4 };
 
@@ -243,7 +243,7 @@ describe('tacche con linguette intralciate', () => {
     const strips = buildStrips(p, { tabs });
     const blocked = strips.filter((s) => s.tab?.blockedBy);
     expect(blocked.length).toBeGreaterThan(0);
-    const ids = tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26 }).map((n) => n.stripId);
+    const ids = tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26, powerAwg: 10 }).map((n) => n.stripId);
     for (const s of blocked) expect(ids).not.toContain(s.id);
   });
 });
@@ -472,6 +472,60 @@ describe('cablaggio del BMS', () => {
 
   it('setBmsMount tiene i valori nei limiti', () => {
     expect(setBmsMount(p, { along: 3, slackMm: -5 }).bmsMount).toMatchObject({ along: 1, slackMm: 0 });
+  });
+});
+
+describe('linguetta di potenza di P+ e P−', () => {
+  const tabs = { side: 'bottom', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, power: { widthMm: 8, holeMm: 3.39 } } as const;
+  const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
+  const strips = buildStrips(p, { tabs });
+  const terminals = strips.filter((x) => x.tab && x.kind !== 'series');
+
+  it('solo P+ e P− hanno la linguetta di potenza, accanto a quella di bilanciamento', () => {
+    expect(terminals).toHaveLength(2);
+    for (const s of strips.filter((x) => x.tab)) {
+      if (s.kind === 'series') {
+        expect(s.powerTab).toBeUndefined();
+        continue;
+      }
+      expect(s.powerTab?.kind).toBe('power');
+      expect(s.tab!.kind).toBe('balance');
+      expect(s.powerTab!.holeDiameterMm).toBeCloseTo(3.39, 6);
+      expect(s.tab!.holeDiameterMm).toBeCloseTo(1.21, 6);
+      expect(s.powerTab!.side).toBe(s.tab!.side);
+    }
+  });
+
+  it('le due linguette non si toccano e hanno la stessa linea di piega', () => {
+    for (const s of terminals) {
+      const a = s.tab!;
+      const b = s.powerTab!;
+      const overlap = intersectRegions([{ outline: a.rect, holes: [] }], [b.rect]).reduce((acc, r) => acc + regionArea(r), 0);
+      expect(overlap).toBeLessThan(1e-6);
+      // lato 'bottom': la piega è una retta orizzontale, stessa y
+      expect(a.bend[0].y).toBeCloseTo(b.bend[0].y, 6);
+      expect(a.bend[1].y).toBeCloseTo(a.bend[0].y, 6);
+    }
+  });
+
+  it('il portacelle ha una scanalatura per linguetta, più profonda per il cavo di potenza', () => {
+    const notches = tabNotches(strips, { ...DEFAULT_HOLDER_SETTINGS, wallMm: 3 }, { balanceAwg: 26, powerAwg: 10 });
+    const ids = (suffix: string) => notches.filter((n) => n.stripId.endsWith(suffix));
+    expect(notches.length).toBeGreaterThanOrEqual(5);
+    const depths = notches.map((n) => n.depthMm);
+    expect(Math.max(...depths)).toBeGreaterThan(Math.min(...depths));
+    expect(ids('-0').length + ids('-4').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('nel DXF i fori tondi sono archi veri e non spezzate', () => {
+    const dxf = buildDxf(strips, { face: 'all', kerfMm: 0.1, includeContacts: false, includeLabels: false });
+    const rings = dxf.split('POLYLINE').slice(1).map((blk) => blk.split('VERTEX').slice(1));
+    expect(rings.length).toBeGreaterThan(0);
+    for (const verts of rings) {
+      const withBulge = verts.filter((v) => /\n42\n/.test(v)).length;
+      // un anello con molti vertici e nessun arco sarebbe un cerchio a spezzata
+      if (verts.length >= 12) expect(withBulge).toBeGreaterThan(0);
+    }
   });
 });
 

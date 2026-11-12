@@ -2,7 +2,7 @@ import { t } from '../i18n';
 import { ringWithArcs, type Circle } from './arcs';
 import { offsetRegion, regionRings } from './clip';
 import { spotPositions } from './sizing';
-import type { Face, Strip } from './strips';
+import { tabsOf, type Face, type Strip } from './strips';
 
 /**
  * Scrittore DXF ASCII minimale (formato R12, il più compatibile: LibreCAD, LightBurn, Inkscape,
@@ -120,6 +120,16 @@ export function labelPlacements(
   return out;
 }
 
+/** Centro e raggio se tutti i punti stanno su un cerchio (un foro tondo disegnato a spezzata), altrimenti null. */
+function circleOf(ring: readonly { x: number; y: number }[]): { x: number; y: number; r: number } | null {
+  if (ring.length < 12) return null;
+  const x = ring.reduce((a, p) => a + p.x, 0) / ring.length;
+  const y = ring.reduce((a, p) => a + p.y, 0) / ring.length;
+  const ds = ring.map((p) => Math.hypot(p.x - x, p.y - y));
+  const r = ds.reduce((a, v) => a + v, 0) / ds.length;
+  return ds.every((v) => Math.abs(v - r) < 0.005) ? { x, y, r } : null;
+}
+
 export function buildDxf(strips: readonly Strip[], options: DxfOptions): string {
   const w = new Writer();
   const list = strips.filter((s) => options.face === 'all' || s.face === options.face);
@@ -206,6 +216,11 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
       { cx: n.x, cy: Y(n.y), r: n.reachMm + k },
       { cx: n.x, cy: Y(n.y), r: s.bandMm / 2 + k },
     ]);
+    // Anche i fori tondi (quello della linguetta…) diventano archi veri: il taglio li stringe di metà kerf.
+    for (const hole of s.holes) {
+      const fit = circleOf(hole);
+      if (fit) circles.push({ cx: fit.x, cy: Y(fit.y), r: fit.r - k });
+    }
     for (const ring of regionRings(offsetRegion(s, k))) {
       const arcs = ringWithArcs(
         ring.map((p) => ({ x: p.x, y: Y(p.y) })),
@@ -214,7 +229,7 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
       polyline('CUT', arcs.map((v) => ({ x: v.x, y: Y(v.y), bulge: v.bulge })));
     }
 
-    if (s.tab) line('MARK', s.tab.bend[0], s.tab.bend[1]);
+    for (const tb of tabsOf(s)) line('MARK', tb.bend[0], tb.bend[1]);
     if (options.includeContacts) for (const n of s.nodes) circle('MARK', n.x, n.y, n.contactRadiusMm);
 
     const spots = options.spotsPerTerminal?.get(s.id);

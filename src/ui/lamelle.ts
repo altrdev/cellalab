@@ -5,7 +5,7 @@ import type { Pt } from '../core/polygon';
 import { AWG_TABLE, POWER_AWGS } from '../core/wire';
 import { COOLING, spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
-import { buildStrips, type Face, type Strip, type TabSide } from '../core/strips';
+import { buildStrips, tabsOf, type Face, type Strip, type TabSide } from '../core/strips';
 import { buildHolder } from '../core/holder';
 import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
 import { holderOf, type HolderCuts } from './holder';
@@ -72,7 +72,7 @@ export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: H
 export function holderCutsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): HolderCuts {
   if (project.bmsId === undefined) return NO_CUTS;
   const opts = optionsOf(project, settings);
-  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, holder.ntc, holder.ntcMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
+  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg, holder.ntc, holder.ntcMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
   const hit = cutsCache.get(project);
   if (hit && hit.key === key) return hit.cuts;
   const notches = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon) : [];
@@ -101,7 +101,7 @@ function tabBlocks(project: Project, settings: LamellaSettings): Record<TabSide,
   const holderOutline = model ? model.wall.map((r) => ({ outline: r.outline, holes: [] })) : null;
   const blocks = { ...none };
   for (const side of TAB_SIDES) {
-    blocks[side] = buildStrips(project, { ...opts, tabs: { ...opts.tabs, side }, holderOutline }).filter((s) => s.tab?.blockedBy).length;
+    blocks[side] = buildStrips(project, { ...opts, tabs: { ...opts.tabs, side }, holderOutline }).filter((s) => tabsOf(s).some((tb) => tb.blockedBy)).length;
   }
   blocksCache.set(project, { key, blocks });
   return blocks;
