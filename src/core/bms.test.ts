@@ -575,6 +575,40 @@ describe('cablaggio del BMS', () => {
   });
 });
 
+describe('linguette di potenza opzionali', () => {
+  const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
+  const withTabs = (over: Partial<typeof DEFAULT_LAMELLA_SETTINGS>, wireHoles = false) => {
+    const o = stripOptionsOf({ ...DEFAULT_LAMELLA_SETTINGS, ...over }, wireHoles);
+    return { o, strips: buildStrips(p, o) };
+  };
+
+  it('di default ci sono le linguette di potenza su P+ e P−', () => {
+    const { strips } = withTabs({});
+    expect(strips.filter((x) => x.powerTab)).toHaveLength(2);
+    expect(strips.filter((x) => x.tab)).toHaveLength(5);
+  });
+
+  it('senza linguette di potenza restano solo quelle di bilanciamento', () => {
+    const { o, strips } = withTabs({ powerTabs: false });
+    expect(o.tabs?.power).toBeNull();
+    expect(strips.some((x) => x.powerTab)).toBe(false);
+    expect(strips.filter((x) => x.tab)).toHaveLength(5);
+  });
+
+  it('solo potenza, solo bilanciamento o niente: ognuna è una scelta a sé', () => {
+    expect(withTabs({ tabs: false }).strips.filter((x) => x.tab)).toHaveLength(0);
+    expect(withTabs({ tabs: false }).strips.filter((x) => x.powerTab)).toHaveLength(2);
+    const none = withTabs({ tabs: false, powerTabs: false });
+    expect(none.o.tabs).toBeNull();
+    expect(none.strips.some((x) => x.tab || x.powerTab)).toBe(false);
+    // con i fori nel portacelle serve comunque il lato di uscita, senza nessuna linguetta
+    const holes = withTabs({ tabs: false, powerTabs: false }, true);
+    expect(holes.o.tabs?.style).toBe('none');
+    expect(holes.o.tabs?.power).toBeNull();
+    expect(holes.strips.some((x) => x.tab || x.powerTab)).toBe(false);
+  });
+});
+
 describe('uscita dei fili dal portacelle, senza linguette', () => {
   const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
   const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, false)!;

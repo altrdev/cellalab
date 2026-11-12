@@ -61,6 +61,8 @@ export interface LamellaSettings {
   widthMm: number | null;
   /** Linguette di presa per i fili del BMS (solo se è scelto un BMS). */
   tabs: boolean;
+  /** Linguette per i cavi di potenza di P+ e P−, indipendenti da quelle di bilanciamento (solo con un BMS). */
+  powerTabs: boolean;
   /** Lato del disegno verso cui sporgono (i fili escono tutti da lì); `auto` sceglie il primo lato libero (lo risolve l'interfaccia). */
   tabSide: TabSide | 'auto';
   tabWidthMm: number;
@@ -92,6 +94,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   contactDiameterMm: null,
   widthMm: null,
   tabs: true,
+  powerTabs: true,
   tabSide: 'auto',
   tabWidthMm: 6,
   tabLengthMm: 8,
@@ -104,7 +107,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
 export const stripOptionsOf = (s: LamellaSettings, wireHoles = false): StripOptions => ({
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
-  tabs: s.tabs || wireHoles ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), style: s.tabs ? 'tab' : 'none', bendMm: s.tabBendMm, power: { widthMm: Math.max(s.tabWidthMm, holeForWireMm(s.powerAwg) + 4), holeMm: holeForWireMm(s.powerAwg) } } : null,
+  tabs: s.tabs || s.powerTabs || wireHoles ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), style: s.tabs ? 'tab' : 'none', bendMm: s.tabBendMm, power: s.powerTabs ? { widthMm: Math.max(s.tabWidthMm, holeForWireMm(s.powerAwg) + 4), holeMm: holeForWireMm(s.powerAwg) } : null } : null,
 });
 
 export type IssueSeverity = 'error' | 'warning' | 'info';

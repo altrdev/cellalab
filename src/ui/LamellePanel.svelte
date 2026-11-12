@@ -196,6 +196,10 @@
     {:else}
       <p class="note">{t('lam.powerNone')}</p>
     {/if}
+    {#if bmsOf(project)}
+      <label><span><input type="checkbox" bind:checked={ui.lamella.powerTabs} /> {t('lam.powerTabs')}</span></label>
+      {#if !ui.lamella.powerTabs}<p class="note">{t('lam.powerTabsOff')}</p>{/if}
+    {/if}
     <Help label={t('lam.what')}>{t('lam.powerHelp')}</Help>
   </section>
 
