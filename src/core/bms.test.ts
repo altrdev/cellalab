@@ -375,6 +375,39 @@ describe('filo dell’NTC', () => {
   });
 });
 
+describe('ingombro della scheda del BMS', () => {
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.2, bendMm: 0.3 } as const;
+  const fitOf = (packP: Project, mount: Parameters<typeof setBmsMount>[1] = {}) => {
+    const q = setBmsMount(setBms(packP, 'bms-4s-30a-li-ion'), mount);
+    return buildHarness(q, buildStrips(q, { tabs }), 0.1)!.fit!;
+  };
+
+  it('un pacco grande a sufficienza ospita la scheda: niente sporgenze', () => {
+    const f = fitOf(pack(4, 3));
+    expect(f.lengthOverMm).toBe(0);
+    expect(f.heightOverMm).toBe(0);
+  });
+
+  it('sul fianco, se la scheda è più lunga del fianco sporge della differenza', () => {
+    const f = fitOf(pack(2, 1));
+    expect(f.lengthKind).toBe('flank');
+    expect(f.lengthOverMm).toBeCloseTo(f.boardLengthMm - f.packLengthMm, 6);
+    expect(f.lengthOverMm).toBeGreaterThan(5);
+  });
+
+  it('in testa la lunghezza della scheda va in profondità: la confronta con la profondità del pacco', () => {
+    const f = fitOf(pack(4, 1), { place: 'head' });
+    expect(f.lengthKind).toBe('head');
+    expect(f.packLengthMm).toBeCloseTo(21.4, 1); // una sola fila di celle in profondità
+    expect(f.lengthOverMm).toBeGreaterThan(30);
+  });
+
+  it('senza scatola (BMS esterno) non c’è niente da controllare', () => {
+    const q = setBmsMount(setBms(pack(4, 3), 'bms-4s-30a-li-ion'), { mode: 'external' });
+    expect(buildHarness(q, buildStrips(q, { tabs }), 0.1)!.fit).toBeNull();
+  });
+});
+
 describe('cablaggio del BMS', () => {
   const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.2, bendMm: 0.3 } as const;
   const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
@@ -426,26 +459,30 @@ describe('cablaggio del BMS', () => {
     }
   });
 
-  it('in testa la scatola sta oltre un’estremità del fianco e i fili arrivano lungo il fianco senza toccarsi', () => {
-    const perp = { x: 1, z: 0 }; // lato 'top': il fianco corre lungo X
-    const cells = p.cells;
-    const xs = cells.map((c) => c.x);
+  it('in testa la scheda sta contro la testata del pacco, girata di 90°, e i pad sono sui suoi bordi', () => {
+    const xs = p.cells.map((c) => c.x);
     const pMin = Math.min(...xs) - 10.7;
     const pMax = Math.max(...xs) + 10.7;
     for (const end of ['start', 'end'] as const) {
       const e = buildHarness(setBmsMount(p, { place: 'head', connectorEnd: end }), strips, 0.1)!;
       const box = e.box!;
-      const half = box.size.x / 2;
-      if (end === 'end') expect(box.center.x - half).toBeGreaterThan(pMax - 1e-6);
-      else expect(box.center.x + half).toBeLessThan(pMin + 1e-6);
-      expect(perp.x).toBe(1);
-      // i pad stanno sulla faccia esterna e sulla parte della scatola verso il pacco
+      // lato 'top': il fianco corre lungo X; lo spessore della scheda va lungo X, la lunghezza lungo Z
+      expect(box.size.x).toBeLessThan(box.size.z);
+      if (end === 'end') expect(box.center.x - box.size.x / 2).toBeGreaterThan(pMax - 1e-6);
+      else expect(box.center.x + box.size.x / 2).toBeLessThan(pMin + 1e-6);
+      const pads: number[] = [];
       for (const w of e.wires) {
         const pin = w.points[w.points.length - 1]!;
-        expect(Math.abs(pin.x - box.center.x)).toBeLessThan(half);
-        expect(end === 'end' ? pin.x < box.center.x : pin.x > box.center.x).toBe(true);
+        expect(pin.x).toBeCloseTo(box.center.x, 6); // sul bordo della scheda
+        expect(Math.abs(pin.z - box.center.z)).toBeLessThanOrEqual(box.size.z / 2); // lungo la scheda
+        const edgeY = w.face === 'top' ? box.center.y + box.size.y / 2 : box.center.y - box.size.y / 2;
+        expect(pin.y).toBeCloseTo(edgeY, 6); // bordo alto per la faccia sopra, basso per la faccia sotto
+        pads.push(pin.z);
       }
-      // nessun filo dentro la scatola e nessuno a meno di un diametro da un altro
+      // pad a passo fisso, nell'ordine dei nodi
+      const sorted = [...pads].sort((a, b) => a - b);
+      for (let k = 1; k < sorted.length; k++) expect(sorted[k]! - sorted[k - 1]!).toBeCloseTo(2.5, 6);
+      // nessun filo dentro la scheda e nessuno a meno di un diametro da un altro
       const sample = (pts: { x: number; y: number; z: number }[]) => {
         const out: { x: number; y: number; z: number }[] = [];
         for (let k = 0; k + 1 < pts.length; k++) {
@@ -461,24 +498,21 @@ describe('cablaggio del BMS', () => {
       for (let i = 0; i < paths.length; i++) for (let j = i + 1; j < paths.length; j++) for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
       expect(closest).toBeGreaterThanOrEqual(0.9 - 1e-6);
       for (const path of paths) for (const q of path) {
-        const inside = Math.abs(q.x - box.center.x) < half - 1e-6 && Math.abs(q.y - box.center.y) < box.size.y / 2 - 1e-6 && Math.abs(q.z - box.center.z) < box.size.z / 2 - 1e-6;
+        const inside = Math.abs(q.x - box.center.x) < box.size.x / 2 - 1e-6 && Math.abs(q.y - box.center.y) < box.size.y / 2 - 1e-6 && Math.abs(q.z - box.center.z) < box.size.z / 2 - 1e-6;
         expect(inside).toBe(false);
       }
     }
   });
 
-  it('le corsie sono ordinate per distanza dal BMS: nessuna discesa dalla linguetta incrocia la corsia di un altro', () => {
+  it('in testa il filo del pad più dentro prende la corsia più lontana dalla scheda: le discese sui pad non incrociano le corsie', () => {
     for (const end of ['start', 'end'] as const) {
       const e = buildHarness(setBmsMount(p, { place: 'head', connectorEnd: end }), strips, 0.1)!;
+      const box = e.box!;
       for (const a of e.wires) {
         for (const b of e.wires) {
-          if (a === b || a.face !== b.face) continue;
-          // discesa di a: x fisso (foro), y da p0 a piede; corsia di b: y fisso, x da foro di b al pad di b
-          const drop = { x: a.points[0]!.x, y0: a.points[0]!.y, y1: a.points[1]!.y };
-          const lane = { y: b.points[1]!.y, x0: b.points[0]!.x, x1: b.points[3]!.x };
-          const crossesX = drop.x > Math.min(lane.x0, lane.x1) + 1e-6 && drop.x < Math.max(lane.x0, lane.x1) - 1e-6;
-          const crossesY = lane.y > Math.min(drop.y0, drop.y1) + 1e-6 && lane.y < Math.max(drop.y0, drop.y1) - 1e-6;
-          expect(crossesX && crossesY).toBe(false);
+          if (a === b || a.face !== b.face || a.node >= b.node) continue;
+          // stessa faccia, nodo più basso = pad più dentro: corsia più lontana dalla scheda
+          expect(Math.abs(a.points[1]!.y - box.center.y)).toBeGreaterThan(Math.abs(b.points[1]!.y - box.center.y));
         }
       }
     }

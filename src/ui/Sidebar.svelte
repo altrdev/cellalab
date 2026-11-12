@@ -34,14 +34,17 @@
   import { holderOf, sanitizeHolderSettings } from './holder';
   import LamellePanel from './LamellePanel.svelte';
   import SettingsMenu from './SettingsMenu.svelte';
-  import { reportOf, sanitizeLamellaSettings } from './lamelle';
+  import { bmsFitIssues, reportOf, sanitizeLamellaSettings } from './lamelle';
   import { ui } from './ui.svelte';
 
   const project = $derived($history.present);
   const stats = $derived(computeStats(project));
   let showGenericInfo = $state(false);
-  const sumErrors = $derived($drc.filter((i) => i.severity === 'error').length);
-  const sumWarnings = $derived($drc.filter((i) => i.severity === 'warning').length);
+  /** Controlli del pacco, più l'ingombro della scheda del BMS (che dipende dalla posizione e dal lato di uscita dei fili). */
+  type Row = { severity: 'error' | 'warning' | 'info'; message: string; cellIds: string[] };
+  const checkRows = $derived<Row[]>([...$drc, ...bmsFitIssues(project, ui.lamella)]);
+  const sumErrors = $derived(checkRows.filter((i) => i.severity === 'error').length);
+  const sumWarnings = $derived(checkRows.filter((i) => i.severity === 'warning').length);
   const sumTone = $derived(sumErrors > 0 ? 'error' : sumWarnings > 0 ? 'warning' : 'ok');
   const sumLabel = $derived(
     sumErrors > 0
@@ -71,7 +74,7 @@
     const strips = project.cells.length > 0 ? reportOf(project, ui.lamella).status : 'empty';
     const issues = holderOf(project, ui.holder).report?.issues ?? [];
     return {
-      pack: $drc.some((i) => i.severity === 'error') ? 'error' : $drc.some((i) => i.severity === 'warning') ? 'warning' : null,
+      pack: checkRows.some((i) => i.severity === 'error') ? 'error' : checkRows.some((i) => i.severity === 'warning') ? 'warning' : null,
       strips: strips === 'error' ? 'error' : strips === 'warning' ? 'warning' : null,
       holder: issues.some((i) => i.level === 'error') ? 'error' : issues.some((i) => i.level === 'warning') ? 'warning' : null,
       file: null,
@@ -637,14 +640,14 @@
 
 
   <details class="sec" open>
-    <summary><Icon name={$drc.some((i) => i.severity !== 'info') ? 'alert' : 'check'} /> {t('side.checks.title')} {#if $drc.length > 0}<span class="count">{$drc.length}</span>{/if}</summary>
+    <summary><Icon name={checkRows.some((i) => i.severity !== 'info') ? 'alert' : 'check'} /> {t('side.checks.title')} {#if checkRows.length > 0}<span class="count">{checkRows.length}</span>{/if}</summary>
     {#if project.cells.length === 0}
       <p class="note">{t('side.checks.none')}</p>
-    {:else if $drc.length === 0}
+    {:else if checkRows.length === 0}
       <p class="ok">{t('side.checks.ok')}</p>
     {:else}
       <ul>
-        {#each $drc as issue (issue.message)}
+        {#each checkRows as issue (issue.message)}
           <li>
             <button
               class="issue {issue.severity}"

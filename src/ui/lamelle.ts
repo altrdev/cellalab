@@ -1,4 +1,5 @@
-import { renderKey } from '../i18n';
+import { renderKey, t } from '../i18n';
+import { len } from '../units';
 import type { StripOptions } from '../core/strips';
 import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf, type LamellaReport, type LamellaSettings } from '../core/lamelle';
 import type { Pt } from '../core/polygon';
@@ -165,6 +166,25 @@ export function tabSideOf(project: Project, settings: LamellaSettings): TabSide 
 function optionsOf(project: Project, settings: LamellaSettings): StripOptions {
   const o = stripOptionsOf(settings, holderSettings().wireHoles);
   return o.tabs ? { ...o, tabs: { ...o.tabs, side: tabSideOf(project, settings) } } : o;
+}
+
+/** Avvisi sull'ingombro della scheda del BMS: se è più grande del posto che ha sul pacco, sporge. */
+export function bmsFitIssues(project: Project, settings: LamellaSettings): { severity: 'warning'; message: string; cellIds: string[] }[] {
+  const fit = harnessOf(project, settings)?.fit;
+  if (!fit) return [];
+  const out: { severity: 'warning'; message: string; cellIds: string[] }[] = [];
+  const hint = t('bms.fitHint');
+  if (fit.lengthOverMm > 0.05) {
+    out.push({
+      severity: 'warning',
+      message: t(fit.lengthKind === 'head' ? 'bms.fitDepth' : 'bms.fitFlank', { board: len(fit.boardLengthMm, 0), pack: len(fit.packLengthMm, 0), over: len(fit.lengthOverMm, 0), hint }),
+      cellIds: [],
+    });
+  }
+  if (fit.heightOverMm > 0.05) {
+    out.push({ severity: 'warning', message: t('bms.fitHeight', { board: len(fit.boardWidthMm, 0), pack: len(fit.packHeightMm, 0), over: len(fit.heightOverMm, 0), hint }), cellIds: [] });
+  }
+  return out;
 }
 
 /** Cablaggio del BMS (posizione e lunghezza dei fili), con lo spessore delle lamelle che si vede nella scena. */

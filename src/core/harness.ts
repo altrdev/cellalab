@@ -50,12 +50,28 @@ export interface Harness {
   box: BmsBox | null;
   wires: HarnessWire[];
   totalCutMm: number;
+  /** Se la scheda del BMS sta nello spazio che ha sul pacco; null senza scatola (BMS esterno o ingombro ignoto). */
+  fit: HarnessFit | null;
+}
+
+/** Ingombro della scheda rispetto al posto sul pacco: di quanto sporge, in lunghezza e in altezza (0 = ci sta). */
+export interface HarnessFit {
+  /** Sul fianco la lunghezza della scheda va lungo il fianco; in testa va in profondità, verso il lato di uscita. */
+  lengthKind: 'flank' | 'head';
+  boardLengthMm: number;
+  packLengthMm: number;
+  lengthOverMm: number;
+  boardWidthMm: number;
+  packHeightMm: number;
+  heightOverMm: number;
 }
 
 /** Passo dei contatti del connettore di bilanciamento (JST-XH), mm. */
 export const CONNECTOR_PITCH_MM = 2.5;
 /** Distanza tra il fianco delle celle e il fascio, mm. */
 const WIRE_CLEARANCE_MM = 1.5;
+/** In testa: distanza tra il bordo della scheda rivolto al fianco e le corsie dei fili, mm. */
+const HEAD_FLANK_GAP_MM = 1.5;
 /** Distanza tra la testata del BMS e il connettore di bilanciamento quando sta oltre la testata, mm. */
 const CONNECTOR_END_GAP_MM = 3;
 /** Margine tra la testata e il primo pad sulla faccia superiore, mm. */
@@ -104,11 +120,13 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
 
   // Estremo del fianco lungo la direzione di uscita e tratto occupato lungo il lato.
   let edge = -Infinity;
+  let aMin = Infinity;
   let pMin = Infinity;
   let pMax = -Infinity;
   for (const c of project.cells) {
     const r = (findCellType(project, c.typeId)?.diameterMm ?? 0) / 2;
     edge = Math.max(edge, c.x * d.x + c.y * d.y + r);
+    aMin = Math.min(aMin, c.x * d.x + c.y * d.y - r);
     const p = c.x * perp.x + c.y * perp.y;
     pMin = Math.min(pMin, p - r);
     pMax = Math.max(pMax, p + r);
@@ -122,7 +140,13 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   // In testa la scatola sta oltre un'estremità del fianco (sulla stessa fila), e i fili arrivano lungo il fianco.
   const head = !!boxSize && mount.place === 'head';
   const headSgn = mount.connectorEnd === 'end' ? 1 : -1;
-  const pc = head ? (headSgn > 0 ? pMax + WIRE_CLEARANCE_MM + boxSize!.lengthMm / 2 : pMin - WIRE_CLEARANCE_MM - boxSize!.lengthMm / 2) : pMin + mount.along * (pMax - pMin);
+  // In testa la scheda sta contro la testata del pacco, girata di 90°: il suo spessore è lungo il fianco, la sua lunghezza
+  // in profondità (verso il lato di uscita) e il bordo rivolto al fianco, a filo delle corsie, porta i pad.
+  const headT = boxSize?.thicknessMm ?? 0;
+  const headL = boxSize?.lengthMm ?? 0;
+  const pHead = headSgn > 0 ? pMax + WIRE_CLEARANCE_MM + headT / 2 : pMin - WIRE_CLEARANCE_MM - headT / 2;
+  const aBoxCenter = aIn - HEAD_FLANK_GAP_MM - headL / 2;
+  const pc = head ? pHead : pMin + mount.along * (pMax - pMin);
   // Con la scatola nota i fili arrivano o sulla faccia superiore (pad o connettore: scavalcano il bordo sopra o sotto la
   // scatola) o a un connettore oltre una testata. Mai dietro: lì c'è la scheda.
   const pins = withTab.length * CONNECTOR_PITCH_MM;
@@ -130,7 +154,7 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const pEnd = boxSize ? pc + sgn * (boxSize.lengthMm / 2) : pc; // testata scelta, lungo il lato
   const onEnd = !!boxSize && !head && mount.connector === 'end';
   const onTop = !!boxSize && !onEnd;
-  const pConn = onEnd ? pEnd + sgn * (pins / 2 + CONNECTOR_END_GAP_MM) : onTop ? pEnd - sgn * Math.min(boxSize!.lengthMm / 2, pins / 2 + TOP_MARGIN_MM) : pc;
+  const pConn = head ? pHead : onEnd ? pEnd + sgn * (pins / 2 + CONNECTOR_END_GAP_MM) : onTop ? pEnd - sgn * Math.min(boxSize!.lengthMm / 2, pins / 2 + TOP_MARGIN_MM) : pc;
   const aTop = aConn + (boxSize?.thicknessMm ?? 0); // faccia superiore della scheda
   const to3 = (a: number, p: number, y: number): Pt3 => ({ x: d.x * a + perp.x * p, y, z: d.y * a + perp.y * p });
 
@@ -145,10 +169,15 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const holeP = (x: Strip) => startPt(x).x * perp.x + startPt(x).y * perp.y;
   const faceRank = new Map<string, number>();
   for (const face of ['top', 'bottom'] as const) {
-    withTab
-      .filter((x) => x.face === face)
-      .sort((x, y) => Math.abs(holeP(y) - pConn) - Math.abs(holeP(x) - pConn) || y.joint - x.joint)
-      .forEach((x, i) => faceRank.set(x.id, i));
+    const group = withTab.filter((x) => x.face === face);
+    if (head) {
+      // In testa i pad sono in fila lungo la scheda, nell'ordine dei nodi: il filo del pad più dentro prende la corsia più
+      // lontana dalla scheda, così le discese sui pad non incrociano le corsie degli altri. Le discese dalle linguette
+      // possono incrociare le corsie: passano a un'altra profondità.
+      group.sort((x, y) => y.joint - x.joint).forEach((x, i) => faceRank.set(x.id, group.length - 1 - i));
+    } else {
+      group.sort((x, y) => Math.abs(holeP(y) - pConn) - Math.abs(holeP(x) - pConn) || y.joint - x.joint).forEach((x, i) => faceRank.set(x.id, i));
+    }
   }
   // Profondità: corsie vicino alle celle, discese dalle linguette più in fuori, salita al connettore ancora più fuori.
   const bendAt = (s: Strip) =>
@@ -204,8 +233,16 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
       const lane = (faceRank.get(s.id) ?? 0) * WIRE_LANE_MM;
       const half = boxSize ? boxSize.widthMm / 2 : 0;
       const yE = s.face === 'top' ? Math.min(yHole, yMid + half + EDGE_GAP_MM + lane) : Math.max(yHole, yMid - half - EDGE_GAP_MM - lane);
-      points.push(to3(aOut, pHole, yE), to3(aIn, pHole, yE), to3(aIn, pPin, yE));
-      if (onTop) points.push(to3(aTop + EDGE_GAP_MM, pPin, yE), to3(aTop, pPin, yMid));
+      points.push(to3(aOut, pHole, yE), to3(aIn, pHole, yE));
+      if (head) {
+        // lungo il fianco fino alla testata, poi verso la scheda sopra (o sotto) il suo bordo e giù (o su) sul pad
+        const aPad = aBoxCenter + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
+        const yEdge = s.face === 'top' ? yMid + half : yMid - half;
+        points.push(to3(aIn, pHead, yE), to3(aPad, pHead, yE), to3(aPad, pHead, yEdge));
+      } else points.push(to3(aIn, pPin, yE));
+      if (head) {
+        // già arrivato sul pad
+      } else if (onTop) points.push(to3(aTop + EDGE_GAP_MM, pPin, yE), to3(aTop, pPin, yMid));
       else points.push(to3(aUp, pPin, yE), to3(aUp, pPin, yMid)); // la salita al connettore sta fuori dalle corsie
       const lengthMm = points.slice(1).reduce((acc, q, i) => acc + len(points[i]!, q), 0);
       const extra = mount.slackMm + (mount.mode === 'external' ? mount.tailMm : 0);
@@ -221,13 +258,32 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     })
     .sort((a, b) => a.node - b.node);
 
-  const connector = to3(onTop ? aTop : aUp, pConn, yMid);
+  const connector = head ? to3(aBoxCenter, pHead, yMid) : to3(onTop ? aTop : aUp, pConn, yMid);
   let boxOut: BmsBox | null = null;
   if (box && size) {
     // Lunghezza lungo il lato, larghezza in altezza, spessore verso l'esterno; la faccia verso il pacco è quella del connettore.
     const along = d.x === 0 ? { x: size.lengthMm, z: size.thicknessMm } : { x: size.thicknessMm, z: size.lengthMm };
-    const out = to3(aConn + size.thicknessMm / 2, pc, yMid);
-    boxOut = { center: out, size: { x: along.x, y: size.widthMm, z: along.z } };
+    if (head) {
+      // girata di 90°: lo spessore va lungo il fianco, la lunghezza in profondità
+      const turned = d.x === 0 ? { x: headT, z: headL } : { x: headL, z: headT };
+      boxOut = { center: to3(aBoxCenter, pHead, yMid), size: { x: turned.x, y: size.widthMm, z: turned.z } };
+    } else {
+      const out = to3(aConn + size.thicknessMm / 2, pc, yMid);
+      boxOut = { center: out, size: { x: along.x, y: size.widthMm, z: along.z } };
+    }
   }
-  return { mount, side, connector, box: boxOut, wires, totalCutMm: wires.reduce((a, w) => a + w.cutMm, 0) };
+  let fit: HarnessFit | null = null;
+  if (boxSize) {
+    const packLength = head ? edge - aMin : pMax - pMin; // in testa la scheda va in profondità, sul fianco lungo il fianco
+    fit = {
+      lengthKind: head ? 'head' : 'flank',
+      boardLengthMm: boxSize.lengthMm,
+      packLengthMm: packLength,
+      lengthOverMm: Math.max(0, boxSize.lengthMm - packLength),
+      boardWidthMm: boxSize.widthMm,
+      packHeightMm: height,
+      heightOverMm: Math.max(0, boxSize.widthMm - height),
+    };
+  }
+  return { mount, side, connector, box: boxOut, wires, totalCutMm: wires.reduce((a, w) => a + w.cutMm, 0), fit };
 }

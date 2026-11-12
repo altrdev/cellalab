@@ -5,12 +5,15 @@
   import { bmsMountOf } from '../core/harness';
   import UnitInput from './UnitInput.svelte';
   import { history } from '../state';
+  import { bmsFitIssues } from './lamelle';
+  import { ui } from './ui.svelte';
   import Help from './Help.svelte';
   import { rangeFill } from './rangeFill';
 
   const project = $derived($history.present);
   const bms = $derived(bmsOf(project));
   const mount = $derived(bmsMountOf(project));
+  const fitIssues = $derived(bmsFitIssues(project, ui.lamella));
   const isCustom = $derived(bms !== undefined && (project.customBmsTypes ?? []).some((b) => b.id === bms.id));
 
   const blank = (): BmsDraft => ({ name: '', minSeries: 13, maxSeries: 13, maxCurrentA: 30, chemistry: 'li-ion', ntc: true, lengthMm: 0, widthMm: 0, thicknessMm: 0 });
@@ -132,6 +135,7 @@
     {/if}
   </div>
   {#if mount.mode === 'pack' && !bms.sizeMm}<p class="note">{t('bms.noSize')}</p>{/if}
+  {#each fitIssues as f (f.message)}<p class="note warn">{f.message}</p>{/each}
 {/if}
 <Help label={t('help.how')}>{t('bms.help')}</Help>
 
@@ -161,6 +165,9 @@
   .top {
     display: flex;
     justify-content: space-between;
+  }
+  .note.warn {
+    color: var(--warn);
   }
   .note {
     margin: 0;
