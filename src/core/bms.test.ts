@@ -481,9 +481,10 @@ describe('linguetta di potenza di P+ e P−', () => {
   const strips = buildStrips(p, { tabs });
   const terminals = strips.filter((x) => x.tab && x.kind !== 'series');
 
-  it('solo P+ e P− hanno la linguetta di potenza, accanto a quella di bilanciamento', () => {
+  it('solo P+ e P− hanno la linguetta di potenza, a 90° da quelle di bilanciamento', () => {
     expect(terminals).toHaveLength(2);
     for (const s of strips.filter((x) => x.tab)) {
+      expect(s.tab!.side).toBe('bottom');
       if (s.kind === 'series') {
         expect(s.powerTab).toBeUndefined();
         continue;
@@ -492,19 +493,22 @@ describe('linguetta di potenza di P+ e P−', () => {
       expect(s.tab!.kind).toBe('balance');
       expect(s.powerTab!.holeDiameterMm).toBeCloseTo(3.39, 6);
       expect(s.tab!.holeDiameterMm).toBeCloseTo(1.21, 6);
-      expect(s.powerTab!.side).toBe(s.tab!.side);
+      expect(['left', 'right']).toContain(s.powerTab!.side);
     }
   });
 
-  it('le due linguette non si toccano e hanno la stessa linea di piega', () => {
+  it('P+ e P− escono da lati opposti (qui sinistra e destra), e le linguette non si toccano', () => {
+    const sides = terminals.map((s) => s.powerTab!.side).sort();
+    expect(sides).toEqual(['left', 'right']);
     for (const s of terminals) {
       const a = s.tab!;
       const b = s.powerTab!;
       const overlap = intersectRegions([{ outline: a.rect, holes: [] }], [b.rect]).reduce((acc, r) => acc + regionArea(r), 0);
       expect(overlap).toBeLessThan(1e-6);
-      // lato 'bottom': la piega è una retta orizzontale, stessa y
-      expect(a.bend[0].y).toBeCloseTo(b.bend[0].y, 6);
-      expect(a.bend[1].y).toBeCloseTo(a.bend[0].y, 6);
+      // bilanciamento verso il basso: piega orizzontale (stessa y); potenza di lato: piega verticale (stessa x)
+      expect(a.bend[0].y).toBeCloseTo(a.bend[1].y, 6);
+      expect(b.bend[0].x).toBeCloseTo(b.bend[1].x, 6);
+      expect(b.blockedBy).toBeNull();
     }
   });
 

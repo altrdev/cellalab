@@ -44,7 +44,7 @@ export function tabNotches(strips: readonly Strip[], holder: HolderSettings, wir
       const a0 = node.cellRadiusMm + holder.clearanceMm + holder.wallMm - depth;
       const a1 = a0 + depth + 2;
       const v = tab.widthMm / 2 + SIDE_CLEARANCE_MM;
-      const at = (a: number, p: number): Pt => ({ x: tab.anchor.x + d.x * a + perp.x * (tab.offsetMm + p), y: tab.anchor.y + d.y * a + perp.y * (tab.offsetMm + p) });
+      const at = (a: number, p: number): Pt => ({ x: tab.anchor.x + d.x * a + perp.x * p, y: tab.anchor.y + d.y * a + perp.y * p });
       out.push({ stripId: s.id, polygon: [at(a0, -v), at(a1, -v), at(a1, v), at(a0, v)], depthMm: depth, shallow: depth < wanted - 1e-9 });
     }
   }

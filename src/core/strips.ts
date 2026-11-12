@@ -44,9 +44,8 @@ export interface StripTab {
   /** Di bilanciamento (una per giunzione) o di potenza (cavo di P+ e P−). */
   kind: 'balance' | 'power';
   side: TabSide;
-  /** Centro della cella da cui parte, spostamento laterale del centro della linguetta rispetto ad essa e larghezza effettiva, mm. */
+  /** Centro della cella da cui parte e larghezza effettiva, mm. */
   anchor: Pt;
-  offsetMm: number;
   widthMm: number;
   /** Rettangolo della linguetta, mm del disegno. */
   rect: Pt[];
@@ -270,11 +269,10 @@ const SIDE_VECTOR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0,
 /**
  * Un filo di bilanciamento per ogni giunzione (S+1 in tutto): sulla lamella completa, di preferenza della faccia
  * sopra. La linguetta parte dalla cella più vicina al lato scelto e sporge in fuori; larghezza e foro si adattano
- * all'appoggio.
+ * all'appoggio. P+ e P− hanno in più la linguetta di potenza: esce a 90° rispetto a quella di bilanciamento, dal lato
+ * libero più vicino alla lamella.
  */
 function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: readonly Region[] | null): void {
-  const d = SIDE_VECTOR[o.side];
-  const perp = { x: -d.y, y: d.x };
   const byJoint = new Map<number, Strip>();
   for (const s of strips) {
     const cur = byJoint.get(s.joint);
@@ -282,79 +280,98 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
     if (better) byJoint.set(s.joint, s);
   }
   const chosen = new Set(byJoint.values());
-  const GAP_MM = 2; // tra la linguetta di bilanciamento e quella di potenza sulla stessa cella
+  const sidesAcross: Record<TabSide, TabSide[]> = { top: ['left', 'right'], bottom: ['left', 'right'], left: ['top', 'bottom'], right: ['top', 'bottom'] };
+  const cellR = (c: { typeId: string }) => (findCellType(project, c.typeId)?.diameterMm ?? 0) / 2;
+  // Quanto si spinge il pacco in una direzione, per scegliere il lato più vicino a una lamella.
+  const packEdge = (side: TabSide): number => {
+    const dd = SIDE_VECTOR[side];
+    return Math.max(...project.cells.map((c) => c.x * dd.x + c.y * dd.y + cellR(c)));
+  };
+
+  interface Plan {
+    kind: StripTab['kind'];
+    side: TabSide;
+    node: StripNode;
+    w: number;
+    holeWant: number;
+    lengthMm: number;
+    rect: Pt[];
+  }
+  const rectOf = (node: StripNode, side: TabSide, w: number, reach: number): Pt[] => {
+    const dd = SIDE_VECTOR[side];
+    const pp = { x: -dd.y, y: dd.x };
+    const at = (a: number, p: number): Pt => ({ x: node.x + dd.x * a + pp.x * p, y: node.y + dd.y * a + pp.y * p });
+    return convexHull([at(0, -w / 2), at(0, w / 2), at(reach, w / 2), at(reach, -w / 2)]);
+  };
+  const frontNode = (s: Strip, side: TabSide): StripNode => {
+    const dd = SIDE_VECTOR[side];
+    const pp = { x: -dd.y, y: dd.x };
+    const fwd = (n: StripNode) => n.x * dd.x + n.y * dd.y + n.reachMm;
+    const sd = (n: StripNode) => n.x * pp.x + n.y * pp.y;
+    const mean = s.nodes.reduce((acc, n) => acc + sd(n), 0) / s.nodes.length;
+    return [...s.nodes].sort((p, q) => (Math.abs(fwd(p) - fwd(q)) > 1e-6 ? fwd(q) - fwd(p) : Math.abs(sd(p) - mean) - Math.abs(sd(q) - mean)))[0]!;
+  };
+  /** Un'ipotesi veloce di intralcio (celle di altre giunzioni e altre lamelle della faccia); il controllo finale è più sotto. */
+  const blocked = (s: Strip, rect: readonly Pt[]): boolean => {
+    const own = new Set(s.nodes.map((n) => n.cellId));
+    if (project.cells.some((c) => !own.has(c.id) && distToRect(c, rect) < cellR(c) - 0.01)) return true;
+    return strips.some((o2) => o2 !== s && o2.face === s.face && intersectRegions({ outline: o2.outline, holes: o2.holes }, [rect]).some((h) => regionArea(h) > 0.01));
+  };
+
   for (const s of strips) {
     if (!chosen.has(s)) continue;
-    const along = (n: StripNode) => n.x * d.x + n.y * d.y;
-    const side = (n: StripNode) => n.x * perp.x + n.y * perp.y;
-    const forward = (n: StripNode) => along(n) + n.reachMm;
-    const meanSide = s.nodes.reduce((a, n) => a + side(n), 0) / s.nodes.length;
-    // Nodi dal più avanti verso il lato scelto (a parità, il più vicino al centro della lamella).
-    const ranked = [...s.nodes].sort((a, b) => {
-      if (Math.abs(forward(a) - forward(b)) > 1e-6) return forward(b) - forward(a);
-      return Math.abs(side(a) - meanSide) - Math.abs(side(b) - meanSide);
-    });
-    const node = ranked[0]!;
-
-    // Linguette da fare: quella di bilanciamento e, su P+ e P−, quella di potenza (su un'altra cella della stessa fila
-    // avanzata se c'è, altrimenti accanto alla prima sulla stessa cella).
-    interface Plan {
-      kind: StripTab['kind'];
-      node: StripNode;
-      offset: number;
-      w: number;
-      holeWant: number;
-      lengthMm: number;
-    }
-    const balW = Math.min(o.widthMm, 2 * node.reachMm);
-    const plans: Plan[] = [{ kind: 'balance', node, offset: 0, w: balW, holeWant: o.holeMm, lengthMm: Math.max(o.lengthMm, 1) }];
+    const bNode = frontNode(s, o.side);
+    const plans: Plan[] = [];
+    const bW = Math.min(o.widthMm, 2 * bNode.reachMm);
+    plans.push({ kind: 'balance', side: o.side, node: bNode, w: bW, holeWant: o.holeMm, lengthMm: Math.max(o.lengthMm, 1), rect: [] });
     if (o.power && s.kind !== 'series') {
       const pw = o.power;
-      const partner = ranked.slice(1).find((n) => Math.abs(forward(n) - forward(node)) < 1);
-      if (partner) {
-        plans.push({ kind: 'power', node: partner, offset: 0, w: Math.min(pw.widthMm, 2 * partner.reachMm), holeWant: pw.holeMm, lengthMm: Math.max(o.lengthMm, pw.holeMm + 4) });
-      } else {
-        // stessa cella: la coppia di linguette sta centrata sulla cella (può sporgere dal lobo della lamella, ma non dalla
-        // cella), quella di potenza prende quello che resta
-        const room = 2 * node.cellRadiusMm - balW - GAP_MM;
-        const w = Math.min(pw.widthMm, room);
-        if (w >= 3) {
-          plans[0]!.offset = -(w + GAP_MM) / 2;
-          plans.push({ kind: 'power', node, offset: (balW + GAP_MM) / 2, w, holeWant: pw.holeMm, lengthMm: Math.max(o.lengthMm, pw.holeMm + 4) });
-        }
-      }
+      const lengthMm = Math.max(o.lengthMm, pw.holeMm + 4);
+      const cands = sidesAcross[o.side].map((side) => {
+        const node = frontNode(s, side);
+        const w = Math.min(pw.widthMm, 2 * node.reachMm);
+        const rect = rectOf(node, side, w, node.cellRadiusMm + DEFAULT_HOLDER_EDGE_MM + o.bendMm + lengthMm + 3);
+        const dd = SIDE_VECTOR[side];
+        return { side, node, w, rect, isBlocked: blocked(s, rect), gap: packEdge(side) - (node.x * dd.x + node.y * dd.y + node.cellRadiusMm) };
+      });
+      // Il lato libero più vicino al bordo del pacco; se sono entrambi intralciati, il più vicino comunque.
+      cands.sort((p, q) => Number(p.isBlocked) - Number(q.isBlocked) || p.gap - q.gap);
+      const c = cands[0]!;
+      plans.push({ kind: 'power', side: c.side, node: c.node, w: c.w, holeWant: pw.holeMm, lengthMm, rect: [] });
     }
-    // Fin dove arriva il holder lungo la linguetta (centro e due bordi): la piega sta oltre. Per tutta la lamella c'è
-    // una sola linea di piega, la più lontana.
+
+    // Fin dove arriva il holder lungo la linguetta (centro e due bordi): la piega sta oltre.
     const exitOf = (pl: Plan): number => {
+      const dd = SIDE_VECTOR[pl.side];
+      const pp = { x: -dd.y, y: dd.x };
       let exit = pl.node.cellRadiusMm + DEFAULT_HOLDER_EDGE_MM;
       if (holder && holder.length > 0) {
         let last = -1;
         for (let a = 0; a <= 80; a += 0.25) {
-          if ([-pl.w / 2, 0, pl.w / 2].some((v) => pointInRegions({ x: pl.node.x + d.x * a + perp.x * (pl.offset + v), y: pl.node.y + d.y * a + perp.y * (pl.offset + v) }, holder))) last = a;
+          if ([-pl.w / 2, 0, pl.w / 2].some((v) => pointInRegions({ x: pl.node.x + dd.x * a + pp.x * v, y: pl.node.y + dd.y * a + pp.y * v }, holder))) last = a;
         }
         if (last >= 0) exit = last;
       }
       return Math.max(exit + o.bendMm, pl.node.reachMm);
     };
-    const bendAbs = Math.max(...plans.map((pl) => along(pl.node) + exitOf(pl)));
 
     let region: Region = { outline: s.outline, holes: s.holes };
     const holes: Pt[][] = [];
     for (const pl of plans) {
-      const bendAlong = bendAbs - along(pl.node);
+      const dd = SIDE_VECTOR[pl.side];
+      const pp = { x: -dd.y, y: dd.x };
+      const bendAlong = exitOf(pl);
       const reach = bendAlong + pl.lengthMm;
-      const at = (a: number, p: number): Pt => ({ x: pl.node.x + d.x * a + perp.x * (pl.offset + p), y: pl.node.y + d.y * a + perp.y * (pl.offset + p) });
-      const rect = convexHull([at(0, -pl.w / 2), at(0, pl.w / 2), at(reach, pl.w / 2), at(reach, -pl.w / 2)]);
+      const at = (a: number, p: number): Pt => ({ x: pl.node.x + dd.x * a + pp.x * p, y: pl.node.y + dd.y * a + pp.y * p });
+      const rect = rectOf(pl.node, pl.side, pl.w, reach);
       const hole = Math.min(pl.holeWant, pl.w - 1, pl.lengthMm - 1);
       const hc = at(bendAlong + pl.lengthMm / 2, 0); // il foro sta a metà della parte piegata
       region = unionPolygons([region.outline, rect]);
       if (hole >= 0.5) holes.push(circlePoints(hc.x, hc.y, hole / 2, circleSegments(hole / 2)));
       const tab: StripTab = {
         kind: pl.kind,
-        side: o.side,
+        side: pl.side,
         anchor: { x: pl.node.x, y: pl.node.y },
-        offsetMm: pl.offset,
         widthMm: pl.w,
         rect,
         holeX: hc.x,

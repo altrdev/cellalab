@@ -9,7 +9,7 @@ import { explodeOffsets } from '../core/explode';
 import { intersectRegions, type Region } from '../core/clip';
 import { boundsOfCells } from '../core/geometry';
 import type { Harness } from '../core/harness';
-import type { Strip, TabSide } from '../core/strips';
+import { tabsOf, type Strip, type TabSide } from '../core/strips';
 import type { Project } from '../core/types';
 import { groupHue } from './colors';
 import { holderHalfGeometries } from './holderMesh';
@@ -438,46 +438,58 @@ export class PackScene {
         return new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
       };
       const region: Region = { outline: s.outline, holes: s.holes };
-      const tab = s.tab;
-      if (!tab) {
+      const folds = tabsOf(s);
+      if (folds.length === 0) {
         const geo = extrude(region);
         geo.rotateX(Math.PI / 2); // y del disegno -> Z, l'estrusione scende lungo -Y
         add(geo, (m) => (m.position.y = sheetY));
         continue;
       }
-      // La linguetta si piega a 90° sulla linea di piega: verso il basso (faccia sopra) o verso l'alto (faccia sotto).
-      const d = SIDE_DIR[tab.side];
-      const perp = { x: -d.y, y: d.x };
-      const mid = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
+      // Ogni linguetta si piega a 90° sulla sua linea di piega: verso il basso (faccia sopra) o verso l'alto (faccia sotto).
       const BIG = 1000;
-      const quad = (u0: number, u1: number): { x: number; y: number }[] =>
-        [[u0, -BIG], [u1, -BIG], [u1, BIG], [u0, BIG]].map(([u, v]) => ({ x: mid.x + d.x * u! + perp.x * v!, y: mid.y + d.y * u! + perp.y * v! }));
-      for (const r of intersectRegions(region, [quad(-BIG, 0)])) {
+      const frame = (tab: (typeof folds)[number]) => {
+        const d = SIDE_DIR[tab.side];
+        const perp = { x: -d.y, y: d.x };
+        const mid = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
+        const quad = (u0: number, u1: number): { x: number; y: number }[] =>
+          [[u0, -BIG], [u1, -BIG], [u1, BIG], [u0, BIG]].map(([u, v]) => ({ x: mid.x + d.x * u! + perp.x * v!, y: mid.y + d.y * u! + perp.y * v! }));
+        return { d, perp, mid, quad };
+      };
+      // Parte piana: quella che sta prima di tutte le linee di piega.
+      let flat: Region[] = [region];
+      for (const tab of folds) {
+        const { quad } = frame(tab);
+        flat = flat.flatMap((r) => intersectRegions(r, [quad(-BIG, 0)]));
+      }
+      for (const r of flat) {
         const geo = extrude(r);
         geo.rotateX(Math.PI / 2);
         add(geo, (m) => (m.position.y = sheetY));
       }
-      // Pezzo piegato: disegnato in (u lungo la linguetta, v di lato) e poi messo in piedi sul bordo della lamella.
+      // Pezzi piegati: disegnati in (u lungo la linguetta, v di lato) e poi messi in piedi sul bordo della lamella.
       const sy = top ? -1 : 1;
       const xAxis = new THREE.Vector3(0, sy, 0);
-      const yAxis = new THREE.Vector3(perp.x, 0, perp.y);
-      const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis);
-      const outward = new THREE.Vector3(d.x, 0, d.y);
-      for (const r of intersectRegions(region, [quad(0, BIG)])) {
-        const local = (p: { x: number; y: number }) => {
-          const dx = p.x - mid.x;
-          const dy = p.y - mid.y;
-          return new THREE.Vector2(dx * d.x + dy * d.y, dx * perp.x + dy * perp.y);
-        };
-        const shape = new THREE.Shape(r.outline.map(local));
-        for (const h of r.holes) shape.holes.push(new THREE.Path(h.map(local)));
-        const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
-        if (zAxis.dot(outward) < 0) geo.translate(0, 0, -thickness); // lo spessore resta verso l'esterno
-        add(geo, (m) => {
-          m.matrixAutoUpdate = false;
-          m.matrix.makeBasis(xAxis, yAxis, zAxis).setPosition(mid.x, top ? sheetY : sheetY - thickness, mid.y);
-          m.matrixWorldNeedsUpdate = true;
-        });
+      for (const tab of folds) {
+        const { d, perp, mid, quad } = frame(tab);
+        const yAxis = new THREE.Vector3(perp.x, 0, perp.y);
+        const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis);
+        const outward = new THREE.Vector3(d.x, 0, d.y);
+        for (const r of intersectRegions(region, [quad(0, BIG)])) {
+          const local = (p: { x: number; y: number }) => {
+            const dx = p.x - mid.x;
+            const dy = p.y - mid.y;
+            return new THREE.Vector2(dx * d.x + dy * d.y, dx * perp.x + dy * perp.y);
+          };
+          const shape = new THREE.Shape(r.outline.map(local));
+          for (const h of r.holes) shape.holes.push(new THREE.Path(h.map(local)));
+          const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+          if (zAxis.dot(outward) < 0) geo.translate(0, 0, -thickness); // lo spessore resta verso l'esterno
+          add(geo, (m) => {
+            m.matrixAutoUpdate = false;
+            m.matrix.makeBasis(xAxis, yAxis, zAxis).setPosition(mid.x, top ? sheetY : sheetY - thickness, mid.y);
+            m.matrixWorldNeedsUpdate = true;
+          });
+        }
       }
     }
     this.busKey = { strips, thickness, height, lift };
