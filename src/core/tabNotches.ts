@@ -1,6 +1,6 @@
 import { MIN_PRINT_WALL_MM, type HolderSettings } from './holder';
 import type { Pt } from './polygon';
-import { tabsOf, type Face, type Strip } from './strips';
+import { foldsOf, type Face, type Strip } from './strips';
 import { findAwg } from './wire';
 
 /** Gioco di lato tra linguetta e scanalatura, mm. */
@@ -33,7 +33,7 @@ export function tabNotches(strips: readonly Strip[], holder: HolderSettings, wir
   const out: Notch[] = [];
   const maxDepth = holder.wallMm - MIN_PRINT_WALL_MM;
   for (const s of strips) {
-    for (const tab of tabsOf(s)) {
+    for (const tab of foldsOf(s)) {
       // Una linguetta che passa sopra altre celle o lamelle non ha un bordo libero dove stare: niente scanalatura.
       if (tab.blockedBy) continue;
       const node = s.nodes.find((n) => Math.hypot(n.x - tab.anchor.x, n.y - tab.anchor.y) < 1e-6);

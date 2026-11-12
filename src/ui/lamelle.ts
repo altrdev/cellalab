@@ -181,6 +181,7 @@ export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
     } else if (typeof v === typeof def && (typeof v !== 'number' || Number.isFinite(v))) out[k] = v;
   }
   if (!['auto', 'top', 'bottom', 'left', 'right'].includes(base.tabSide)) base.tabSide = DEFAULT_LAMELLA_SETTINGS.tabSide;
+  if (base.tabStyle !== 'hole') base.tabStyle = 'tab';
   for (const k of ['tabWidthMm', 'tabLengthMm'] as const) {
     if (!(base[k] > 0)) base[k] = DEFAULT_LAMELLA_SETTINGS[k];
   }

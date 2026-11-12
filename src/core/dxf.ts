@@ -2,7 +2,7 @@ import { t } from '../i18n';
 import { fitFreeArcs, ringWithArcs, type Circle } from './arcs';
 import { offsetRegion, regionRings } from './clip';
 import { spotPositions } from './sizing';
-import { tabsOf, type Face, type Strip } from './strips';
+import { foldsOf, type Face, type Strip } from './strips';
 
 /**
  * Scrittore DXF ASCII minimale (formato R12, il più compatibile: LibreCAD, LightBurn, Inkscape,
@@ -232,7 +232,7 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
       polyline('CUT', arcs.map((v) => ({ x: v.x, y: Y(v.y), bulge: v.bulge })));
     }
 
-    for (const tb of tabsOf(s)) line('MARK', tb.bend[0], tb.bend[1]);
+    for (const tb of foldsOf(s)) line('MARK', tb.bend[0], tb.bend[1]);
     if (options.includeContacts) for (const n of s.nodes) circle('MARK', n.x, n.y, n.contactRadiusMm);
 
     const spots = options.spotsPerTerminal?.get(s.id);

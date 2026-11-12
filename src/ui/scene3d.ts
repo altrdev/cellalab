@@ -9,7 +9,7 @@ import { explodeOffsets } from '../core/explode';
 import { intersectRegions, type Region } from '../core/clip';
 import { boundsOfCells } from '../core/geometry';
 import type { Harness } from '../core/harness';
-import { tabsOf, type Strip, type TabSide } from '../core/strips';
+import { foldsOf, type Strip, type TabSide } from '../core/strips';
 import type { Project } from '../core/types';
 import { groupHue } from './colors';
 import { holderHalfGeometries } from './holderMesh';
@@ -438,7 +438,7 @@ export class PackScene {
         return new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
       };
       const region: Region = { outline: s.outline, holes: s.holes };
-      const folds = tabsOf(s);
+      const folds = foldsOf(s);
       if (folds.length === 0) {
         const geo = extrude(region);
         geo.rotateX(Math.PI / 2); // y del disegno -> Z, l'estrusione scende lungo -Y

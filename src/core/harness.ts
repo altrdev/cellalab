@@ -158,15 +158,17 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
       const tab = s.tab!;
       const node = last - s.joint;
       const bend = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
-      const u = (tab.holeX - bend.x) * d.x + (tab.holeY - bend.y) * d.y; // dal piegamento al foro, lungo la linguetta
+      const flat = !!tab.flat; // solo un foro nella lamella: il filo parte dal piano e va al bordo del holder
+      const u = flat ? 0 : (tab.holeX - bend.x) * d.x + (tab.holeY - bend.y) * d.y; // dal piegamento al foro, lungo la linguetta
       const aBend = bend.x * d.x + bend.y * d.y;
       const pHole = tab.holeX * perp.x + tab.holeY * perp.y;
       const yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
       const pPin = pConn + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
       const aOut = Math.max(aBend, aDown); // le discese stanno più in fuori delle corsie
-      const p0 = to3(aBend, pHole, yHole);
+      const p0 = to3(flat ? tab.holeX * d.x + tab.holeY * d.y : aBend, pHole, yHole);
       const len = (x: Pt3, y: Pt3) => Math.hypot(x.x - y.x, x.y - y.y, x.z - y.z);
       const points: Pt3[] = [p0];
+      if (flat) points.push(to3(aBend, pHole, yHole));
       // Ogni filo ha la sua corsia (quota) e non ne tocca nessun altro: scende (o sale) lungo il bordo del pacco, entra
       // sotto (verso il pacco) dove deve incrociare, corre sulla sua corsia e arriva al pad o al connettore. Le discese
       // dalle linguette e quelle sui pad stanno a profondità diverse dalle corsie, quindi quando si incrociano un filo
