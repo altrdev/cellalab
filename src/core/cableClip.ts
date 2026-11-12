@@ -5,36 +5,22 @@ import type { Pt } from './polygon';
 import type { Project } from './types';
 
 /**
- * Fermacavi stampati a scatto per i cavi di potenza. Ogni fermacavo è una fascia a C che si incastra su una cella del fianco
- * (si spinge da fuori, le braccia si aprono e si chiudono sulla cella) con, ai bordi della bocca, due ganci dove il cavo
- * si preme dall'alto e resta fermo, appoggiato alla cella. Qui si decide dove vanno e di che misure; la forma la fa `ui/clipMesh.ts`.
+ * Fermacavi stampati per i cavi di potenza: un blocco che sta nel vuoto tra due celle vicine del fianco, con una lama
+ * sottile nella fessura tra le superfici e un corpo con un incavo a U dove il cavo si preme dall'alto (due labbra lo
+ * trattengono). Qui si decide dove vanno e di che misure; la forma la fa `ui/clipMesh.ts`.
  */
-
-/**
- * `valley`: blocco che sta nel vuoto tra due celle del fianco (una lama sottile nella fessura, un corpo con un incavo a U per
- * il cavo): è quello della foto. `band`: fascia a C attorno a una cella, per i tratti dove non c'è un vuoto tra due celle.
- */
-export type ClipKind = 'valley' | 'band';
 
 export interface ClipSpec {
-  kind: ClipKind;
   cellDiameterMm: number;
   cableOdMm: number;
-  /** Solo valley: spessore della lama nella fessura tra due celle, e quanto scende, mm. */
+  /** Spessore della lama nella fessura tra due celle, e quanto scende, mm. */
   bladeMm: number;
   bladeDepthMm: number;
-  /** Spessore della fascia: sta nello spazio tra due celle vicine. */
-  thicknessMm: number;
-  /** Altezza della fascia lungo la cella. */
-  heightMm: number;
-  /** Larghezza della bocca, mm. */
-  mouthMm: number;
 }
 
 export interface CableClip {
-  cellId: string;
   cable: HarnessCable['label'];
-  /** Band: asse della cella a metà altezza. Valley: punto sulla tangente del fianco nel vuoto, all'altezza del cavo. Nella scena. */
+  /** Punto sulla tangente del fianco, nel vuoto tra le due celle, all'altezza del cavo (scena). */
   center: Pt3;
   /** Versori nel disegno: verso l'esterno del pacco e lungo il cavo. */
   out: Pt;
@@ -42,8 +28,6 @@ export interface CableClip {
   spec: ClipSpec;
 }
 
-/** Gioco tra la fascia e la cella, mm. */
-export const CLIP_FIT_MM = 0.15;
 /** Distanza minima tra due fermacavi sullo stesso cavo, mm. */
 export const CLIP_SPACING_MM = 35;
 
@@ -62,19 +46,13 @@ export function minCellGap(project: Project): number {
   return Number.isFinite(gap) ? gap : 1.5;
 }
 
-export function clipSpec(project: Project, cellDiameterMm: number, cableOdMm: number, kind: ClipKind = 'band'): ClipSpec {
-  // Spessore: quello che entra nel vuoto tra due celle (distanza minima tra le celle meno il gioco).
+export function clipSpec(project: Project, cellDiameterMm: number, cableOdMm: number): ClipSpec {
   const gap = minCellGap(project);
-  const t = Math.max(0.8, Math.min(1.4, gap - 0.25 - CLIP_FIT_MM));
   return {
-    kind,
     cellDiameterMm,
     cableOdMm,
     bladeMm: Math.round(Math.max(0.6, Math.min(1.2, gap - 0.4)) * 100) / 100,
     bladeDepthMm: Math.round(Math.min(8, cellDiameterMm / 2 - 1) * 10) / 10,
-    thicknessMm: Math.round(t * 100) / 100,
-    heightMm: Math.round((cableOdMm + 5) * 10) / 10,
-    mouthMm: Math.round(cellDiameterMm * 0.78 * 10) / 10,
   };
 }
 
@@ -111,7 +89,7 @@ export function cableClips(project: Project, h: Harness, spacingMm = CLIP_SPACIN
         .map((i) => ({ ...i, t: (i.c.x - a.x) * u.x + (i.c.y - a.z) * u.y }))
         .filter((i) => i.t >= -i.r && i.t <= len + i.r)
         .sort((p, q) => p.t - q.t);
-      // Prima i vuoti tra due celle vicine del fianco (blocco a lama); se non ce ne sono, una fascia sulle celle del fianco.
+      // I fermacavi stanno nei vuoti tra due celle vicine del fianco; dove le celle non sono in fila (righe sfalsate) non ce ne sono.
       const near = pitchOf(info.map((i) => i.c)) * 1.25 + 1e-6;
       const valleys: { t: number }[] = [];
       for (let i = 0; i + 1 < flank.length; i++) {
@@ -119,34 +97,18 @@ export function cableClips(project: Project, h: Harness, spacingMm = CLIP_SPACIN
         if (Math.hypot(fa.c.x - fb.c.x, fa.c.y - fb.c.y) <= near) valleys.push({ t: (fa.t + fb.t) / 2 });
       }
       let lastT = -Infinity;
-      if (valleys.length > 0) {
-        for (const v of valleys) {
-          if (v.t < 0 || v.t > len || v.t - lastT < spacingMm) continue;
-          lastT = v.t;
-          const od = cable.odMm;
-          const pt = { x: a.x + u.x * v.t, z: a.z + u.y * v.t };
-          const off = CABLE_GAP_MM + od / 2; // dalla tangente del fianco al centro del cavo
-          out.push({
-            cellId: '',
-            cable: cable.label,
-            center: { x: pt.x - n.x * off, y: a.y, z: pt.z - n.y * off },
-            out: n,
-            along: u,
-            spec: clipSpec(project, flank[0]!.r * 2, od, 'valley'),
-          });
-        }
-        continue;
-      }
-      for (const f of flank) {
-        if (f.t - lastT < spacingMm) continue;
-        lastT = f.t;
+      for (const v of valleys) {
+        if (v.t < 0 || v.t > len || v.t - lastT < spacingMm) continue;
+        lastT = v.t;
+        const od = cable.odMm;
+        const pt = { x: a.x + u.x * v.t, z: a.z + u.y * v.t };
+        const off = CABLE_GAP_MM + od / 2; // dalla tangente del fianco al centro del cavo
         out.push({
-          cellId: f.c.id,
           cable: cable.label,
-          center: { x: f.c.x, y: cable.points[1]!.y, z: f.c.y },
+          center: { x: pt.x - n.x * off, y: a.y, z: pt.z - n.y * off },
           out: n,
           along: u,
-          spec: clipSpec(project, f.r * 2, cable.odMm, 'band'),
+          spec: clipSpec(project, flank[0]!.r * 2, od),
         });
       }
     }
