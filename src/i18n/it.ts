@@ -453,6 +453,7 @@ export const it = {
   'hold.wireHolesSection': 'Uscita dei fili di bilanciamento',
   'hold.wireHoles': 'Piccoli fori nel portacelle, senza linguette',
   'hold.wireHolesNote': 'Fori trovati: {n}. Il filo si salda sulla lamella vicino al bordo, passa nel foro accanto alla lamella e scende lungo il fianco.',
+  'hold.wireHolesAround': 'Giunti senza posto per il foro (plastica troppo sottile tra le celle): {m}. Il loro filo fa il giro esterno sul piano del portacelle. Con la forma arrotondata o uno smusso più piccolo c’è più posto.',
   'hold.wireHolesHelp': 'Al posto delle linguette piegate, ogni giunzione ha un piccolo foro nel portacelle (attraverso fondo e pareti), sul materiale tra le celle e non sotto nessuna lamella. Il filo si salda sulla lamella vicino al suo bordo dal lato di uscita, passa nel foro e scende lungo il fianco. Accendere questa opzione spegne le linguette di bilanciamento. Le linguette di potenza di P+ e P− si accendono o spengono a parte, nel tab Lamelle. Il lato di uscita si sceglie nel tab Lamelle.',
   'hold.ntcSection': 'Sensore NTC',
   'hold.ntc': 'Tasca per il sensore NTC',

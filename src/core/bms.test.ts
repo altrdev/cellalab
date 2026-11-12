@@ -10,7 +10,7 @@ import { circlePoints } from './polygon';
 import { buildDxf } from './dxf';
 import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { buildHarness } from './harness';
-import { findAroundExits, findWireExits } from './wireExit';
+import { findAroundExits, findWireExits, findWireRoutes } from './wireExit';
 import { ntcSite, ntcSites } from './ntc';
 import { tabNotches } from './tabNotches';
 import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './lamelle';
@@ -612,7 +612,8 @@ describe('linguette di potenza opzionali', () => {
 
 describe('uscita dei fili dal portacelle, senza linguette', () => {
   const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
-  const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, false)!;
+  const ROUND = { ...DEFAULT_HOLDER_SETTINGS, shape: 'rounded' as const }; // con la forma arrotondata la plastica tra le celle basta
+  const plain = buildHolder(p, ROUND, false)!;
   const strips = buildStrips(p, { tabs: { side: 'bottom', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, style: 'none' } });
   const exits = findWireExits(p, strips, plain.wall, 'bottom', 1.21, plain.totalMm, plain.floorMm);
 
@@ -631,29 +632,36 @@ describe('uscita dei fili dal portacelle, senza linguette', () => {
     }
   });
 
-  it('con uno smusso grande il foro resta circondato da plastica (rinforzo del contorno dove serve)', () => {
+  it('con uno smusso grande il foro resta in plastica e il contorno non cambia mai (niente rinforzi)', () => {
     for (const chamferMm of [0.6, 2]) {
-      const st = { ...DEFAULT_HOLDER_SETTINGS, chamferMm };
+      const st = { ...ROUND, chamferMm };
       const base = buildHolder(p, st, false)!;
       const ex = findWireExits(p, strips, base.wall, 'bottom', 1.21, base.totalMm, base.floorMm, chamferMm);
       expect(ex.length).toBe(5);
-      const model = buildHolder(p, st, false, { addOuter: ex.filter((e) => e.bossMm > 0).map((e) => circlePoints(e.hole!.x, e.hole!.y, e.bossMm, 24)) })!;
       for (const e of ex) {
-        const r = e.diameterMm / 2 + Math.max(0.8, chamferMm + 0.5) - 0.05;
+        // almeno la parete stampabile attorno al foro, dentro il contorno del portacelle (che resta quello senza fori)
+        const r = e.diameterMm / 2 + 0.8 - 0.05;
         for (let k = 0; k < 24; k++) {
           const a = (k / 24) * 2 * Math.PI;
-          // dentro il contorno (le tasche delle celle contano a parte: il loro gioco è la parete minima, già controllata)
-          expect(pointInRegions({ x: e.hole!.x + Math.cos(a) * r, y: e.hole!.y + Math.sin(a) * r }, model.wall.map((rg) => ({ outline: rg.outline, holes: [] })))).toBe(true);
+          expect(pointInRegions({ x: e.hole!.x + Math.cos(a) * r, y: e.hole!.y + Math.sin(a) * r }, base.wall.map((rg) => ({ outline: rg.outline, holes: [] })))).toBe(true);
         }
       }
     }
+  });
+
+  it('con il profilo della cella dove la plastica è sottile il giunto fa il giro esterno: nessun filo manca', () => {
+    const prof = buildHolder(p, { ...DEFAULT_HOLDER_SETTINGS, shape: 'profile' }, false)!;
+    const routes = findWireRoutes(p, strips, prof.wall, 'bottom', 1.21, prof.totalMm, prof.floorMm, 0.6, 0.3);
+    expect(routes).toHaveLength(5);
+    expect(routes.every((e) => e.hole || e.edge)).toBe(true);
+    expect(new Set(routes.map((e) => e.stripId)).size).toBe(5);
   });
 
   it('i fori tolgono materiale alla piastra e il filo passa per il foro senza toccare gli altri', () => {
     const holes = exits.map((e) => circlePoints(e.hole!.x, e.hole!.y, e.diameterMm / 2, 16));
     const vol = (m: { layers: { z0: number; z1: number; regions: Parameters<typeof regionArea>[0][] }[] }) =>
       m.layers.reduce((a, l) => a + (l.z1 - l.z0) * l.regions.reduce((b, r) => b + regionArea(r), 0), 0);
-    expect(vol(buildHolder(p, DEFAULT_HOLDER_SETTINGS, true)!) - vol(buildHolder(p, DEFAULT_HOLDER_SETTINGS, true, { throughHoles: holes })!)).toBeGreaterThan(0.5);
+    expect(vol(buildHolder(p, ROUND, true)!) - vol(buildHolder(p, ROUND, true, { throughHoles: holes })!)).toBeGreaterThan(0.5);
     // cablaggio: le lamelle portano l'uscita
     for (const e of exits) strips.find((x) => x.id === e.stripId)!.wireExit = e;
     const h = buildHarness(p, strips, 0.1)!;

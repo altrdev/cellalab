@@ -154,7 +154,8 @@
     <h3><Icon name="ruler" /> {t('hold.wireHolesSection')}</h3>
     <label><span><input type="checkbox" bind:checked={ui.holder.wireHoles} onchange={() => { if (ui.holder.wireHoles) ui.lamella.tabs = false; }} /> {t('hold.wireHoles')}</span></label>
     {#if ui.holder.wireHoles}
-      <p class="note">{t('hold.wireHolesNote', { n: wireExits.length })}</p>
+      <p class="note">{t('hold.wireHolesNote', { n: wireExits.filter((e) => e.hole).length })}</p>
+      {#if wireExits.some((e) => !e.hole)}<p class="note">{t('hold.wireHolesAround', { m: wireExits.filter((e) => !e.hole).length })}</p>{/if}
     {/if}
     <Help label={t('hold.what')}>{t('hold.wireHolesHelp')}</Help>
   </section>

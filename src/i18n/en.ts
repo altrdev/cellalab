@@ -455,6 +455,7 @@ export const en: Record<keyof typeof it, string> = {
   'hold.wireHolesSection': 'Balance wire exit',
   'hold.wireHoles': 'Small holes in the holder, no tabs',
   'hold.wireHolesNote': 'Holes found: {n}. The wire is soldered on the busbar near its edge, goes through the hole next to it and down the flank.',
+  'hold.wireHolesAround': 'Joints with no room for the hole (plastic too thin between the cells): {m}. Their wire goes round the outside, on the holder plane. The rounded shape or a smaller chamfer leaves more room.',
   'hold.wireHolesHelp': 'Instead of folded tabs, every joint gets a small hole in the holder (through floor and walls), on the material between the cells and not under any busbar. The wire is soldered on the busbar near its edge on the exit side, goes through the hole and down the flank. Turning this on turns the balance tabs off. The P+ and P− power tabs are turned on or off separately, in the Busbars tab. The exit side is chosen in the Busbars tab.',
   'hold.ntcSection': 'NTC sensor',
   'hold.ntc': 'NTC sensor pocket',

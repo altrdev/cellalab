@@ -25,21 +25,16 @@ export interface WireExit {
   /** Spessore della piastra e del suo fondo, mm: il filo entra dalla faccia esterna ed esce dal bordo delle pareti. */
   plateMm: number;
   floorMm: number;
-  /** Raggio del rinforzo da aggiungere al contorno attorno al foro quando lì la plastica non basta (incavo stretto tra due celle, smusso); 0 = non serve. */
-  bossMm: number;
 }
 
 const SIDE: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 /** Plastica che deve restare attorno al foro verso le tasche delle celle: almeno una parete stampabile, mm. */
 const MARGIN_MM = MIN_PRINT_WALL_MM;
-/** Il foro sta al massimo così fuori dal contorno (nell'incavo tra due celle, dove si aggiunge un rinforzo) o così dentro, mm. */
-const OUTSIDE_MM = 4;
+/** Il foro sta nella fascia lungo il bordo larga così: più dentro il filo resterebbe chiuso tra le celle, mm. */
 const RIM_MM = 7;
 /** Quanto lontano dal punto di saldatura si cerca il foro, mm. */
 const SEARCH_MM = 24;
 const STEP_MM = 0.5;
-/** Un foro che chiede un rinforzo del contorno vale come se fosse così più lontano dal punto di saldatura, mm: si preferisce un posto dove la plastica basta. */
-const BOSS_PENALTY_MM = 8;
 
 /** Una lamella per giunzione, di preferenza completa e della faccia sopra (come per le linguette). */
 function chosenStrips(strips: readonly Strip[]): Strip[] {
@@ -81,9 +76,10 @@ export function findWireExits(
   const out: WireExit[] = [];
   const holeR = holeMm / 2;
   const rPocket = holeR + MARGIN_MM; // gioco verso le tasche delle celle
-  const rOut = holeR + Math.max(MARGIN_MM, chamferMm + 0.5); // gioco verso il bordo, smusso compreso
+  // Gioco verso il bordo, dal più prudente (smusso compreso) al minimo stampabile: se lo smusso lascia poco posto il foro
+  // si avvicina al bordo e morde un po' lo smusso, ma la forma del portacelle non cambia mai.
+  const rOuts = [holeR + Math.max(MARGIN_MM, chamferMm + 0.5), holeR + Math.max(MARGIN_MM, chamferMm * 0.5 + 0.5), holeR + MARGIN_MM];
   const outlines = wall.map((r) => ({ outline: r.outline, holes: [] as Pt[][] }));
-  const near = offsetRegions(outlines, OUTSIDE_MM);
   const deep = offsetRegions(outlines, -RIM_MM);
   const pockets = wall.flatMap((r) => r.holes.map((h) => ({ outline: h, holes: [] as Pt[][] })));
   const taken: Pt[] = [];
@@ -92,31 +88,35 @@ export function findWireExits(
     // punto di saldatura: sul lobo della lamella, dal lato di uscita, appena dentro il bordo
     const solder = { x: node.x + d.x * (node.reachMm - 0.7), y: node.y + d.y * (node.reachMm - 0.7) };
     const covering = strips.filter((o) => o.face === s.face).map((o) => ({ outline: o.outline, holes: o.holes }));
-    let best: { p: Pt; score: number; room: boolean } | null = null;
-    for (let dx = -SEARCH_MM; dx <= SEARCH_MM; dx += STEP_MM) {
-      for (let dy = -SEARCH_MM; dy <= SEARCH_MM; dy += STEP_MM) {
-        const c = { x: solder.x + dx, y: solder.y + dy };
-        const dist = Math.hypot(dx, dy);
-        if (dist > SEARCH_MM) continue;
-        // il filo non torna indietro verso l'interno: il foro sta oltre il punto di saldatura o al suo fianco
-        if (dx * d.x + dy * d.y < -2) continue;
-        if (best && dist >= best.score) continue; // la distanza da sola è già un limite inferiore del punteggio
-        // nella fascia lungo il bordo (o appena fuori, nell'incavo tra due celle), mai in una tasca
-        if (!pointInRegions(c, near) || pointInRegions(c, deep) || pockets.some((q) => pointInRegions(c, [q]))) continue;
-        if (taken.some((q) => Math.hypot(q.x - c.x, q.y - c.y) < 2 * rOut + 0.5)) continue;
-        const disk = circlePoints(c.x, c.y, rPocket, 16);
-        if (pockets.some((q) => intersectRegions(q, [disk]).some((x) => regionArea(x) > 0.01))) continue;
-        if (covering.some((r) => intersectRegions(r, [disk]).some((x) => regionArea(x) > 0.01))) continue;
-        // se il gioco verso il bordo non sta nel contorno servirà un rinforzo: meglio un altro posto, se c'è
-        const room = circlePoints(c.x, c.y, rOut, 16).every((q) => pointInRegions(q, wall));
-        const score = dist + (room ? 0 : BOSS_PENALTY_MM);
-        if (!best || score < best.score) best = { p: c, score, room };
+    let found: Pt | null = null;
+    for (const rOut of rOuts) {
+      let best: { p: Pt; score: number } | null = null;
+      for (let dx = -SEARCH_MM; dx <= SEARCH_MM; dx += STEP_MM) {
+        for (let dy = -SEARCH_MM; dy <= SEARCH_MM; dy += STEP_MM) {
+          const c = { x: solder.x + dx, y: solder.y + dy };
+          const dist = Math.hypot(dx, dy);
+          if (dist > SEARCH_MM) continue;
+          // il filo non torna indietro verso l'interno: il foro sta oltre il punto di saldatura o al suo fianco
+          if (dx * d.x + dy * d.y < -2) continue;
+          if (best && dist >= best.score) continue;
+          // sul materiale, nella fascia lungo il bordo, mai in una tasca
+          if (!pointInRegions(c, wall) || pointInRegions(c, deep)) continue;
+          if (taken.some((q) => Math.hypot(q.x - c.x, q.y - c.y) < 2 * rOut + 0.5)) continue;
+          if (!circlePoints(c.x, c.y, rOut, 16).every((q) => pointInRegions(q, outlines))) continue; // gioco verso il bordo
+          const disk = circlePoints(c.x, c.y, rPocket, 16);
+          if (pockets.some((q) => intersectRegions(q, [disk]).some((x) => regionArea(x) > 0.01))) continue;
+          if (covering.some((r) => intersectRegions(r, [disk]).some((x) => regionArea(x) > 0.01))) continue;
+          best = { p: c, score: dist };
+        }
+      }
+      if (best) {
+        found = best.p;
+        break;
       }
     }
-    if (!best) continue;
-    taken.push(best.p);
-    const room = best.room;
-    out.push({ stripId: s.id, face: s.face, side, solder, hole: best.p, diameterMm: holeMm, plateMm, floorMm, bossMm: room ? 0 : rOut + 0.3 });
+    if (!found) continue;
+    taken.push(found);
+    out.push({ stripId: s.id, face: s.face, side, solder, hole: found, diameterMm: holeMm, plateMm, floorMm });
   }
   return out;
 }
@@ -150,12 +150,14 @@ export function findAroundExits(
   plateMm: number,
   floorMm: number,
   bendMm = 0.5,
+  only?: ReadonlySet<string>,
 ): WireExit[] {
   const d = SIDE[side];
   const pp = { x: -d.y, y: d.x };
   const outlines = wall.map((r) => ({ outline: r.outline, holes: [] as Pt[][] }));
   const out: WireExit[] = [];
   for (const s of chosenStrips(strips)) {
+    if (only && !only.has(s.id)) continue;
     const own = new Set(s.nodes.map((n) => n.cellId));
     const others = strips.filter((o) => o !== s && o.face === s.face).map((o) => ({ outline: o.outline, holes: o.holes }));
     const nodes = [...s.nodes].sort((p, q) => q.x * d.x + q.y * d.y + q.reachMm - (p.x * d.x + p.y * d.y + p.reachMm));
@@ -191,7 +193,6 @@ export function findAroundExits(
           diameterMm: 0,
           plateMm,
           floorMm,
-          bossMm: 0,
         };
         if (!cand.blocked) {
           best = cand;
@@ -203,4 +204,25 @@ export function findAroundExits(
     if (best) out.push(best);
   }
   return out;
+}
+
+/**
+ * Fori nel portacelle dove c'è posto; i giunti senza posto per il foro (plastica troppo sottile tra le celle) fanno il giro
+ * esterno sul piano del portacelle, così nessun filo manca.
+ */
+export function findWireRoutes(
+  project: Project,
+  strips: readonly Strip[],
+  wall: readonly Region[],
+  side: TabSide,
+  holeMm: number,
+  plateMm: number,
+  floorMm: number,
+  chamferMm = 0,
+  bendMm = 0.5,
+): WireExit[] {
+  const holed = findWireExits(project, strips, wall, side, holeMm, plateMm, floorMm, chamferMm);
+  const have = new Set(holed.map((e) => e.stripId));
+  const missing = new Set(chosenStrips(strips).filter((x) => !have.has(x.id)).map((x) => x.id));
+  return missing.size === 0 ? holed : [...holed, ...findAroundExits(project, strips, wall, side, plateMm, floorMm, bendMm, missing)];
 }

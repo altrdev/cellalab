@@ -18,13 +18,11 @@ export interface HolderCuts {
   notches: { top: Pt[][]; bottom: Pt[][] };
   /** Fori per i fili di bilanciamento senza linguette: passano per fondo e pareti della piastra della faccia della lamella. */
   wireHoles: { top: Pt[][]; bottom: Pt[][] };
-  /** Rinforzi del contorno attorno a quei fori, dove la plastica tra le celle non basta. */
-  wireBosses: { top: Pt[][]; bottom: Pt[][] };
   pockets: Pt[][];
   /** Fori che passano anche nel fondo (il filo dell'NTC). */
   through: Pt[][];
 }
-const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, wireHoles: { top: [], bottom: [] }, wireBosses: { top: [], bottom: [] }, pockets: [], through: [] };
+const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, wireHoles: { top: [], bottom: [] }, pockets: [], through: [] };
 let cutsSource: (project: Project, settings: HolderSettings) => HolderCuts = () => NO_CUTS;
 export function bindHolderCuts(get: (project: Project, settings: HolderSettings) => HolderCuts): void {
   cutsSource = get;
@@ -32,11 +30,11 @@ export function bindHolderCuts(get: (project: Project, settings: HolderSettings)
 
 export function holderOf(project: Project, settings: HolderSettings): { model: HolderModel | null; report: HolderReport | null; split: HolderSplit | null } {
   const cuts = cutsSource(project, settings);
-  const hasCuts = cuts.notches.top.length > 0 || cuts.notches.bottom.length > 0 || cuts.wireHoles.top.length > 0 || cuts.wireHoles.bottom.length > 0 || cuts.wireBosses.top.length > 0 || cuts.wireBosses.bottom.length > 0 || cuts.pockets.length > 0 || cuts.through.length > 0;
+  const hasCuts = cuts.notches.top.length > 0 || cuts.notches.bottom.length > 0 || cuts.wireHoles.top.length > 0 || cuts.wireHoles.bottom.length > 0 || cuts.pockets.length > 0 || cuts.through.length > 0;
   const key = renderKey() + JSON.stringify(settings) + (hasCuts ? JSON.stringify(cuts) : ''); // i messaggi del rapporto dipendono da lingua e unità
   if (last && last.project === project && last.key === key) return last;
-  const buildFor = (face: 'top' | 'bottom') => ({ notches: cuts.notches[face], extraPockets: cuts.pockets, throughHoles: [...cuts.through, ...cuts.wireHoles[face]], addOuter: cuts.wireBosses[face] });
-  const same = JSON.stringify([cuts.notches.top, cuts.wireHoles.top, cuts.wireBosses.top]) === JSON.stringify([cuts.notches.bottom, cuts.wireHoles.bottom, cuts.wireBosses.bottom]);
+  const buildFor = (face: 'top' | 'bottom') => ({ notches: cuts.notches[face], extraPockets: cuts.pockets, throughHoles: [...cuts.through, ...cuts.wireHoles[face]] });
+  const same = JSON.stringify([cuts.notches.top, cuts.wireHoles.top]) === JSON.stringify([cuts.notches.bottom, cuts.wireHoles.bottom]);
   const topModel = buildHolder(project, settings, true, buildFor('top'));
   let model = topModel;
   if (!same && topModel) {
@@ -44,7 +42,7 @@ export function holderOf(project: Project, settings: HolderSettings): { model: H
     if (bottomModel) model = { ...topModel, halves: { top: topModel, bottom: bottomModel } };
   }
   // Le piastre a pezzi (troppo grandi per il piano) hanno ancora scanalature e fori di entrambe le facce.
-  const both = { notches: [...cuts.notches.top, ...cuts.notches.bottom], extraPockets: cuts.pockets, throughHoles: [...cuts.through, ...cuts.wireHoles.top, ...cuts.wireHoles.bottom], addOuter: [...cuts.wireBosses.top, ...cuts.wireBosses.bottom] };
+  const both = { notches: [...cuts.notches.top, ...cuts.notches.bottom], extraPockets: cuts.pockets, throughHoles: [...cuts.through, ...cuts.wireHoles.top, ...cuts.wireHoles.bottom] };
   const split = model ? splitHolder(project, settings, same ? buildFor('top') : both) : null;
   const report = model ? analyzeHolder(project, model, split) : null;
   last = { project, key, model, report, split };
