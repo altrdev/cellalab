@@ -621,16 +621,30 @@ describe('uscita dei fili dal portacelle, senza linguette', () => {
     expect(new Set(exits.map((e) => e.stripId)).size).toBe(5);
   });
 
-  it('il foro sta sul materiale del portacelle, non sotto una lamella della sua faccia, e vicino al punto di saldatura', () => {
+  it('il foro non sta in una tasca né sotto una lamella della sua faccia, ed è vicino al punto di saldatura', () => {
     for (const e of exits) {
-      const r = e.diameterMm / 2;
-      for (let k = 0; k < 12; k++) {
-        const a = (k / 12) * 2 * Math.PI;
-        expect(pointInRegions({ x: e.hole.x + Math.cos(a) * r, y: e.hole.y + Math.sin(a) * r }, plain.wall)).toBe(true);
-      }
+      for (const hole of plain.wall.flatMap((r) => r.holes)) expect(pointInRegions(e.hole, [{ outline: hole, holes: [] }])).toBe(false);
       const covering = strips.filter((x) => x.face === e.face).map((x) => ({ outline: x.outline, holes: x.holes }));
       expect(covering.some((c) => pointInRegions(e.hole, [c]))).toBe(false);
-      expect(Math.hypot(e.hole.x - e.solder.x, e.hole.y - e.solder.y)).toBeLessThanOrEqual(16);
+      expect(Math.hypot(e.hole.x - e.solder.x, e.hole.y - e.solder.y)).toBeLessThanOrEqual(24);
+    }
+  });
+
+  it('con uno smusso grande il foro resta circondato da plastica (rinforzo del contorno dove serve)', () => {
+    for (const chamferMm of [0.6, 2]) {
+      const st = { ...DEFAULT_HOLDER_SETTINGS, chamferMm };
+      const base = buildHolder(p, st, false)!;
+      const ex = findWireExits(p, strips, base.wall, 'bottom', 1.21, base.totalMm, base.floorMm, chamferMm);
+      expect(ex.length).toBe(5);
+      const model = buildHolder(p, st, false, { addOuter: ex.filter((e) => e.bossMm > 0).map((e) => circlePoints(e.hole.x, e.hole.y, e.bossMm, 24)) })!;
+      for (const e of ex) {
+        const r = e.diameterMm / 2 + Math.max(0.8, chamferMm + 0.5) - 0.05;
+        for (let k = 0; k < 24; k++) {
+          const a = (k / 24) * 2 * Math.PI;
+          // dentro il contorno (le tasche delle celle contano a parte: il loro gioco è la parete minima, già controllata)
+          expect(pointInRegions({ x: e.hole.x + Math.cos(a) * r, y: e.hole.y + Math.sin(a) * r }, model.wall.map((rg) => ({ outline: rg.outline, holes: [] })))).toBe(true);
+        }
+      }
     }
   });
 

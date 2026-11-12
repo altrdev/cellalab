@@ -55,7 +55,7 @@ interface NtcPlan {
   site: NtcSite | null;
 }
 const ntcCache = new WeakMap<Project, { key: string; plan: NtcPlan }>();
-const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, wireHoles: { top: [], bottom: [] }, pockets: [], through: [] };
+const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, wireHoles: { top: [], bottom: [] }, wireBosses: { top: [], bottom: [] }, pockets: [], through: [] };
 
 const exitCache = new WeakMap<Project, { key: string; exits: WireExit[] }>();
 /**
@@ -69,7 +69,7 @@ export function wireExitsOf(project: Project, settings: LamellaSettings, holder:
   if (hit && hit.key === key) return hit.exits;
   const plain = buildHolder(project, holder, false);
   const opts = optionsOf(project, settings);
-  const exits = plain && opts.tabs ? findWireExits(project, buildStrips(project, opts), plain.wall, opts.tabs.side, holeForWireMm(settings.balanceAwg), plain.totalMm, plain.floorMm) : [];
+  const exits = plain && opts.tabs ? findWireExits(project, buildStrips(project, opts), plain.wall, opts.tabs.side, holeForWireMm(settings.balanceAwg), plain.totalMm, plain.floorMm, holder.chamferMm) : [];
   exitCache.set(project, { key, exits });
   return exits;
 }
@@ -107,8 +107,13 @@ export function holderCutsOf(project: Project, settings: LamellaSettings, holder
   const { site } = ntcPlanOf(project, settings, holder);
   const exits = wireExitsOf(project, settings, holder);
   const holeOf = (e: WireExit) => circlePoints(e.hole.x, e.hole.y, e.diameterMm / 2, 16);
+  const bossOf = (e: WireExit) => circlePoints(e.hole.x, e.hole.y, e.bossMm, 24);
+  const wireBosses = {
+    top: exits.filter((e) => e.face === 'top' && e.bossMm > 0).map(bossOf),
+    bottom: exits.filter((e) => e.face === 'bottom' && e.bossMm > 0).map(bossOf),
+  };
   const wireHoles = { top: exits.filter((e) => e.face === 'top').map(holeOf), bottom: exits.filter((e) => e.face === 'bottom').map(holeOf) };
-  const cuts = { notches, wireHoles, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
+  const cuts = { notches, wireHoles, wireBosses, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
   cutsCache.set(project, { key, cuts });
   return cuts;
 }

@@ -1,5 +1,6 @@
 import { circlePoints, type Pt } from './polygon';
-import { intersectRegions, pointInRegions, regionArea, type Region } from './clip';
+import { intersectRegions, offsetRegions, pointInRegions, regionArea, type Region } from './clip';
+import { MIN_PRINT_WALL_MM } from './holder';
 import { findCellType } from './catalog';
 import type { Face, Strip, StripNode, TabSide } from './strips';
 import type { Project } from './types';
@@ -21,13 +22,18 @@ export interface WireExit {
   /** Spessore della piastra e del suo fondo, mm: il filo entra dalla faccia esterna ed esce dal bordo delle pareti. */
   plateMm: number;
   floorMm: number;
+  /** Raggio del rinforzo da aggiungere al contorno attorno al foro quando lì la plastica non basta (incavo stretto tra due celle, smusso); 0 = non serve. */
+  bossMm: number;
 }
 
 const SIDE: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
-/** Gioco attorno al foro, dentro il materiale, mm. */
-const MARGIN_MM = 0.5;
+/** Plastica che deve restare attorno al foro verso le tasche delle celle: almeno una parete stampabile, mm. */
+const MARGIN_MM = MIN_PRINT_WALL_MM;
+/** Il foro sta al massimo così fuori dal contorno (nell'incavo tra due celle, dove si aggiunge un rinforzo) o così dentro, mm. */
+const OUTSIDE_MM = 4;
+const RIM_MM = 7;
 /** Quanto lontano dal punto di saldatura si cerca il foro, mm. */
-const SEARCH_MM = 16;
+const SEARCH_MM = 24;
 const STEP_MM = 0.5;
 
 /** Una lamella per giunzione, di preferenza completa e della faccia sopra (come per le linguette). */
@@ -62,12 +68,20 @@ export function findWireExits(
   holeMm: number,
   plateMm: number,
   floorMm: number,
+  chamferMm = 0,
 ): WireExit[] {
   void project;
   void findCellType;
   const d = SIDE[side];
   const out: WireExit[] = [];
-  const radius = holeMm / 2 + MARGIN_MM;
+  const holeR = holeMm / 2;
+  const rPocket = holeR + MARGIN_MM; // gioco verso le tasche delle celle
+  const rOut = holeR + Math.max(MARGIN_MM, chamferMm + 0.5); // gioco verso il bordo, smusso compreso
+  const outlines = wall.map((r) => ({ outline: r.outline, holes: [] as Pt[][] }));
+  const near = offsetRegions(outlines, OUTSIDE_MM);
+  const deep = offsetRegions(outlines, -RIM_MM);
+  const pockets = wall.flatMap((r) => r.holes.map((h) => ({ outline: h, holes: [] as Pt[][] })));
+  const taken: Pt[] = [];
   for (const s of chosenStrips(strips)) {
     const node = frontNode(s, side);
     // punto di saldatura: sul lobo della lamella, dal lato di uscita, appena dentro il bordo
@@ -82,14 +96,20 @@ export function findWireExits(
         // il filo non torna indietro verso l'interno: il foro sta oltre il punto di saldatura o al suo fianco
         if (dx * d.x + dy * d.y < -2) continue;
         if (best && dist >= best.score) continue;
-        if (!pointInRegions(c, wall)) continue;
-        const disk = circlePoints(c.x, c.y, radius, 16);
-        if (!disk.every((q) => pointInRegions(q, wall))) continue;
+        // nella fascia lungo il bordo (o appena fuori, nell'incavo tra due celle), mai in una tasca
+        if (!pointInRegions(c, near) || pointInRegions(c, deep) || pockets.some((q) => pointInRegions(c, [q]))) continue;
+        if (taken.some((q) => Math.hypot(q.x - c.x, q.y - c.y) < 2 * rOut + 0.5)) continue;
+        const disk = circlePoints(c.x, c.y, rPocket, 16);
+        if (pockets.some((q) => intersectRegions(q, [disk]).some((x) => regionArea(x) > 0.01))) continue;
         if (covering.some((r) => intersectRegions(r, [disk]).some((x) => regionArea(x) > 0.01))) continue;
         best = { p: c, score: dist };
       }
     }
-    if (best) out.push({ stripId: s.id, face: s.face, side, solder, hole: best.p, diameterMm: holeMm, plateMm, floorMm });
+    if (!best) continue;
+    taken.push(best.p);
+    // se il gioco verso il bordo non sta nel contorno, si aggiunge un rinforzo attorno al foro
+    const room = circlePoints(best.p.x, best.p.y, rOut, 16).every((q) => pointInRegions(q, wall));
+    out.push({ stripId: s.id, face: s.face, side, solder, hole: best.p, diameterMm: holeMm, plateMm, floorMm, bossMm: room ? 0 : rOut + 0.3 });
   }
   return out;
 }
