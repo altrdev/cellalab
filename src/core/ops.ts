@@ -1,6 +1,6 @@
 import { slotIndexOf, slotPosition } from './lattice';
 import { findBmsType } from './bms';
-import { DEFAULT_BMS_MOUNT, POWER_CONNECTORS, type BmsMount, type BmsType, type CellType, type PackGenerator, type PlacedCell, type Project } from './types';
+import { DEFAULT_BMS_MOUNT, type BmsMount, type BmsType, type CellType, type PackGenerator, type PlacedCell, type Project } from './types';
 import { t } from '../i18n';
 
 /** Operazioni pure sul progetto: ricevono un Project e ne restituiscono uno nuovo. */
@@ -224,14 +224,7 @@ export function setBmsMount(project: Project, mount: Partial<BmsMount>): Project
   const clamp = (v: number, lo: number, hi: number) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo);
   return {
     ...project,
-    bmsMount: {
-      mode: cur.mode,
-      along: clamp(cur.along, 0, 1),
-      slackMm: clamp(cur.slackMm, 0, 200),
-      tailMm: clamp(cur.tailMm, 0, 2000),
-      powerConnector: POWER_CONNECTORS.includes(cur.powerConnector) ? cur.powerConnector : DEFAULT_BMS_MOUNT.powerConnector,
-      cablesEnd: cur.cablesEnd === 'low' ? 'low' : 'high',
-    },
+    bmsMount: { mode: cur.mode, along: clamp(cur.along, 0, 1), slackMm: clamp(cur.slackMm, 0, 200), tailMm: clamp(cur.tailMm, 0, 2000) },
   };
 }
 

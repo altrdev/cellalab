@@ -5,7 +5,7 @@
   import { onMount } from 'svelte';
   import { history } from '../state';
   import { holderOf } from './holder';
-  import { clipsOf, harnessOf, reportOf, stripsOf } from './lamelle';
+  import { harnessOf, reportOf, stripsOf } from './lamelle';
   import { PackScene, type ViewPreset } from './scene3d';
   import { ui } from './ui.svelte';
 
@@ -40,7 +40,6 @@
     const project = $history.present;
     const strips = showBus ? stripsOf(project, ui.lamella) : null;
     const report = showBus ? reportOf(project, ui.lamella) : null;
-    const harness = showHarness && showBus ? harnessOf(project, ui.lamella) : null;
     scene?.update(project, {
       explosionMm: explosion,
       showCells,
@@ -53,8 +52,7 @@
       holderTop: ui.holderView.showTop,
       holderBottom: ui.holderView.showBottom,
       holderColor: ui.holderView.color,
-      harness: harness,
-      clips: harness ? clipsOf(project, ui.lamella) : undefined,
+      harness: showHarness && showBus ? harnessOf(project, ui.lamella) : null,
     });
   });
 

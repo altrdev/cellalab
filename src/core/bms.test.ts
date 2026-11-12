@@ -15,7 +15,7 @@ import { tabNotches } from './tabNotches';
 import { DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './lamelle';
 import { holeForWireMm } from './wire';
 import { buildSvg } from './lamelleExport';
-import { buildStrips, tabsOf } from './strips';
+import { buildStrips } from './strips';
 import type { Project } from './types';
 
 const T = '21700-5000-10a';
@@ -155,18 +155,11 @@ describe('linea di piega della linguetta', () => {
 
   it('sta sulla linguetta, tra la cella e il foro', () => {
     for (const s of strips.filter((x) => x.tab)) {
-      for (const tab of tabsOf(s)) {
-        const [a, b] = tab.bend;
-        const horizontal = tab.side === 'top' || tab.side === 'bottom'; // la piega è una retta orizzontale o verticale
-        if (horizontal) expect(a.y).toBeCloseTo(b.y, 6);
-        else expect(a.x).toBeCloseTo(b.x, 6);
-        const out = tab.side === 'top' || tab.side === 'left' ? -1 : 1; // verso dove sporge (y e x verso il basso e destra)
-        const beyond = horizontal ? (tab.holeY - a.y) * out : (tab.holeX - a.x) * out;
-        expect(beyond).toBeGreaterThan(0); // il foro sta oltre la piega, in fuori
-        expect(horizontal ? Math.abs(a.x - b.x) : Math.abs(a.y - b.y)).toBeCloseTo(tab.widthMm, 6);
-        if (!tab.power) expect(tab.widthMm).toBeGreaterThanOrEqual(3 - 1e-6);
-        else expect(tab.widthMm).toBeGreaterThanOrEqual(2.85 + 2.4 - 1e-6);
-      }
+      const [a, b] = s.tab!.bend;
+      expect(a.y).toBeCloseTo(b.y, 6);
+      expect(a.y).toBeGreaterThan(s.tab!.holeY); // y verso il basso: la piega è più vicina alla cella del foro
+      expect(Math.abs(a.x - b.x)).toBeCloseTo(s.tab!.widthMm, 6);
+      expect(s.tab!.widthMm).toBeCloseTo(s.kind === 'series' ? 6 : 6.9, 6);
     }
   });
 
@@ -208,16 +201,12 @@ describe('tacche del portacelle per le linguette', () => {
   const p = setBms(pack(4, 2), 'bms-4s-30a-li-ion');
   const settings = { ...DEFAULT_HOLDER_SETTINGS, wallMm: 2.4 };
 
-  it('una per linguetta (i terminali ne hanno due), più profonda per il cavo di potenza', () => {
+  it('una per linguetta, più profonda per il cavo di potenza', () => {
     const notches = tabNotches(buildStrips(p, { tabs }), settings, wires);
-    expect(notches).toHaveLength(7);
-    const terminal = (id: string) => id.endsWith('-0') || id.endsWith('-4');
-    const seriesDepth = notches.filter((n) => !terminal(n.stripId)).map((n) => n.depthMm);
-    for (const id of ['top-0', 'top-4']) {
-      const depths = notches.filter((n) => n.stripId === id).map((n) => n.depthMm);
-      expect(depths).toHaveLength(2);
-      expect(Math.max(...depths)).toBeGreaterThanOrEqual(Math.max(...seriesDepth) - 1e-9);
-    }
+    expect(notches).toHaveLength(5);
+    const power = notches.filter((n) => n.stripId.endsWith('-0') || n.stripId.endsWith('-4'));
+    const series = notches.filter((n) => !power.includes(n));
+    expect(Math.max(...series.map((n) => n.depthMm))).toBeLessThan(Math.min(...power.map((n) => n.depthMm)) + 1e-9);
   });
 
   it('la parete resta stampabile: profondità al massimo parete − 0,8', () => {
@@ -255,7 +244,7 @@ describe('tacche con linguette intralciate', () => {
 
   it('nessuna scanalatura per le linguette che passano sopra altre celle', () => {
     const strips = buildStrips(p, { tabs });
-    const blocked = strips.filter((s) => tabsOf(s).length > 0 && tabsOf(s).every((x) => x.blockedBy));
+    const blocked = strips.filter((s) => s.tab?.blockedBy);
     expect(blocked.length).toBeGreaterThan(0);
     const ids = tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26, powerAwg: 12 }).map((n) => n.stripId);
     for (const s of blocked) expect(ids).not.toContain(s.id);
@@ -398,30 +387,12 @@ describe('cablaggio del BMS', () => {
     expect(strips.find((s) => s.id === h.wires[4]!.stripId)!.kind).toBe('terminal-plus');
   });
 
-  it('nessun filo attraversa da una piastra all’altra: corre in una corsia fuori dalla scatola', () => {
-    const top = h.box!.center.y + h.box!.size.y / 2;
-    const bottom = h.box!.center.y - h.box!.size.y / 2;
+  it('nessun filo attraversa da una piastra all’altra: ogni filo arriva a metà altezza', () => {
     for (const w of h.wires) {
-      const lane = w.points[1]!;
-      if (w.face === 'top') expect(lane.y).toBeGreaterThan(top);
-      else expect(lane.y).toBeLessThan(bottom);
-      expect(w.points[0]!.y > lane.y).toBe(w.face === 'top');
-    }
-  });
-
-  it('niente passa sotto il BMS: né i fili né i cavi entrano nel volume della scatola', () => {
-    const b = h.box!;
-    const inside = (q: { x: number; y: number; z: number }, m: number) =>
-      Math.abs(q.x - b.center.x) < b.size.x / 2 + m - 1e-6 && Math.abs(q.y - b.center.y) < b.size.y / 2 + m - 1e-6 && Math.abs(q.z - b.center.z) < b.size.z / 2 + m - 1e-6;
-    const paths = [...h.wires.map((w) => w.points), ...h.cables.map((c) => c.points)];
-    for (const pts of paths) {
-      for (let i = 0; i + 1 < pts.length; i++) {
-        for (let k = 0; k <= 40; k++) {
-          const t = k / 40;
-          const q = { x: pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t, y: pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t, z: pts[i]!.z + (pts[i + 1]!.z - pts[i]!.z) * t };
-          expect(inside(q, -0.01)).toBe(false);
-        }
-      }
+      expect(w.points[1].y).toBeCloseTo(35.2, 6); // metà dell'altezza delle celle (70,4)
+      expect(w.points[2].y).toBeCloseTo(w.points[1].y, 6);
+      const above = w.points[0].y > w.points[1].y;
+      expect(above).toBe(w.face === 'top');
     }
   });
 
@@ -429,19 +400,15 @@ describe('cablaggio del BMS', () => {
     expect(new Set(h.wires.map((w) => w.face)).size).toBe(2);
     for (const w of h.wires) {
       expect(w.lengthMm).toBeGreaterThan(20);
-      expect(w.lengthMm).toBeLessThan(150);
+      expect(w.lengthMm).toBeLessThan(120);
       expect(w.cutMm).toBeGreaterThanOrEqual(w.lengthMm + h.mount.slackMm - 1e-6);
       expect(w.cutMm % 5).toBe(0);
     }
   });
 
-  it('i contatti del connettore sono su una testata, in colonna e a passo fisso', () => {
-    const ys = h.wires.map((w) => w.points[w.points.length - 1]!.y);
-    for (let i = 1; i < ys.length; i++) expect(ys[i]! - ys[i - 1]!).toBeCloseTo(2.5, 6);
-    const pin = h.wires[0]!.points[h.wires[0]!.points.length - 1]!;
-    // la testata è quella opposta ai cavi di potenza (alta di default): il connettore sta dal lato basso
-    expect(pin.x).toBeLessThan(h.box!.center.x - h.box!.size.x / 2);
-    expect(h.header.center.x).toBeLessThan(h.box!.center.x - h.box!.size.x / 2);
+  it('i contatti del connettore sono ordinati e a passo fisso', () => {
+    const xs = h.wires.map((w) => w.points[2].x);
+    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeCloseTo(2.5, 6);
   });
 
   it('la posizione lungo il lato sposta il connettore; esterno aggiunge la coda e toglie la scatola', () => {
@@ -451,7 +418,7 @@ describe('cablaggio del BMS', () => {
     expect(h.box).not.toBeNull();
     const ext = buildHarness(setBmsMount(p, { mode: 'external', tailMm: 100 }), strips, 0.1)!;
     expect(ext.box).toBeNull();
-    expect(ext.wires[0]!.cutMm).toBeGreaterThanOrEqual(ext.wires[0]!.lengthMm + h.mount.slackMm + 100);
+    expect(ext.wires[0]!.cutMm).toBeGreaterThan(h.wires[0]!.cutMm + 90);
   });
 
   it('senza BMS o senza linguette non c’è cablaggio', () => {
@@ -464,142 +431,53 @@ describe('cablaggio del BMS', () => {
   });
 });
 
-describe('linguette dei terminali: potenza e bilanciamento separate', () => {
+describe('fori sulle linguette dei terminali', () => {
   const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, powerHoleMm: 2.85 } as const;
   const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
   const strips = buildStrips(p, { tabs });
-  const terminals = strips.filter((x) => x.tab && x.kind !== 'series');
-  const series = strips.filter((x) => x.tab && x.kind === 'series');
 
-  it('i terminali hanno due linguette, le lamelle in serie una', () => {
-    expect(terminals.length).toBe(2);
-    for (const s of terminals) {
-      expect(tabsOf(s)).toHaveLength(2);
-      expect(s.tab!.power).toBe(true);
-      expect(s.balanceTab!.power).toBe(false);
-      expect(s.tab!.balanceHole).toBeUndefined();
-      expect(s.balanceTab!.balanceHole!.diameterMm).toBeCloseTo(1.21, 6);
-      expect(s.tab!.holeDiameterMm).toBeCloseTo(2.85, 6);
-    }
-    for (const s of series) {
-      expect(tabsOf(s)).toHaveLength(1);
-      expect(s.tab!.balanceHole!.diameterMm).toBeCloseTo(1.21, 6);
-    }
-  });
-
-  it('il bilanciamento esce dal lato scelto con gli altri, la potenza di lato', () => {
-    for (const s of terminals) expect(s.balanceTab!.side).toBe('top');
-    for (const s of series) expect(s.tab!.side).toBe('top');
-    const plus = terminals.find((s) => s.kind === 'terminal-plus')!;
-    const minus = terminals.find((s) => s.kind === 'terminal-minus')!;
-    // P+ è la colonna a sinistra, P− quella a destra: la potenza esce dal bordo laterale più vicino
-    expect(plus.tab!.side).toBe('left');
-    expect(minus.tab!.side).toBe('right');
-    // la potenza non parte dalla cella del bilanciamento
-    for (const s of terminals) expect(Math.hypot(s.tab!.anchor.x - s.balanceTab!.anchor.x, s.tab!.anchor.y - s.balanceTab!.anchor.y)).toBeGreaterThan(5);
-  });
-
-  it('la linguetta di bilanciamento del terminale ha la stessa larghezza delle altre', () => {
-    for (const s of terminals) expect(s.balanceTab!.widthMm).toBeCloseTo(series[0]!.tab!.widthMm, 6);
-  });
-
-  it('nessuna linguetta è intralciata', () => {
-    expect(strips.every((s) => tabsOf(s).every((x) => x.blockedBy === null))).toBe(true);
-  });
-
-  it('ogni foro è un buco della lamella', () => {
+  it('i terminali hanno due fori: bilanciamento vicino alla piega, potenza più in fuori', () => {
     const plain = buildStrips(p, {});
-    for (const s of terminals) expect(s.holes.length).toBe(plain.find((x) => x.id === s.id)!.holes.length + 2);
-    for (const s of series) expect(s.holes.length).toBe(plain.find((x) => x.id === s.id)!.holes.length + 1);
+    for (const s of strips.filter((x) => x.tab)) {
+      const base = plain.find((x) => x.id === s.id)!.holes.length;
+      const bh = s.tab!.balanceHole;
+      if (s.kind === 'series') {
+        expect(s.holes.length).toBe(base + 1);
+        expect(bh.x).toBeCloseTo(s.tab!.holeX, 6);
+        expect(bh.diameterMm).toBeCloseTo(1.21, 6);
+      } else {
+        expect(s.holes.length).toBe(base + 2);
+        expect(s.tab!.holeDiameterMm).toBeCloseTo(2.85, 6);
+        expect(bh.diameterMm).toBeCloseTo(1.21, 6);
+        // il foro piccolo sta più vicino alla piega (verso l'alto del disegno, y minore, il foro grande più in fuori)
+        expect(Math.hypot(bh.x - s.tab!.holeX, bh.y - s.tab!.holeY)).toBeGreaterThan((1.21 + 2.85) / 2);
+        const bend = s.tab!.bend;
+        const dist = (x: number, y: number) => Math.hypot(x - (bend[0].x + bend[1].x) / 2, y - (bend[0].y + bend[1].y) / 2);
+        expect(dist(bh.x, bh.y)).toBeLessThan(dist(s.tab!.holeX, s.tab!.holeY));
+      }
+    }
   });
 
-  it('i fili di bilanciamento partono tutti dal lato scelto: stesso percorso a tre punti', () => {
+  it('la linguetta del terminale è lunga abbastanza per i due fori', () => {
+    for (const s of strips.filter((x) => x.tab && x.kind !== 'series')) {
+      const bend = s.tab!.bend;
+      const mid = { x: (bend[0].x + bend[1].x) / 2, y: (bend[0].y + bend[1].y) / 2 };
+      const far = Math.hypot(s.tab!.holeX - mid.x, s.tab!.holeY - mid.y) + s.tab!.holeDiameterMm / 2;
+      expect(far).toBeLessThanOrEqual(Math.max(...s.tab!.rect.map((q) => Math.hypot(q.x - mid.x, q.y - mid.y))) + 1e-6);
+    }
+  });
+
+  it('il filo di bilanciamento di B0 e BS parte dall’altezza del foro piccolo, non da quella del cavo', () => {
     const h = buildHarness(p, strips, 0.1)!;
-    for (const w of h.wires) expect(w.points).toHaveLength(5);
-    const first = h.wires[0]!;
-    const s0 = strips.find((x) => x.id === first.stripId)!;
-    const bend = s0.balanceTab!.bend;
-    expect(first.points[0]!.x).toBeCloseTo((bend[0].x + bend[1].x) / 2, 6);
-  });
-
-  it('una scanalatura per linguetta: i terminali ne hanno due', () => {
-    const notches = tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26, powerAwg: 12 });
-    expect(notches).toHaveLength(7);
-    for (const s of terminals) expect(notches.filter((n) => n.stripId === s.id)).toHaveLength(2);
-  });
-});
-
-describe('cavi di potenza (BMS a porta comune)', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, powerHoleMm: 2.85 } as const;
-  const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
-  const strips = buildStrips(p, { tabs });
-  const h = buildHarness(p, strips, 0.1)!;
-  const cable = (l: string) => h.cables.find((c) => c.label === l)!;
-
-  it('tre cavi: P+ dritto, B− nel BMS, P− dal BMS, con il diametro dell’AWG scelto', () => {
-    expect(h.cables.map((c) => c.label).sort()).toEqual(['B−', 'P+', 'P−']);
-    for (const c of h.cables) expect(c.odMm).toBeCloseTo(3.6, 6);
-    expect(buildHarness(p, strips, 0.1, { balanceAwg: 26, powerAwg: 8 })!.cables[0]!.odMm).toBeCloseTo(6, 6);
-    // il negativo del pacco parte dalla lamella di P−, il positivo da quella di P+
-    expect(strips.find((x) => x.id === cable('P+').stripId)!.kind).toBe('terminal-plus');
-    expect(strips.find((x) => x.id === cable('B−').stripId)!.kind).toBe('terminal-minus');
-  });
-
-  it('il negativo entra nel BMS: B− finisce all’estremità del BMS e P− riparte da lì', () => {
-    const bIn = cable('B−');
-    const pOut = cable('P−');
-    const end = bIn.points[bIn.points.length - 1]!;
-    expect(end.x).toBeCloseTo(h.box!.center.x + h.box!.size.x / 2, 6); // estremità alta del BMS (default)
-    expect(bIn.points[bIn.points.length - 2]!.y).toBeCloseTo(end.y, 6); // entra orizzontale nel pad, dopo essere sceso
-    expect(pOut.points[0]!.x).toBeCloseTo(end.x, 6);
-    expect(pOut.points[0]!.z).toBeCloseTo(end.z, 6);
-    expect(pOut.points[0]!.y).toBeLessThan(end.y); // P− sta sotto B−
-  });
-
-  it('P+ passa davanti al BMS senza entrarci e prosegue nella coda insieme a P−', () => {
-    const plus = cable('P+');
-    const pOut = cable('P−');
-    const e = plus.points[plus.tailFrom]!;
-    expect(e.x).toBeGreaterThan(cable('B−').points[cable('B−').points.length - 1]!.x); // scende più in fuori di B−
-    const tailP = plus.points[plus.points.length - 1]!;
-    const tailM = pOut.points[pOut.points.length - 1]!;
-    expect(tailP.x).toBeCloseTo(tailM.x, 6);
-    expect(tailP.x - e.x).toBeCloseTo(150, 6);
-    expect(plus.points[plus.tailFrom]!.y).toBeGreaterThan(pOut.points[0]!.y); // P+ sopra P−
-  });
-
-  it('i cavi partono dal bordo laterale e arrivano al lato di uscita', () => {
-    for (const c of [cable('P+'), cable('B−')]) {
-      const first = c.points[0]!;
-      const end = c.points[c.tailFrom]!;
-      expect(first.z).toBeGreaterThan(end.z + 15); // il lato di uscita è l'alto del disegno
+    for (const w of [h.wires[0]!, h.wires[h.wires.length - 1]!]) {
+      const s = strips.find((x) => x.id === w.stripId)!;
+      const bend = s.tab!.bend;
+      const midY = (bend[0].y + bend[1].y) / 2;
+      const uBal = midY - s.tab!.balanceHole.y; // lato alto del disegno: la linguetta esce verso y minore
+      const uPow = midY - s.tab!.holeY;
+      expect(uPow).toBeGreaterThan(uBal);
+      const expected = w.face === 'top' ? 70.4 + 1.1 + 0.1 - uBal : -1.1 - 0.1 + uBal;
+      expect(w.points[0].y).toBeCloseTo(expected, 6);
     }
-  });
-
-  it('con le estremità a sinistra tutto si sposta dall’altra parte', () => {
-    const left = buildHarness(setBmsMount(p, { cablesEnd: 'low' }), strips, 0.1)!;
-    const c = left.cables.find((x) => x.label === 'P+')!;
-    expect(c.points[c.tailFrom]!.x).toBeLessThan(left.box!.center.x);
-    expect(c.points[c.points.length - 1]!.x).toBeLessThan(c.points[c.tailFrom]!.x - 100);
-  });
-
-  it('scorta e arrotondamento: la lunghezza da tagliare è percorso più scorta, a multipli di 5 mm', () => {
-    for (const c of h.cables) {
-      expect(c.cutMm).toBeGreaterThanOrEqual(c.lengthMm + h.mount.slackMm - 1e-6);
-      expect(c.cutMm).toBeLessThan(c.lengthMm + h.mount.slackMm + 5 + 1e-6);
-      expect(c.cutMm % 5).toBe(0);
-    }
-  });
-
-  it('il connettore sta in fondo alla coda, lontano dal pacco, e dipende dalla scelta', () => {
-    expect(h.connectors).toHaveLength(1);
-    expect(h.connectors[0]!.kind).toBe('xt60');
-    expect(h.connectors[0]!.cable).toBe('P±');
-    const tail = cable('P+').points[cable('P+').points.length - 1]!;
-    expect(h.connectors[0]!.center.x).toBeGreaterThan(tail.x);
-    expect(buildHarness(setBmsMount(p, { powerConnector: 'none' }), strips, 0.1)!.connectors).toHaveLength(0);
-    const bullet = buildHarness(setBmsMount(p, { powerConnector: 'bullet' }), strips, 0.1)!;
-    expect(bullet.connectors).toHaveLength(2);
-    expect(bullet.connectors.every((k) => k.shape === 'cylinder')).toBe(true);
   });
 });

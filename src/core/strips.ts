@@ -37,9 +37,6 @@ export interface StripNode {
   reachMm: number;
 }
 
-/** Le linguette di una lamella (una in serie, due sui terminali). */
-export const tabsOf = (s: Pick<Strip, 'tab' | 'balanceTab'>): StripTab[] => [s.tab, s.balanceTab].filter((t): t is StripTab => t !== undefined);
-
 export type TabSide = 'top' | 'bottom' | 'left' | 'right';
 
 /** Linguetta di presa per il filo di bilanciamento del BMS: sporge dalla lamella (e ne fa parte) ed è forata. */
@@ -56,10 +53,8 @@ export interface StripTab {
   holeX: number;
   holeY: number;
   holeDiameterMm: number;
-  /** Posizione della linguetta di lato rispetto alla cella da cui parte (la linguetta di potenza e quella di bilanciamento dei terminali sono affiancate), mm. */
-  lateralMm: number;
-  /** Foro dove si salda il filo di bilanciamento: solo sulla linguetta che lo porta (quella in serie, o quella piccola dei terminali). */
-  balanceHole?: { x: number; y: number; diameterMm: number };
+  /** Foro dove si salda il filo di bilanciamento: sulle linguette in serie è il foro stesso, su quelle dei terminali è un foro piccolo a parte dal cavo di potenza. */
+  balanceHole: { x: number; y: number; diameterMm: number };
   /** Linea di piega consigliata (oltre il bordo del holder, prima del foro), da segnare e non da tagliare. */
   bend: [Pt, Pt];
   /** Cosa intralcia la linguetta: un'altra lamella della stessa faccia o una cella; null = libera. */
@@ -90,10 +85,8 @@ export interface Strip {
   /** Quante celle in parallelo dividono la corrente: ogni banda porta circa I/P. */
   parallelCount: number;
   areaMm2: number;
-  /** Presente solo sulle lamelle che portano un filo di bilanciamento (con un BMS scelto). Sui terminali è la linguetta del cavo di potenza. */
+  /** Presente solo sulle lamelle che portano un filo di bilanciamento (con un BMS scelto). */
   tab?: StripTab;
-  /** Solo sui terminali (P+/P−): la linguetta piccola, affiancata, per il filo di bilanciamento. */
-  balanceTab?: StripTab;
   /** Vero se manca uno dei due lati di un collegamento in serie (es. gruppo con polarità miste). */
   partial: boolean;
 }
@@ -273,13 +266,10 @@ export function buildStrips(project: Project, options: StripOptions = {}): Strip
 
 const SIDE_VECTOR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
-const sideOf = (v: Pt): TabSide => (v.y < 0 ? 'top' : v.y > 0 ? 'bottom' : v.x < 0 ? 'left' : 'right');
-
 /**
  * Un filo di bilanciamento per ogni giunzione (S+1 in tutto): sulla lamella completa, di preferenza della faccia
  * sopra. La linguetta parte dalla cella più vicina al lato scelto e sporge in fuori; larghezza e foro si adattano
- * all'appoggio. Sui terminali (P+/P−) ce ne sono due: una piccola per il filo di bilanciamento, dal lato scelto con le
- * altre, e una larga per il cavo di potenza dal lato opposto (l'altro capo della lamella).
+ * all'appoggio.
  */
 function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: readonly Region[] | null): void {
   const d = SIDE_VECTOR[o.side];
@@ -291,138 +281,70 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
     if (better) byJoint.set(s.joint, s);
   }
   const chosen = new Set(byJoint.values());
-  const dot = (n: { x: number; y: number }, v: Pt) => n.x * v.x + n.y * v.y;
-  const centre = { x: project.cells.reduce((a, c) => a + c.x, 0) / Math.max(1, project.cells.length), y: project.cells.reduce((a, c) => a + c.y, 0) / Math.max(1, project.cells.length) };
-  const cellDisc = project.cells.map((c) => ({ id: c.id, x: c.x, y: c.y, r: (findCellType(project, c.typeId)?.diameterMm ?? 0) / 2 }));
-
-  interface Spec {
-    lateral: number;
-    width: number;
-    holeWant: number;
-    length: number;
-    power: boolean;
-    carriesBalance: boolean;
-  }
-  interface Made {
-    tabs: StripTab[];
-    rects: Pt[][];
-    holes: Pt[][];
-  }
-
-  /** Linguette che partono dal nodo `node` in direzione `dir`, tutte con la stessa linea di piega. */
-  const makeTabs = (node: StripNode, dir: Pt, specs: Spec[]): Made => {
-    const pp = { x: -dir.y, y: dir.x };
-    const at = (a: number, p: number): Pt => ({ x: node.x + dir.x * a + pp.x * p, y: node.y + dir.y * a + pp.y * p });
-    // Fin dove arriva il holder lungo la linguetta (controllando il centro e i due bordi di ogni linguetta): la piega sta oltre.
+  for (const s of strips) {
+    if (!chosen.has(s)) continue;
+    const along = (n: StripNode) => n.x * d.x + n.y * d.y;
+    const side = (n: StripNode) => n.x * perp.x + n.y * perp.y;
+    const meanSide = s.nodes.reduce((a, n) => a + side(n), 0) / s.nodes.length;
+    // Nodo più avanti verso il lato scelto (a parità, il più vicino al centro della lamella).
+    const node = s.nodes.reduce((a, b) => {
+      const ea = along(a) + a.reachMm;
+      const eb = along(b) + b.reachMm;
+      if (Math.abs(ea - eb) > 1e-6) return eb > ea ? b : a;
+      return Math.abs(side(b) - meanSide) < Math.abs(side(a) - meanSide) ? b : a;
+    });
+    const power = s.kind !== 'series';
+    const holeWant = power ? o.powerHoleMm : o.holeMm;
+    const w = Math.min(power ? Math.max(o.widthMm, holeWant + 4) : o.widthMm, 2 * node.reachMm);
+    // I terminali hanno due fori in fila lungo la linguetta: filo di bilanciamento (vicino alla piega) e cavo di potenza.
+    const balWant = Math.min(o.holeMm, w - 1);
+    const lengthMm = Math.max(o.lengthMm, power ? balWant + holeWant + 4.5 : 1);
+    // Fin dove arriva il holder lungo la linguetta (controllando il centro e i due bordi): la piega sta oltre.
     let exit = node.cellRadiusMm + DEFAULT_HOLDER_EDGE_MM;
     if (holder && holder.length > 0) {
       let last = -1;
-      const vs = specs.flatMap((sp) => [sp.lateral - sp.width / 2, sp.lateral, sp.lateral + sp.width / 2]);
-      for (let aa = 0; aa <= 80; aa += 0.25) {
-        if (vs.some((v) => pointInRegions(at(aa, v), holder))) last = aa;
+      for (let a = 0; a <= 80; a += 0.25) {
+        if ([-w / 2, 0, w / 2].some((v) => pointInRegions({ x: node.x + d.x * a + perp.x * v, y: node.y + d.y * a + perp.y * v }, holder))) last = a;
       }
       if (last >= 0) exit = last;
     }
     const bendAlong = Math.max(exit + o.bendMm, node.reachMm);
-    const made: Made = { tabs: [], rects: [], holes: [] };
-    for (const sp of specs) {
-      const reach = bendAlong + sp.length;
-      const l0 = sp.lateral - sp.width / 2;
-      const l1 = sp.lateral + sp.width / 2;
-      const rect = convexHull([at(0, l0), at(0, l1), at(reach, l1), at(reach, l0)]);
-      const hole = Math.min(sp.holeWant, sp.width - 1, sp.length - 1);
-      const hc = at(bendAlong + sp.length / 2, sp.lateral);
-      made.rects.push(rect);
-      if (hole >= 0.5) made.holes.push(circlePoints(hc.x, hc.y, hole / 2, circleSegments(hole / 2)));
-      made.tabs.push({
-        side: sideOf(dir),
-        power: sp.power,
-        anchor: { x: node.x, y: node.y },
-        widthMm: sp.width,
-        lateralMm: sp.lateral,
-        rect,
-        holeX: hc.x,
-        holeY: hc.y,
-        holeDiameterMm: hole >= 0.5 ? hole : 0,
-        ...(sp.carriesBalance && { balanceHole: { x: hc.x, y: hc.y, diameterMm: hole >= 0.5 ? hole : 0 } }),
-        bend: [at(bendAlong, l0), at(bendAlong, l1)],
-        blockedBy: null,
-      });
-    }
-    return made;
-  };
-
-  /** Una linguetta che passa sopra celle di altre giunzioni o lamelle della stessa faccia non può stare lì. */
-  const blocked = (rect: Pt[], s: Strip): boolean => {
-    const own = new Set(s.nodes.map((n) => n.cellId));
-    if (cellDisc.some((c) => !own.has(c.id) && distToRect(c, rect) < c.r - 0.01)) return true;
-    return strips.some((o2) => o2 !== s && o2.face === s.face && intersectRegions({ outline: o2.outline, holes: o2.holes }, [rect]).some((h) => regionArea(h) > 0.01));
-  };
-
-  for (const s of strips) {
-    if (!chosen.has(s)) continue;
-    const extreme = (dir: Pt) =>
-      s.nodes.reduce((a, b) => (dot(b, dir) + b.reachMm > dot(a, dir) + a.reachMm + 1e-6 ? b : a));
-    const meanSide = s.nodes.reduce((a, n) => a + dot(n, perp), 0) / s.nodes.length;
-    const node = s.nodes.reduce((a, b) => {
-      const ea = dot(a, d) + a.reachMm;
-      const eb = dot(b, d) + b.reachMm;
-      if (Math.abs(ea - eb) > 1e-6) return eb > ea ? b : a;
-      return Math.abs(dot(b, perp) - meanSide) < Math.abs(dot(a, perp) - meanSide) ? b : a;
-    });
-    const reachSpan = 2 * node.reachMm;
-    const balHole = o.holeMm;
-    // La linguetta di bilanciamento ha la stessa larghezza su tutte le lamelle, terminali compresi.
-    const balW = Math.max(balHole + 1.8, o.widthMm);
-    const balSpec: Spec = { lateral: 0, width: Math.min(balW, reachSpan), holeWant: balHole, length: Math.max(o.lengthMm, balHole + 3), power: false, carriesBalance: true };
-    let made: Made;
-    if (s.kind === 'series') {
-      made = makeTabs(node, d, [{ lateral: 0, width: Math.min(o.widthMm, reachSpan), holeWant: balHole, length: Math.max(o.lengthMm, 1), power: false, carriesBalance: true }]);
-    } else {
-      // Terminali: il filo di bilanciamento sta con gli altri dal lato scelto (linguetta piccola); il cavo di potenza esce
-      // di lato (linguetta larga), dal bordo laterale più vicino, dalla cella più lontana da quella del bilanciamento.
-      // Se di lato è intralciato, dal lato opposto a quello scelto.
-      const bal = makeTabs(node, d, [balSpec]);
-      const away = dot(node, perp) >= dot(centre, perp) ? perp : { x: -perp.x, y: -perp.y };
-      const candidates = [away, { x: -away.x, y: -away.y }, { x: -d.x, y: -d.y }];
-      let pw: Made | null = null;
-      for (const dir of candidates) {
-        const top = s.nodes.reduce((m, n) => Math.max(m, dot(n, dir) + n.reachMm), -Infinity);
-        // tra le celle più avanti verso quel lato, la più lontana da quella del bilanciamento
-        const nodeP = s.nodes
-          .filter((n) => dot(n, dir) + n.reachMm >= top - 1e-6)
-          .reduce((best, n) => (Math.hypot(n.x - node.x, n.y - node.y) > Math.hypot(best.x - node.x, best.y - node.y) ? n : best));
-        const powSpec: Spec = { lateral: 0, width: Math.min(Math.max(o.widthMm, o.powerHoleMm + 4), 2 * nodeP.reachMm), holeWant: o.powerHoleMm, length: Math.max(o.lengthMm, o.powerHoleMm + 3), power: true, carriesBalance: false };
-        const m = makeTabs(nodeP, dir, [powSpec]);
-        pw = m;
-        if (!blocked(m.rects[0]!, s)) break;
-      }
-      made = { tabs: [...pw!.tabs, ...bal.tabs], rects: [...pw!.rects, ...bal.rects], holes: [...pw!.holes, ...bal.holes] };
-    }
-    const region: Region = unionPolygons([s.outline, ...made.rects]);
+    const reach = bendAlong + lengthMm;
+    const at = (a: number, p: number): Pt => ({ x: node.x + d.x * a + perp.x * p, y: node.y + d.y * a + perp.y * p });
+    const rect = convexHull([at(0, -w / 2), at(0, w / 2), at(reach, w / 2), at(reach, -w / 2)]);
+    const hole = Math.min(holeWant, w - 1, lengthMm - 1);
+    // Posizione dei fori lungo la linguetta, dalla piega: la linguetta in serie ne ha uno al centro; il terminale due in fila.
+    const balAt = power ? bendAlong + 1.5 + balWant / 2 : bendAlong + lengthMm / 2;
+    const powAt = power ? bendAlong + 1.5 + balWant + 1.5 + hole / 2 : bendAlong + lengthMm / 2;
+    const hc = at(powAt, 0);
+    const bc = at(balAt, 0);
+    const region: Region = unionPolygons([s.outline, rect]);
+    const holes = [...s.holes];
+    if (hole >= 0.5) holes.push(circlePoints(hc.x, hc.y, hole / 2, circleSegments(hole / 2)));
+    if (power && balWant >= 0.5) holes.push(circlePoints(bc.x, bc.y, balWant / 2, circleSegments(balWant / 2)));
     s.outline = region.outline;
-    s.holes = [...s.holes, ...made.holes];
-    s.areaMm2 = regionArea({ outline: s.outline, holes: s.holes });
-    s.tab = made.tabs[0]!;
-    if (made.tabs[1]) s.balanceTab = made.tabs[1];
+    s.holes = holes;
+    s.areaMm2 = regionArea({ outline: s.outline, holes });
+    const bend: [Pt, Pt] = [at(bendAlong, -w / 2), at(bendAlong, w / 2)];
+    s.tab = { side: o.side, power, anchor: { x: node.x, y: node.y }, widthMm: w, rect, holeX: hc.x, holeY: hc.y, holeDiameterMm: hole >= 0.5 ? hole : 0, balanceHole: { x: bc.x, y: bc.y, diameterMm: power ? (balWant >= 0.5 ? balWant : 0) : hole >= 0.5 ? hole : 0 }, bend, blockedBy: null };
   }
   // Intralci: celle dell'altra parte e lamelle della stessa faccia (con le loro linguette).
   for (const s of strips) {
+    const tab = s.tab;
+    if (!tab) continue;
     const own = new Set(s.nodes.map((n) => n.cellId));
-    for (const tab of tabsOf(s)) {
-      for (const c of project.cells) {
-        if (own.has(c.id)) continue;
-        const r = (findCellType(project, c.typeId)?.diameterMm ?? 0) / 2;
-        if (distToRect(c, tab.rect) < r - 0.01) tab.blockedBy = 'cell';
-      }
-      if (tab.blockedBy) continue;
-      for (const o2 of strips) {
-        if (o2 === s || o2.face !== s.face) continue;
-        const hit = intersectRegions({ outline: o2.outline, holes: o2.holes }, [tab.rect]);
-        if (hit.some((h) => regionArea(h) > 0.01)) {
-          tab.blockedBy = 'strip';
-          break;
-        }
+    for (const c of project.cells) {
+      if (own.has(c.id)) continue;
+      const r = (findCellType(project, c.typeId)?.diameterMm ?? 0) / 2;
+      if (distToRect(c, tab.rect) < r - 0.01) tab.blockedBy = 'cell';
+    }
+    if (tab.blockedBy) continue;
+    for (const o2 of strips) {
+      if (o2 === s || o2.face !== s.face) continue;
+      const hit = intersectRegions({ outline: o2.outline, holes: o2.holes }, [tab.rect]);
+      if (hit.some((h) => regionArea(h) > 0.01)) {
+        tab.blockedBy = 'strip';
+        break;
       }
     }
   }

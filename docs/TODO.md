@@ -33,7 +33,6 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 - [x] NTC wire groove (1.6 mm wide, half the floor deep) on the outer face from the wire hole to the exit edge, avoiding the busbars of the face; the plate with a free path is suggested.
 - [ ] Still open: balance-wire routing along the pack between the two faces, warning when the wall is too thin for the wire, (NTC pocket, hole and groove are now on the suggested plate only).
 - [x] BMS position and wiring: BMS on the flank at mid height (or external exit point), position along the side, wire lengths B0..BS in the Export tab, BMS box and wires in the 3D view. Generic BMS sizes are class estimates.
-- [x] Terminal tabs: balance tab on the chosen side with the others, power tab on the opposite side; power cables (lengths in the wire list) with bullet/XT60/XT90 housings and printable snap-fit cable clips (STL) on the flank cells, all drawn in 3D. Clips are untested in a slicer or on a real pack.
 - [ ] BMS mounting hardware in the holder (pocket + spacers, strain relief) and the BMS's real holes/connector/B-/P-/P+ positions in the catalogue.
 
 ## Polish (phase 6)

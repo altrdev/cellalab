@@ -5,12 +5,11 @@ import type { Pt } from '../core/polygon';
 import { AWG_TABLE } from '../core/wire';
 import { COOLING, spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
-import { buildStrips, tabsOf, type Face, type Strip, type TabSide } from '../core/strips';
+import { buildStrips, type Face, type Strip, type TabSide } from '../core/strips';
 import { buildHolder } from '../core/holder';
 import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
 import { holderOf, type HolderCuts } from './holder';
 import { bmsOf } from '../core/bms';
-import { cableClips, type CableClip } from '../core/cableClip';
 import { buildHarness, type Harness } from '../core/harness';
 import { ntcSites, type NtcSite } from '../core/ntc';
 import { ntcRoute, type NtcRoute } from '../core/ntcRoute';
@@ -132,7 +131,7 @@ function tabBlocks(project: Project, settings: LamellaSettings): Record<TabSide,
   const holderOutline = model ? model.wall.map((r) => ({ outline: r.outline, holes: [] })) : null;
   const blocks = { ...none };
   for (const side of TAB_SIDES) {
-    blocks[side] = buildStrips(project, { ...opts, tabs: { ...opts.tabs, side }, holderOutline }).filter((s) => tabsOf(s).some((x) => x.blockedBy)).length;
+    blocks[side] = buildStrips(project, { ...opts, tabs: { ...opts.tabs, side }, holderOutline }).filter((s) => s.tab?.blockedBy).length;
   }
   blocksCache.set(project, { key, blocks });
   return blocks;
@@ -157,25 +156,12 @@ function optionsOf(project: Project, settings: LamellaSettings): StripOptions {
   return o.tabs ? { ...o, tabs: { ...o.tabs, side: tabSideOf(project, settings) } } : o;
 }
 
-const harnessCache = new WeakMap<Project, { key: string; harness: Harness | null; clips: CableClip[] }>();
-
-function harnessEntry(project: Project, settings: LamellaSettings): { harness: Harness | null; clips: CableClip[] } {
-  const report = reportOf(project, settings);
-  const thickness = Math.max(0.3, report.totalThicknessMm ?? report.requiredMm ?? 0.3);
-  const key = JSON.stringify([settings, thickness]);
-  const hit = harnessCache.get(project);
-  if (hit && hit.key === key) return hit;
-  const harness = project.bmsId === undefined ? null : buildHarness(project, stripsOf(project, settings), thickness, settings);
-  const entry = { key, harness, clips: harness ? cableClips(project, harness) : [] };
-  harnessCache.set(project, entry);
-  return entry;
-}
-
 /** Cablaggio del BMS (posizione e lunghezza dei fili), con lo spessore delle lamelle che si vede nella scena. */
-export const harnessOf = (project: Project, settings: LamellaSettings): Harness | null => harnessEntry(project, settings).harness;
-
-/** Fermacavi a scatto dei cavi di potenza. */
-export const clipsOf = (project: Project, settings: LamellaSettings): CableClip[] => harnessEntry(project, settings).clips;
+export function harnessOf(project: Project, settings: LamellaSettings): Harness | null {
+  if (project.bmsId === undefined) return null;
+  const report = reportOf(project, settings);
+  return buildHarness(project, stripsOf(project, settings), Math.max(0.3, report.totalThicknessMm ?? report.requiredMm ?? 0.3));
+}
 
 let last: { project: Project; key: string; report: LamellaReport } | null = null;
 

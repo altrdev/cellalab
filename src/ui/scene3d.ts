@@ -8,10 +8,8 @@ import type { HolderModel } from '../core/holder';
 import { explodeOffsets } from '../core/explode';
 import { intersectRegions, type Region } from '../core/clip';
 import { boundsOfCells } from '../core/geometry';
-import type { CableClip } from '../core/cableClip';
 import type { Harness } from '../core/harness';
-import { clipGeometry } from './clipMesh';
-import { tabsOf, type Strip, type TabSide } from '../core/strips';
+import type { Strip, TabSide } from '../core/strips';
 import type { Project } from '../core/types';
 import { groupHue } from './colors';
 import { holderHalfGeometries } from './holderMesh';
@@ -45,8 +43,6 @@ export interface SceneOptions {
   holderColor?: string;
   /** BMS e fili da disegnare (null = nascosti). Spariscono nella vista esplosa. */
   harness?: Harness | null;
-  /** Fermacavi a scatto dei cavi di potenza. */
-  clips?: readonly CableClip[];
 }
 
 const RING_COLOR = 0xc9382f; // anello isolante sul lato positivo
@@ -145,7 +141,6 @@ export class PackScene {
   private busRoot = new THREE.Group();
   private harnessRoot = new THREE.Group();
   private harnessShown: Harness | null = null;
-  private clipsShown: readonly CableClip[] | undefined = undefined;
   private harnessMats: THREE.Material[] = [];
   private holderRoot = new THREE.Group();
   private holderShown: HolderModel | null = null;
@@ -443,68 +438,46 @@ export class PackScene {
         return new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
       };
       const region: Region = { outline: s.outline, holes: s.holes };
-      const tabs = tabsOf(s);
-      if (tabs.length === 0) {
+      const tab = s.tab;
+      if (!tab) {
         const geo = extrude(region);
         geo.rotateX(Math.PI / 2); // y del disegno -> Z, l'estrusione scende lungo -Y
         add(geo, (m) => (m.position.y = sheetY));
         continue;
       }
-      // Ogni linguetta si piega a 90° sulla sua linea di piega: verso il basso (faccia sopra) o verso l'alto (faccia sotto).
-      // Le linguette sulla stessa linea (affiancate) si piegano insieme.
-      interface Fold {
-        d: { x: number; y: number };
-        perp: { x: number; y: number };
-        mid: { x: number; y: number };
-      }
-      const folds: Fold[] = [];
-      for (const tab of tabs) {
-        const d = SIDE_DIR[tab.side];
-        const mid = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
-        const same = folds.some((f) => f.d.x === d.x && f.d.y === d.y && Math.abs((mid.x - f.mid.x) * d.x + (mid.y - f.mid.y) * d.y) < 1e-6);
-        if (!same) folds.push({ d, perp: { x: -d.y, y: d.x }, mid });
-      }
+      // La linguetta si piega a 90° sulla linea di piega: verso il basso (faccia sopra) o verso l'alto (faccia sotto).
+      const d = SIDE_DIR[tab.side];
+      const perp = { x: -d.y, y: d.x };
+      const mid = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
       const BIG = 1000;
-      const quad = (f: Fold, u0: number, u1: number): { x: number; y: number }[] =>
-        [[u0, -BIG], [u1, -BIG], [u1, BIG], [u0, BIG]].map(([u, v]) => ({ x: f.mid.x + f.d.x * u! + f.perp.x * v!, y: f.mid.y + f.d.y * u! + f.perp.y * v! }));
-      /** Parte della lamella davanti a tutte le piegature tranne (eventualmente) `except`, e oltre `except` se indicata. */
-      const piece = (except: Fold | null): Region[] => {
-        let cur: Region[] = [region];
-        for (const f of folds) {
-          if (f === except) continue;
-          cur = intersectRegions(cur, [quad(f, -BIG, 0)]);
-        }
-        if (except) cur = intersectRegions(cur, [quad(except, 0, BIG)]);
-        return cur;
-      };
-      for (const r of piece(null)) {
+      const quad = (u0: number, u1: number): { x: number; y: number }[] =>
+        [[u0, -BIG], [u1, -BIG], [u1, BIG], [u0, BIG]].map(([u, v]) => ({ x: mid.x + d.x * u! + perp.x * v!, y: mid.y + d.y * u! + perp.y * v! }));
+      for (const r of intersectRegions(region, [quad(-BIG, 0)])) {
         const geo = extrude(r);
         geo.rotateX(Math.PI / 2);
         add(geo, (m) => (m.position.y = sheetY));
       }
       // Pezzo piegato: disegnato in (u lungo la linguetta, v di lato) e poi messo in piedi sul bordo della lamella.
       const sy = top ? -1 : 1;
-      for (const f of folds) {
-        const xAxis = new THREE.Vector3(0, sy, 0);
-        const yAxis = new THREE.Vector3(f.perp.x, 0, f.perp.y);
-        const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis);
-        const outward = new THREE.Vector3(f.d.x, 0, f.d.y);
-        for (const r of piece(f)) {
-          const local = (p: { x: number; y: number }) => {
-            const dx = p.x - f.mid.x;
-            const dy = p.y - f.mid.y;
-            return new THREE.Vector2(dx * f.d.x + dy * f.d.y, dx * f.perp.x + dy * f.perp.y);
-          };
-          const shape = new THREE.Shape(r.outline.map(local));
-          for (const h of r.holes) shape.holes.push(new THREE.Path(h.map(local)));
-          const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
-          if (zAxis.dot(outward) < 0) geo.translate(0, 0, -thickness); // lo spessore resta verso l'esterno
-          add(geo, (m) => {
-            m.matrixAutoUpdate = false;
-            m.matrix.makeBasis(xAxis, yAxis, zAxis).setPosition(f.mid.x, top ? sheetY : sheetY - thickness, f.mid.y);
-            m.matrixWorldNeedsUpdate = true;
-          });
-        }
+      const xAxis = new THREE.Vector3(0, sy, 0);
+      const yAxis = new THREE.Vector3(perp.x, 0, perp.y);
+      const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis);
+      const outward = new THREE.Vector3(d.x, 0, d.y);
+      for (const r of intersectRegions(region, [quad(0, BIG)])) {
+        const local = (p: { x: number; y: number }) => {
+          const dx = p.x - mid.x;
+          const dy = p.y - mid.y;
+          return new THREE.Vector2(dx * d.x + dy * d.y, dx * perp.x + dy * perp.y);
+        };
+        const shape = new THREE.Shape(r.outline.map(local));
+        for (const h of r.holes) shape.holes.push(new THREE.Path(h.map(local)));
+        const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+        if (zAxis.dot(outward) < 0) geo.translate(0, 0, -thickness); // lo spessore resta verso l'esterno
+        add(geo, (m) => {
+          m.matrixAutoUpdate = false;
+          m.matrix.makeBasis(xAxis, yAxis, zAxis).setPosition(mid.x, top ? sheetY : sheetY - thickness, mid.y);
+          m.matrixWorldNeedsUpdate = true;
+        });
       }
     }
     this.busKey = { strips, thickness, height, lift };
@@ -514,8 +487,7 @@ export class PackScene {
   private updateHarness(options: SceneOptions) {
     const h = options.harness ?? null;
     this.harnessRoot.visible = !!h && options.explosionMm === 0;
-    if (h === this.harnessShown && options.clips === this.clipsShown) return;
-    this.clipsShown = options.clips;
+    if (h === this.harnessShown) return;
     for (const m of [...this.harnessRoot.children] as THREE.Mesh[]) {
       m.geometry.dispose();
       this.harnessRoot.remove(m);
@@ -531,6 +503,7 @@ export class PackScene {
     };
     if (h.box) {
       const geo = new THREE.BoxGeometry(h.box.size.x, h.box.size.y, h.box.size.z);
+      // Un po' trasparente, così si vedono i fili che arrivano al connettore dietro la scheda.
       const boxMat = mat(0x1f7a4a, 0.6) as THREE.MeshStandardMaterial;
       boxMat.transparent = true;
       boxMat.opacity = 0.55;
@@ -539,58 +512,15 @@ export class PackScene {
       mesh.position.set(h.box.center.x, h.box.center.y, h.box.center.z);
       mesh.renderOrder = 2;
       this.harnessRoot.add(mesh);
-      // Connettore di bilanciamento sulla testata: i fili entrano da lì.
-      const hg = new THREE.Mesh(new THREE.BoxGeometry(h.header.size.x, h.header.size.y, h.header.size.z), mat(0xe8e4d8, 0.6));
-      hg.position.set(h.header.center.x, h.header.center.y, h.header.center.z);
-      this.harnessRoot.add(hg);
     }
     for (const w of h.wires) {
       const path = new THREE.CurvePath<THREE.Vector3>();
       const pts = w.points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
-      for (let i = 0; i + 1 < pts.length; i++) path.add(new THREE.LineCurve3(pts[i]!, pts[i + 1]!));
+      path.add(new THREE.LineCurve3(pts[0]!, pts[1]!));
+      path.add(new THREE.LineCurve3(pts[1]!, pts[2]!));
       const geo = new THREE.TubeGeometry(path, 24, 0.45, 6, false);
       const color = w.node === 0 ? 0x1b1b1b : new THREE.Color().setHSL(groupHue(w.node) / 360, 0.75, 0.5).getHex();
       const mesh = new THREE.Mesh(geo, mat(color, 0.55));
-      mesh.castShadow = true;
-      this.harnessRoot.add(mesh);
-    }
-    // Cavi di potenza (rosso P+, nero P−) con il loro diametro, e connettori a spina alla fine.
-    for (const c of h.cables) {
-      const path = new THREE.CurvePath<THREE.Vector3>();
-      const pts = c.points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
-      for (let i = 0; i + 1 < pts.length; i++) path.add(new THREE.LineCurve3(pts[i]!, pts[i + 1]!));
-      const geo = new THREE.TubeGeometry(path, 48, c.odMm / 2, 8, false);
-      const mesh = new THREE.Mesh(geo, mat(c.label === 'P+' ? 0xc9382f : 0x222222, 0.5));
-      mesh.castShadow = true;
-      this.harnessRoot.add(mesh);
-    }
-    // Fermacavi: una forma per misura, messa su ogni cella del fianco con la bocca verso l'esterno.
-    const clipGeos = new Map<string, THREE.BufferGeometry>();
-    for (const c of options.clips ?? []) {
-      const key = `${c.spec.cableOdMm}|${c.spec.bladeMm}|${c.spec.bladeDepthMm}`;
-      let geo = clipGeos.get(key);
-      if (!geo) {
-        geo = clipGeometry(c.spec);
-        clipGeos.set(key, geo);
-      }
-      const mesh = new THREE.Mesh(geo, mat(0x3b82c4, 0.6));
-      const xAxis = new THREE.Vector3(c.along.x, 0, c.along.y);
-      const zAxis = new THREE.Vector3(c.out.x, 0, c.out.y);
-      const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis);
-      mesh.matrixAutoUpdate = false;
-      mesh.matrix.makeBasis(xAxis, yAxis, zAxis).setPosition(c.center.x, c.center.y, c.center.z);
-      mesh.castShadow = true;
-      this.harnessRoot.add(mesh);
-    }
-    for (const k of h.connectors) {
-      const color = k.kind === 'bullet' ? 0xd4a73a : 0xe3b504; // ottone / giallo XT
-      const geo = k.shape === 'cylinder' ? new THREE.CylinderGeometry(k.widthMm / 2, k.widthMm / 2, k.lengthMm, 16) : new THREE.BoxGeometry(k.lengthMm, k.heightMm, k.widthMm);
-      const mesh = new THREE.Mesh(geo, mat(color, 0.45));
-      mesh.position.set(k.center.x, k.center.y, k.center.z);
-      // L'asse del connettore segue il lato: i box sono lunghi lungo X, i cilindri lungo Y (si ruotano sull'asse).
-      const axis = new THREE.Vector3(k.axis.x, k.axis.y, k.axis.z).normalize();
-      if (k.shape === 'cylinder') mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
-      else mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(Math.abs(axis.x) > 0.5 ? Math.sign(axis.x) || 1 : 0, 0, Math.abs(axis.z) > 0.5 ? Math.sign(axis.z) : 0).normalize());
       mesh.castShadow = true;
       this.harnessRoot.add(mesh);
     }

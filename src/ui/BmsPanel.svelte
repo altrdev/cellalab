@@ -4,8 +4,6 @@
   import { addCustomBms, removeCustomBms, setBms, setBmsMount } from '../core/ops';
   import { bmsMountOf } from '../core/harness';
   import UnitInput from './UnitInput.svelte';
-  import { tabSideOf } from './lamelle';
-  import { ui } from './ui.svelte';
   import { history } from '../state';
   import Help from './Help.svelte';
   import { rangeFill } from './rangeFill';
@@ -13,15 +11,6 @@
   const project = $derived($history.present);
   const bms = $derived(bmsOf(project));
   const mount = $derived(bmsMountOf(project));
-  /** Da che parte del disegno sta l'angolo dei cavi: dipende dal lato di uscita (il lato 'maggiore' segue la perpendicolare). */
-  const exitSide = $derived(tabSideOf(project, ui.lamella));
-  const endNames = {
-    top: { low: t('lam.tabSide.left'), high: t('lam.tabSide.right') },
-    bottom: { low: t('lam.tabSide.right'), high: t('lam.tabSide.left') },
-    left: { low: t('lam.tabSide.bottom'), high: t('lam.tabSide.top') },
-    right: { low: t('lam.tabSide.top'), high: t('lam.tabSide.bottom') },
-  } as const;
-  const endName = $derived(endNames[exitSide]);
   const isCustom = $derived(bms !== undefined && (project.customBmsTypes ?? []).some((b) => b.id === bms.id));
 
   const blank = (): BmsDraft => ({ name: '', minSeries: 13, maxSeries: 13, maxCurrentA: 30, chemistry: 'li-ion', ntc: true, lengthMm: 0, widthMm: 0, thicknessMm: 0 });
@@ -98,20 +87,6 @@
       <option value="external">{t('bms.mountExternal')}</option>
     </select>
   </label>
-  <label>{t('bms.connector')}
-    <select value={mount.powerConnector} onchange={(e) => history.commit((p) => setBmsMount(p, { powerConnector: e.currentTarget.value as typeof mount.powerConnector }))}>
-      <option value="none">{t('bms.conn.none')}</option>
-      <option value="bullet">{t('bms.conn.bullet')}</option>
-      <option value="xt60">XT60</option>
-      <option value="xt90">XT90</option>
-    </select>
-  </label>
-  <label>{t('bms.cablesEnd')}
-    <select value={mount.cablesEnd} onchange={(e) => history.commit((p) => setBmsMount(p, { cablesEnd: e.currentTarget.value === 'low' ? 'low' : 'high' }))}>
-      <option value="low">{endName.low}</option>
-      <option value="high">{endName.high}</option>
-    </select>
-  </label>
   <label>
     <span class="top"><span>{t('bms.along')}</span><b>{Math.round(mount.along * 100)}%</b></span>
     <input
@@ -126,7 +101,9 @@
   </label>
   <div class="row">
     <label>{t('bms.slack')}<UnitInput kind="len" min={0} max={200} step={5} value={mount.slackMm} onchange={(v) => { if (v !== null) history.commit((p) => setBmsMount(p, { slackMm: v })); }} /></label>
-    <label>{t('bms.tail')}<UnitInput kind="len" min={0} max={2000} step={10} value={mount.tailMm} onchange={(v) => { if (v !== null) history.commit((p) => setBmsMount(p, { tailMm: v })); }} /></label>
+    {#if mount.mode === 'external'}
+      <label>{t('bms.tail')}<UnitInput kind="len" min={0} max={2000} step={10} value={mount.tailMm} onchange={(v) => { if (v !== null) history.commit((p) => setBmsMount(p, { tailMm: v })); }} /></label>
+    {/if}
   </div>
   {#if mount.mode === 'pack' && !bms.sizeMm}<p class="note">{t('bms.noSize')}</p>{/if}
 {/if}
