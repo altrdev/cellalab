@@ -8,6 +8,7 @@ import type { HolderModel } from '../core/holder';
 import { explodeOffsets } from '../core/explode';
 import { intersectRegions, type Region } from '../core/clip';
 import { boundsOfCells } from '../core/geometry';
+import { SIDE_VECTOR } from '../core/polygon';
 import type { Harness } from '../core/harness';
 import { tabsOf, type Strip, type TabSide } from '../core/strips';
 import type { Project } from '../core/types';
@@ -15,7 +16,6 @@ import { groupHue } from './colors';
 import { holderHalfGeometries } from './holderMesh';
 
 /** Direzione della linguetta nel disegno (y verso il basso). */
-const SIDE_DIR: Record<TabSide, { x: number; y: number }> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
 /**
  * Scena 3D del pacco. Coordinate: x e y del disegno 2D diventano X e Z (y verso chi guarda),
@@ -448,7 +448,7 @@ export class PackScene {
       // Ogni linguetta si piega a 90° sulla sua linea di piega: verso il basso (faccia sopra) o verso l'alto (faccia sotto).
       const BIG = 1000;
       const frame = (tab: (typeof folds)[number]) => {
-        const d = SIDE_DIR[tab.side];
+        const d = SIDE_VECTOR[tab.side];
         const perp = { x: -d.y, y: d.x };
         const mid = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
         const quad = (u0: number, u1: number): { x: number; y: number }[] =>

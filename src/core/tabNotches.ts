@@ -1,5 +1,5 @@
 import { MIN_PRINT_WALL_MM, type HolderSettings } from './holder';
-import type { Pt } from './polygon';
+import { SIDE_VECTOR, type Pt } from './polygon';
 import { tabsOf, type Face, type Strip } from './strips';
 import { findAwg } from './wire';
 
@@ -10,7 +10,6 @@ const DEPTH_EXTRA_MM = 0.2;
 /** Una scanalatura più sottile di così non serve a niente. */
 const MIN_DEPTH_MM = 0.3;
 
-const DIR: Record<'top' | 'bottom' | 'left' | 'right', Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
 export interface Notch {
   stripId: string;
@@ -41,7 +40,7 @@ export function tabNotches(strips: readonly Strip[], holder: HolderSettings, wir
       const wanted = findAwg(tab.kind === 'power' ? wires.powerAwg : wires.balanceAwg).outerMm + DEPTH_EXTRA_MM;
       const depth = Math.min(wanted, maxDepth);
       if (depth < MIN_DEPTH_MM) continue;
-      const d = DIR[tab.side];
+      const d = SIDE_VECTOR[tab.side];
       const perp = { x: -d.y, y: d.x };
       const a0 = node.cellRadiusMm + holder.clearanceMm + holder.wallMm - depth;
       const a1 = a0 + depth + 2;

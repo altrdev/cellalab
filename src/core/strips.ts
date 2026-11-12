@@ -1,7 +1,7 @@
 import { findCellType } from './catalog';
 import { bmsOf } from './bms';
 import { intersectRegions, pointInRegions, regionArea, unionPolygons, type Region } from './clip';
-import { circlePoints, convexHull, type Pt } from './polygon';
+import { circlePoints, convexHull, distToRect, SIDE_VECTOR, type Pt } from './polygon';
 import type { PlacedCell, Project } from './types';
 
 /**
@@ -269,7 +269,37 @@ export function buildStrips(project: Project, options: StripOptions = {}): Strip
   return strips;
 }
 
-const SIDE_VECTOR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+
+/** Una lamella per giunzione, di preferenza completa e della faccia sopra (come per le linguette). */
+export function chosenStrips(strips: readonly Strip[]): Strip[] {
+  const byJoint = new Map<number, Strip>();
+  for (const s of strips) {
+    const cur = byJoint.get(s.joint);
+    const better = !cur || (cur.partial && !s.partial) || (cur.partial === s.partial && cur.face === 'bottom' && s.face === 'top');
+    if (better) byJoint.set(s.joint, s);
+  }
+  return [...byJoint.values()];
+}
+
+/** Il nodo della lamella che arriva più avanti verso `side` (a parità, il più centrale). */
+export function frontNode(s: Strip, side: TabSide): StripNode {
+  const d = SIDE_VECTOR[side];
+  const pp = { x: -d.y, y: d.x };
+  const fwd = (n: StripNode) => n.x * d.x + n.y * d.y + n.reachMm;
+  const sd = (n: StripNode) => n.x * pp.x + n.y * pp.y;
+  const mean = s.nodes.reduce((a, n) => a + sd(n), 0) / s.nodes.length;
+  return [...s.nodes].sort((p, q) => (Math.abs(fwd(p) - fwd(q)) > 1e-6 ? fwd(q) - fwd(p) : Math.abs(sd(p) - mean) - Math.abs(sd(q) - mean)))[0]!;
+}
+
+/** Fin dove (mm) il portacelle arriva uscendo da `from` lungo `dir`, guardando i punti spostati di ciascun `offsets` di lato; -1 se mai. */
+export function holderReach(from: Pt, dir: Pt, offsets: readonly number[], regions: readonly Region[]): number {
+  const pp = { x: -dir.y, y: dir.x };
+  let last = -1;
+  for (let a = 0; a <= 80; a += 0.25) {
+    if (offsets.some((v) => pointInRegions({ x: from.x + dir.x * a + pp.x * v, y: from.y + dir.y * a + pp.y * v }, regions))) last = a;
+  }
+  return last;
+}
 
 /**
  * Un filo di bilanciamento per ogni giunzione (S+1 in tutto): sulla lamella completa, di preferenza della faccia
@@ -278,13 +308,7 @@ const SIDE_VECTOR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0,
  * libero più vicino alla lamella.
  */
 function addTabs(project: Project, strips: Strip[], o: TabOptions, holderOpt: StripOptions['holderOutline']): void {
-  const byJoint = new Map<number, Strip>();
-  for (const s of strips) {
-    const cur = byJoint.get(s.joint);
-    const better = !cur || (cur.partial && !s.partial) || (cur.partial === s.partial && cur.face === 'bottom' && s.face === 'top');
-    if (better) byJoint.set(s.joint, s);
-  }
-  const chosen = new Set(byJoint.values());
+  const chosen = new Set(chosenStrips(strips));
   const sidesAcross: Record<TabSide, TabSide[]> = { top: ['left', 'right'], bottom: ['left', 'right'], left: ['top', 'bottom'], right: ['top', 'bottom'] };
   const cellR = (c: { typeId: string }) => (findCellType(project, c.typeId)?.diameterMm ?? 0) / 2;
   // Quanto si spinge il pacco in una direzione, per scegliere il lato più vicino a una lamella.
@@ -307,14 +331,6 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holderOpt: St
     const pp = { x: -dd.y, y: dd.x };
     const at = (a: number, p: number): Pt => ({ x: node.x + dd.x * a + pp.x * p, y: node.y + dd.y * a + pp.y * p });
     return convexHull([at(0, -w / 2), at(0, w / 2), at(reach, w / 2), at(reach, -w / 2)]);
-  };
-  const frontNode = (s: Strip, side: TabSide): StripNode => {
-    const dd = SIDE_VECTOR[side];
-    const pp = { x: -dd.y, y: dd.x };
-    const fwd = (n: StripNode) => n.x * dd.x + n.y * dd.y + n.reachMm;
-    const sd = (n: StripNode) => n.x * pp.x + n.y * pp.y;
-    const mean = s.nodes.reduce((acc, n) => acc + sd(n), 0) / s.nodes.length;
-    return [...s.nodes].sort((p, q) => (Math.abs(fwd(p) - fwd(q)) > 1e-6 ? fwd(q) - fwd(p) : Math.abs(sd(p) - mean) - Math.abs(sd(q) - mean)))[0]!;
   };
   /** Un'ipotesi veloce di intralcio (celle di altre giunzioni e altre lamelle della faccia); il controllo finale è più sotto. */
   const blocked = (s: Strip, rect: readonly Pt[]): boolean => {
@@ -352,10 +368,7 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holderOpt: St
       const pp = { x: -dd.y, y: dd.x };
       let exit = pl.node.cellRadiusMm + DEFAULT_HOLDER_EDGE_MM;
       if (holder && holder.length > 0) {
-        let last = -1;
-        for (let a = 0; a <= 80; a += 0.25) {
-          if ([-pl.w / 2, 0, pl.w / 2].some((v) => pointInRegions({ x: pl.node.x + dd.x * a + pp.x * v, y: pl.node.y + dd.y * a + pp.y * v }, holder))) last = a;
-        }
+        const last = holderReach(pl.node, dd, [-pl.w / 2, 0, pl.w / 2], holder);
         if (last >= 0) exit = last;
       }
       return Math.max(exit + o.bendMm, pl.node.reachMm);
@@ -415,22 +428,6 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holderOpt: St
 
 /** Le linguette di una lamella: quella di bilanciamento e, su P+ e P−, quella di potenza. */
 export const tabsOf = (s: Strip): StripTab[] => [s.tab, s.powerTab].filter((t): t is StripTab => t !== undefined);
-
-/** Distanza di un punto da un rettangolo (poligono convesso); 0 se dentro. */
-function distToRect(p: Pt, rect: readonly Pt[]): number {
-  let inside = true;
-  let best = Infinity;
-  for (let i = 0; i < rect.length; i++) {
-    const a = rect[i]!;
-    const b = rect[(i + 1) % rect.length]!;
-    const ex = b.x - a.x;
-    const ey = b.y - a.y;
-    if (ex * (p.y - a.y) - ey * (p.x - a.x) < 0) inside = false;
-    const t = Math.max(0, Math.min(1, ((p.x - a.x) * ex + (p.y - a.y) * ey) / (ex * ex + ey * ey)));
-    best = Math.min(best, Math.hypot(p.x - (a.x + t * ex), p.y - (a.y + t * ey)));
-  }
-  return inside ? 0 : best;
-}
 
 /** Larghezza utile dove passa la corrente: quella delle bande tra le celle. */
 export const neckWidthMm = (strip: Strip): number => strip.bandMm;

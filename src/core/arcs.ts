@@ -1,4 +1,4 @@
-import type { Pt } from './polygon';
+import { circumcenter, type Pt } from './polygon';
 
 /**
  * Da una polilinea chiusa che approssima dei cerchi a una polilinea con archi veri (vertici con «bulge», come
@@ -108,23 +108,13 @@ export function fitFreeArcs(ring: readonly ArcVertex[], tolMm = DEFAULT_TOL_MM):
     }
   }
   const at = (k: number) => ring[(start + k) % n]!;
-  /** Cerchio per tre punti, o null se sono quasi allineati. */
-  const circle3 = (a: Pt, b: Pt, c: Pt): Circle | null => {
-    const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
-    if (Math.abs(d) < 1e-9) return null;
-    const a2 = a.x * a.x + a.y * a.y;
-    const b2 = b.x * b.x + b.y * b.y;
-    const c2 = c.x * c.x + c.y * c.y;
-    const cx = (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d;
-    const cy = (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d;
-    return { cx, cy, r: Math.hypot(a.x - cx, a.y - cy) };
-  };
   /** La catena dal punto i al punto j sta su un cerchio e gira sempre dalla stessa parte, per un angolo ≤ 90°? */
   const fit = (i: number, j: number): { c: Circle; sweepRad: number } | null => {
     const a = at(i);
     const b = at(j);
     const m = at(Math.floor((i + j) / 2));
-    const c = circle3(a, m, b);
+    const o = circumcenter(a, m, b);
+    const c: Circle | null = o ? { cx: o.x, cy: o.y, r: Math.hypot(a.x - o.x, a.y - o.y) } : null;
     if (!c || c.r > 80 || c.r < 0.05) return null;
     let total = 0;
     let sign = 0;

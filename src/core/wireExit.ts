@@ -1,8 +1,8 @@
-import { circlePoints, type Pt } from './polygon';
+import { circlePoints, distToRect, SIDE_VECTOR, type Pt } from './polygon';
 import { intersectRegions, offsetRegions, pointInRegions, regionArea, type Region } from './clip';
 import { MIN_PRINT_WALL_MM } from './holder';
 import { findCellType } from './catalog';
-import type { Face, Strip, StripNode, TabSide } from './strips';
+import { chosenStrips, frontNode, holderReach, type Face, type Strip, type StripNode, type TabSide } from './strips';
 import type { Project } from './types';
 
 /**
@@ -29,7 +29,6 @@ export interface WireExit {
   bossMm?: number;
 }
 
-const SIDE: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 /** Plastica che deve restare attorno al foro verso le tasche delle celle: almeno una parete stampabile, mm. */
 const MARGIN_MM = MIN_PRINT_WALL_MM;
 /** Il foro sta nella fascia lungo il bordo larga così: più dentro il filo resterebbe chiuso tra le celle, mm. */
@@ -41,26 +40,6 @@ const SEARCH_MM = 24;
 const STEP_MM = 0.5;
 /** Quanto pesa, nella scelta del foro, la distanza laterale dal punto di saldatura rispetto all'essere sul bordo (mm di bordo per mm di distanza). */
 const LATERAL_WEIGHT = 0.15;
-
-/** Una lamella per giunzione, di preferenza completa e della faccia sopra (come per le linguette). */
-function chosenStrips(strips: readonly Strip[]): Strip[] {
-  const byJoint = new Map<number, Strip>();
-  for (const s of strips) {
-    const cur = byJoint.get(s.joint);
-    const better = !cur || (cur.partial && !s.partial) || (cur.partial === s.partial && cur.face === 'bottom' && s.face === 'top');
-    if (better) byJoint.set(s.joint, s);
-  }
-  return [...byJoint.values()];
-}
-
-function frontNode(s: Strip, side: TabSide): StripNode {
-  const d = SIDE[side];
-  const pp = { x: -d.y, y: d.x };
-  const fwd = (n: StripNode) => n.x * d.x + n.y * d.y + n.reachMm;
-  const sd = (n: StripNode) => n.x * pp.x + n.y * pp.y;
-  const mean = s.nodes.reduce((a, n) => a + sd(n), 0) / s.nodes.length;
-  return [...s.nodes].sort((p, q) => (Math.abs(fwd(p) - fwd(q)) > 1e-6 ? fwd(q) - fwd(p) : Math.abs(sd(p) - mean) - Math.abs(sd(q) - mean)))[0]!;
-}
 
 /**
  * `wall` è la sagoma piena del portacelle (pareti con le tasche delle celle come buchi), `plateMm`/`floorMm` il suo
@@ -78,7 +57,7 @@ export function findWireExits(
   allowBoss = false,
 ): WireExit[] {
   void project;
-  const d = SIDE[side];
+  const d = SIDE_VECTOR[side];
   const out: WireExit[] = [];
   const holeR = holeMm / 2;
   const rPocket = holeR + MARGIN_MM; // gioco verso le tasche delle celle
@@ -151,22 +130,6 @@ export function findWireExits(
   return out;
 }
 
-/** Distanza di un punto da un rettangolo convesso (0 se dentro). */
-function distToRect(p: Pt, rect: readonly Pt[]): number {
-  let inside = true;
-  let best = Infinity;
-  for (let i = 0; i < rect.length; i++) {
-    const a = rect[i]!;
-    const b = rect[(i + 1) % rect.length]!;
-    const ex = b.x - a.x;
-    const ey = b.y - a.y;
-    if (ex * (p.y - a.y) - ey * (p.x - a.x) < 0) inside = false;
-    const t = Math.max(0, Math.min(1, ((p.x - a.x) * ex + (p.y - a.y) * ey) / (ex * ex + ey * ey)));
-    best = Math.min(best, Math.hypot(p.x - (a.x + t * ex), p.y - (a.y + t * ey)));
-  }
-  return inside ? 0 : best;
-}
-
 /**
  * Giro esterno, senza foro né linguetta: il filo si salda sulla lamella, vicino al bordo dal lato di uscita, corre in
  * linea retta sul piano del portacelle fino al bordo della piastra e da lì scende lungo il fianco, all'esterno. Si
@@ -183,7 +146,7 @@ export function findAroundExits(
   bendMm = 0.5,
   only?: ReadonlySet<string>,
 ): WireExit[] {
-  const d = SIDE[side];
+  const d = SIDE_VECTOR[side];
   const pp = { x: -d.y, y: d.x };
   const outlines = wall.map((r) => ({ outline: r.outline, holes: [] as Pt[][] }));
   const out: WireExit[] = [];
@@ -198,8 +161,7 @@ export function findAroundExits(
         const ang = Math.atan2(d.y, d.x) + (deg * Math.PI) / 180;
         const solder = { x: node.x + Math.cos(ang) * (node.reachMm - 0.7), y: node.y + Math.sin(ang) * (node.reachMm - 0.7) };
         // fin dove arriva il portacelle uscendo dal punto di saldatura in linea retta verso il lato di uscita
-        let last = 0;
-        for (let a = 0; a <= 80; a += 0.25) if (pointInRegions({ x: solder.x + d.x * a, y: solder.y + d.y * a }, outlines)) last = a;
+        const last = Math.max(0, holderReach(solder, d, [0], outlines));
         const reach = last + bendMm;
         const w = 1.2;
         const corridor = [

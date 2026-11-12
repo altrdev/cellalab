@@ -50,3 +50,35 @@ export function circlePoints(cx: number, cy: number, r: number, n: number): Pt[]
   return out;
 }
 
+/** Versori dei quattro lati nel disegno (y verso il basso). */
+export type Side = 'top' | 'bottom' | 'left' | 'right';
+export const SIDE_VECTOR: Record<Side, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+
+/** Centro del cerchio per tre punti, o null se sono quasi allineati. */
+export function circumcenter(a: Pt, b: Pt, c: Pt): Pt | null {
+  const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+  if (Math.abs(d) < 1e-9) return null;
+  const a2 = a.x * a.x + a.y * a.y;
+  const b2 = b.x * b.x + b.y * b.y;
+  const c2 = c.x * c.x + c.y * c.y;
+  return {
+    x: (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d,
+    y: (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d,
+  };
+}
+
+/** Distanza di un punto da un rettangolo (poligono convesso); 0 se dentro. */
+export function distToRect(p: Pt, rect: readonly Pt[]): number {
+  let inside = true;
+  let best = Infinity;
+  for (let i = 0; i < rect.length; i++) {
+    const a = rect[i]!;
+    const b = rect[(i + 1) % rect.length]!;
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    if (ex * (p.y - a.y) - ey * (p.x - a.x) < 0) inside = false;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * ex + (p.y - a.y) * ey) / (ex * ex + ey * ey)));
+    best = Math.min(best, Math.hypot(p.x - (a.x + t * ex), p.y - (a.y + t * ey)));
+  }
+  return inside ? 0 : best;
+}

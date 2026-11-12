@@ -1,6 +1,6 @@
 import { findCellType } from './catalog';
 import { circlePolygon, intersectRegions, regionArea, type Region } from './clip';
-import type { Pt } from './polygon';
+import { circumcenter, SIDE_VECTOR, type Pt } from './polygon';
 import type { Project } from './types';
 
 /**
@@ -28,23 +28,10 @@ export interface NtcSite {
   open: boolean;
 }
 
-const DIR: Record<NtcSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 /** Due celle sono vicine se i centri distano al massimo 1,25 volte la distanza minima nel pacco. */
 const NEIGHBOUR_FACTOR = 1.25;
 /** Nella griglia quadrata le due celle accanto a una terza stanno in diagonale: fino a 1,5 volte il passo. */
 const DIAGONAL_FACTOR = 1.5;
-
-function circumcenter(a: Pt, b: Pt, c: Pt): Pt | null {
-  const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
-  if (Math.abs(d) < 1e-9) return null;
-  const a2 = a.x * a.x + a.y * a.y;
-  const b2 = b.x * b.x + b.y * b.y;
-  const c2 = c.x * c.x + c.y * c.y;
-  return {
-    x: (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d,
-    y: (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d,
-  };
-}
 
 /**
  * I vuoti adatti all'NTC, dal migliore: prima quelli di una cella centrale, e a parità i liberi da lamelle e più verso il
@@ -64,7 +51,7 @@ export function ntcSites(project: Project, side: NtcSide, diameterMm: number, cl
   }
   const near = pitch * NEIGHBOUR_FACTOR + 1e-6;
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
-  const d = DIR[side];
+  const d = SIDE_VECTOR[side];
   const radiusMm = diameterMm / 2;
   const central = [...cells].sort((a, b) => dist(a, { x: cx, y: cy }) - dist(b, { x: cx, y: cy }));
   const collect = (pairNear: number, open: boolean): NtcSite[] => {

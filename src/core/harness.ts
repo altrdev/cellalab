@@ -1,6 +1,6 @@
 import { findBmsType, bmsOf } from './bms';
 import { findCellType } from './catalog';
-import type { Pt } from './polygon';
+import { SIDE_VECTOR, type Pt } from './polygon';
 import type { Face, Strip, TabSide } from './strips';
 import { DEFAULT_BMS_MOUNT, type BmsMount, type BmsSize, type Project } from './types';
 
@@ -84,7 +84,6 @@ const EDGE_GAP_MM = 2;
 /** Distanza tra due fili in corsie vicine, mm. */
 const WIRE_LANE_MM = 1.5;
 
-const DIR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
 /** Di quanto la lamella si appoggia sopra il bordo della cella (il bottone sporge): come nella scena 3D. */
 export function busbarLiftMm(project: Project): number {
@@ -108,7 +107,7 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   if (!bms || withTab.length === 0 || project.cells.length === 0) return null;
   const mount = bmsMountOf(project);
   const side = withTab[0]!.tab?.side ?? withTab[0]!.wireExit!.side;
-  const d = DIR[side];
+  const d = SIDE_VECTOR[side];
   const perp = { x: -d.y, y: d.x };
 
   let height = 0;

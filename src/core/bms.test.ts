@@ -19,6 +19,26 @@ import { buildSvg } from './lamelleExport';
 import { buildStrips } from './strips';
 import type { Project } from './types';
 
+type P3 = { x: number; y: number; z: number };
+/** Punti ogni 0,1 mm lungo una spezzata 3D. */
+function samplePath(pts: readonly P3[]): P3[] {
+  const out: P3[] = [];
+  for (let k = 0; k + 1 < pts.length; k++) {
+    const a = pts[k]!;
+    const b = pts[k + 1]!;
+    const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 0.1));
+    for (let t = 0; t <= steps; t++) out.push({ x: a.x + ((b.x - a.x) * t) / steps, y: a.y + ((b.y - a.y) * t) / steps, z: a.z + ((b.z - a.z) * t) / steps });
+  }
+  return out;
+}
+/** La distanza minima tra due percorsi diversi. */
+function closestApart(paths: readonly (readonly P3[])[]): number {
+  let closest = Infinity;
+  for (let i = 0; i < paths.length; i++) for (let j = i + 1; j < paths.length; j++) for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
+  return closest;
+}
+
+
 const T = '21700-5000-10a';
 const pack = (s: number, p: number): Project =>
   replaceCells(createProject(), generateGrid({ typeId: T, diameterMm: 21.4, series: s, parallel: p, kind: 'hex', gapMm: 1 }));
@@ -434,26 +454,11 @@ describe('cablaggio del BMS', () => {
 
   it('nessun filo ne tocca un altro: ogni percorso ha la sua corsia, e dove si incrociano passano a profondità diverse', () => {
     const DIAMETER = 0.9; // filo 26 AWG con la guaina, un po' abbondante
-    const sample = (pts: { x: number; y: number; z: number }[]) => {
-      const out: { x: number; y: number; z: number }[] = [];
-      for (let k = 0; k + 1 < pts.length; k++) {
-        const a = pts[k]!;
-        const b = pts[k + 1]!;
-        const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 0.1));
-        for (let t = 0; t <= steps; t++) out.push({ x: a.x + ((b.x - a.x) * t) / steps, y: a.y + ((b.y - a.y) * t) / steps, z: a.z + ((b.z - a.z) * t) / steps });
-      }
-      return out;
-    };
     for (const connector of ['top', 'end'] as const) {
       for (const connectorEnd of ['start', 'end'] as const) {
         const e = buildHarness(setBmsMount(p, { connector, connectorEnd }), strips, 0.1)!;
-        const paths = e.wires.map((w) => sample(w.points));
-        let closest = Infinity;
-        for (let i = 0; i < paths.length; i++) {
-          for (let j = i + 1; j < paths.length; j++) {
-            for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
-          }
-        }
+        const paths = e.wires.map((w) => samplePath(w.points));
+        const closest = closestApart(paths);
         expect(closest).toBeGreaterThanOrEqual(DIAMETER - 1e-6);
       }
     }
@@ -483,19 +488,8 @@ describe('cablaggio del BMS', () => {
       const sorted = [...pads].sort((a, b) => a - b);
       for (let k = 1; k < sorted.length; k++) expect(sorted[k]! - sorted[k - 1]!).toBeCloseTo(2.5, 6);
       // nessun filo dentro la scheda e nessuno a meno di un diametro da un altro
-      const sample = (pts: { x: number; y: number; z: number }[]) => {
-        const out: { x: number; y: number; z: number }[] = [];
-        for (let k = 0; k + 1 < pts.length; k++) {
-          const a = pts[k]!;
-          const b = pts[k + 1]!;
-          const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 0.1));
-          for (let t = 0; t <= steps; t++) out.push({ x: a.x + ((b.x - a.x) * t) / steps, y: a.y + ((b.y - a.y) * t) / steps, z: a.z + ((b.z - a.z) * t) / steps });
-        }
-        return out;
-      };
-      const paths = e.wires.map((w) => sample(w.points));
-      let closest = Infinity;
-      for (let i = 0; i < paths.length; i++) for (let j = i + 1; j < paths.length; j++) for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
+      const paths = e.wires.map((w) => samplePath(w.points));
+      const closest = closestApart(paths);
       expect(closest).toBeGreaterThanOrEqual(0.9 - 1e-6);
       for (const path of paths) for (const q of path) {
         const inside = Math.abs(q.x - box.center.x) < box.size.x / 2 - 1e-6 && Math.abs(q.y - box.center.y) < box.size.y / 2 - 1e-6 && Math.abs(q.z - box.center.z) < box.size.z / 2 - 1e-6;
@@ -751,19 +745,8 @@ describe('uscita dei fili dal portacelle, senza linguette', () => {
       expect(w.points[2]!.x).toBeCloseTo(ex.hole!.x, 6); // …e attraverso la piastra
       expect(Math.abs(w.points[2]!.y - w.points[1]!.y)).toBeGreaterThanOrEqual(ex.plateMm - 1e-6); // attraversa tutto lo spessore
     }
-    const sample = (pts: { x: number; y: number; z: number }[]) => {
-      const out: { x: number; y: number; z: number }[] = [];
-      for (let k = 0; k + 1 < pts.length; k++) {
-        const a = pts[k]!;
-        const b = pts[k + 1]!;
-        const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 0.1));
-        for (let t = 0; t <= steps; t++) out.push({ x: a.x + ((b.x - a.x) * t) / steps, y: a.y + ((b.y - a.y) * t) / steps, z: a.z + ((b.z - a.z) * t) / steps });
-      }
-      return out;
-    };
-    const paths = h.wires.map((w) => sample(w.points));
-    let closest = Infinity;
-    for (let i = 0; i < paths.length; i++) for (let j = i + 1; j < paths.length; j++) for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
+    const paths = h.wires.map((w) => samplePath(w.points));
+    const closest = closestApart(paths);
     expect(closest).toBeGreaterThanOrEqual(0.9 - 1e-6);
   });
 });
@@ -799,19 +782,8 @@ describe('giro esterno del portacelle, senza linguette né fori', () => {
       expect(w.points[0]!.y).toBeCloseTo(w.points[1]!.y, 6); // sul piano della lamella fino al bordo
       expect(w.points[2]!.y).not.toBeCloseTo(w.points[1]!.y, 3); // poi scende
     }
-    const sample = (pts: { x: number; y: number; z: number }[]) => {
-      const out: { x: number; y: number; z: number }[] = [];
-      for (let k = 0; k + 1 < pts.length; k++) {
-        const a = pts[k]!;
-        const b = pts[k + 1]!;
-        const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 0.1));
-        for (let t = 0; t <= steps; t++) out.push({ x: a.x + ((b.x - a.x) * t) / steps, y: a.y + ((b.y - a.y) * t) / steps, z: a.z + ((b.z - a.z) * t) / steps });
-      }
-      return out;
-    };
-    const paths = h.wires.map((w) => sample(w.points));
-    let closest = Infinity;
-    for (let i = 0; i < paths.length; i++) for (let j = i + 1; j < paths.length; j++) for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
+    const paths = h.wires.map((w) => samplePath(w.points));
+    const closest = closestApart(paths);
     expect(closest).toBeGreaterThanOrEqual(0.9 - 1e-6);
     const box = h.box!;
     for (const path of paths) for (const q of path) {
