@@ -590,7 +590,7 @@ export const it = {
   'exp.harnessCol.from': 'Da',
   'exp.harnessCol.path': 'Percorso',
   'exp.harnessCol.cut': 'Taglia',
-  'exp.harnessHelp': 'Il filo parte dal foro della linguetta, scende o sale lungo il bordo fino a metà altezza e va al connettore: nessun filo attraversa da una piastra all’altra. B0 è il meno del pacco.',
+  'exp.harnessHelp': 'Il filo parte dal foro della linguetta, scende o sale lungo il bordo fino a metà altezza e va al connettore: nessun filo attraversa da una piastra all’altra. B0 è il meno del pacco. Cavi di potenza (BMS a porta comune): P+ va dritto al connettore, B− porta il negativo del pacco al BMS e P− esce dal BMS verso il connettore.',
   'exp.cutList': 'Lista di taglio',
   'exp.refs': 'Includi i riferimenti nel DXF',
   'exp.refsHint': 'Aree di saldatura, punti ed etichette (layer MARK, SPOTS, TEXT): non vanno tagliati.',

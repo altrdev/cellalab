@@ -508,67 +508,74 @@ describe('linguette dei terminali: potenza e bilanciamento separate', () => {
   });
 });
 
-describe('cavi di potenza', () => {
+describe('cavi di potenza (BMS a porta comune)', () => {
   const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, powerHoleMm: 2.85 } as const;
   const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
   const strips = buildStrips(p, { tabs });
   const h = buildHarness(p, strips, 0.1)!;
+  const cable = (l: string) => h.cables.find((c) => c.label === l)!;
 
-  it('un cavo per terminale, P− e P+, con il diametro dell’AWG scelto', () => {
-    expect(h.cables.map((c) => c.label).sort()).toEqual(['P+', 'P−']);
+  it('tre cavi: P+ dritto, B− nel BMS, P− dal BMS, con il diametro dell’AWG scelto', () => {
+    expect(h.cables.map((c) => c.label).sort()).toEqual(['B−', 'P+', 'P−']);
     for (const c of h.cables) expect(c.odMm).toBeCloseTo(3.6, 6);
     expect(buildHarness(p, strips, 0.1, { balanceAwg: 26, powerAwg: 8 })!.cables[0]!.odMm).toBeCloseTo(6, 6);
+    // il negativo del pacco parte dalla lamella di P−, il positivo da quella di P+
+    expect(strips.find((x) => x.id === cable('P+').stripId)!.kind).toBe('terminal-plus');
+    expect(strips.find((x) => x.id === cable('B−').stripId)!.kind).toBe('terminal-minus');
   });
 
-  it('i cavi partono dal bordo laterale e si incontrano nello stesso angolo del lato di uscita', () => {
-    const [plus, minus] = [h.cables.find((c) => c.label === 'P+')!, h.cables.find((c) => c.label === 'P−')!];
-    for (const c of h.cables) {
+  it('il negativo entra nel BMS: B− finisce all’estremità del BMS e P− riparte da lì', () => {
+    const bIn = cable('B−');
+    const pOut = cable('P−');
+    const end = bIn.points[bIn.points.length - 1]!;
+    expect(end.x).toBeCloseTo(h.box!.center.x + h.box!.size.x / 2, 6); // estremità alta del BMS (default)
+    expect(pOut.points[0]!.x).toBeCloseTo(end.x, 6);
+    expect(pOut.points[0]!.z).toBeCloseTo(end.z, 6);
+    expect(pOut.points[0]!.y).toBeLessThan(end.y); // P− sta sotto B−
+  });
+
+  it('P+ passa davanti al BMS senza entrarci e prosegue nella coda insieme a P−', () => {
+    const plus = cable('P+');
+    const pOut = cable('P−');
+    const e = plus.points[plus.tailFrom]!;
+    expect(e.x).toBeCloseTo(cable('B−').points[cable('B−').points.length - 1]!.x, 6);
+    const tailP = plus.points[plus.points.length - 1]!;
+    const tailM = pOut.points[pOut.points.length - 1]!;
+    expect(tailP.x).toBeCloseTo(tailM.x, 6);
+    expect(tailP.x - e.x).toBeCloseTo(150, 6);
+    expect(plus.points[plus.tailFrom]!.y).toBeGreaterThan(pOut.points[0]!.y); // P+ sopra P−
+  });
+
+  it('i cavi partono dal bordo laterale e arrivano al lato di uscita', () => {
+    for (const c of [cable('P+'), cable('B−')]) {
       const first = c.points[0]!;
-      const corner = c.points[c.tailFrom]!;
-      // il lato di uscita è l'alto del disegno (z minore): il cavo parte più in basso e arriva in alto
-      expect(first.z).toBeGreaterThan(corner.z + 15);
-      expect(c.points[1]!.y).toBeCloseTo(35.2 + (c.label === 'P+' ? 1 : -1) * ((3.6 + 0.4) / 2), 6);
+      const end = c.points[c.tailFrom]!;
+      expect(first.z).toBeGreaterThan(end.z + 15); // il lato di uscita è l'alto del disegno
     }
-    // stesso punto in pianta, uno sopra l'altro
-    const [cp, cm] = [plus.points[plus.tailFrom]!, minus.points[minus.tailFrom]!];
-    expect(cp.x).toBeCloseTo(cm.x, 6);
-    expect(cp.z).toBeCloseTo(cm.z, 6);
-    expect(cp.y).toBeGreaterThan(cm.y);
-    // l'angolo è a destra del pacco (default) e la coda esce da lì
-    expect(cp.x).toBeGreaterThan(91); // oltre l'ultima cella (x = 91,2)
-    const tail = plus.points[plus.points.length - 1]!;
-    expect(tail.x - cp.x).toBeCloseTo(150, 6);
-    expect(tail.z).toBeCloseTo(cp.z, 6);
   });
 
-  it('con l’angolo a sinistra i cavi si incontrano dall’altra parte', () => {
+  it('con le estremità a sinistra tutto si sposta dall’altra parte', () => {
     const left = buildHarness(setBmsMount(p, { cablesEnd: 'low' }), strips, 0.1)!;
-    const c = left.cables[0]!;
-    expect(c.points[c.tailFrom]!.x).toBeLessThan(0);
-    const t = c.points[c.points.length - 1]!;
-    expect(t.x).toBeLessThan(c.points[c.tailFrom]!.x - 100);
+    const c = left.cables.find((x) => x.label === 'P+')!;
+    expect(c.points[c.tailFrom]!.x).toBeLessThan(left.box!.center.x);
+    expect(c.points[c.points.length - 1]!.x).toBeLessThan(c.points[c.tailFrom]!.x - 100);
   });
 
-  it('girano sul fianco laterale e rispettano scorta e arrotondamento', () => {
+  it('scorta e arrotondamento: la lunghezza da tagliare è percorso più scorta, a multipli di 5 mm', () => {
     for (const c of h.cables) {
-      const first = c.points[0]!;
-      const end = c.points[c.points.length - 1]!;
-      const direct = Math.hypot(end.x - first.x, end.y - first.y, end.z - first.z);
-      expect(c.lengthMm).toBeGreaterThanOrEqual(direct - 1e-6);
       expect(c.cutMm).toBeGreaterThanOrEqual(c.lengthMm + h.mount.slackMm - 1e-6);
+      expect(c.cutMm).toBeLessThan(c.lengthMm + h.mount.slackMm + 5 + 1e-6);
       expect(c.cutMm % 5).toBe(0);
     }
   });
 
   it('il connettore sta in fondo alla coda, lontano dal pacco, e dipende dalla scelta', () => {
-    // XT60: un involucro per la coppia; bullet: uno per cavo
     expect(h.connectors).toHaveLength(1);
     expect(h.connectors[0]!.kind).toBe('xt60');
     expect(h.connectors[0]!.cable).toBe('P±');
-    const tail = h.cables[0]!.points[h.cables[0]!.points.length - 1]!;
+    const tail = cable('P+').points[cable('P+').points.length - 1]!;
     expect(h.connectors[0]!.center.x).toBeGreaterThan(tail.x);
-    const none = buildHarness(setBmsMount(p, { powerConnector: 'none' }), strips, 0.1)!;
-    expect(none.connectors).toHaveLength(0);
+    expect(buildHarness(setBmsMount(p, { powerConnector: 'none' }), strips, 0.1)!.connectors).toHaveLength(0);
     const bullet = buildHarness(setBmsMount(p, { powerConnector: 'bullet' }), strips, 0.1)!;
     expect(bullet.connectors).toHaveLength(2);
     expect(bullet.connectors.every((k) => k.shape === 'cylinder')).toBe(true);

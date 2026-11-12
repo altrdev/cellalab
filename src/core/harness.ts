@@ -36,9 +36,12 @@ export interface HarnessWire {
   cutMm: number;
 }
 
-/** Cavo di potenza di un terminale: dal foro della linguetta larga (lato opposto) al BMS, lungo il fianco laterale. */
+/**
+ * Cavi di potenza (BMS a porta comune): P+ dalla lamella dritto al connettore; B− dalla lamella di P− al pad B− del BMS;
+ * P− dal pad P− del BMS al connettore. P+ e P− escono insieme dal BMS in una coda libera.
+ */
 export interface HarnessCable {
-  label: 'P+' | 'P−';
+  label: 'P+' | 'B−' | 'P−';
   stripId: string;
   face: Face;
   points: Pt3[];
@@ -46,7 +49,7 @@ export interface HarnessCable {
   cutMm: number;
   /** Diametro del cavo con la guaina, mm. */
   odMm: number;
-  /** Indice del punto dove i due cavi si incontrano (l'angolo): da lì in poi c'è la coda libera fino al connettore. */
+  /** Indice del punto dove inizia la coda libera verso il connettore (l'estremità del BMS); i fermacavi stanno prima. */
   tailFrom: number;
 }
 
@@ -201,22 +204,23 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
 
   const connector = to3(aConn, pc, yMid);
 
-  // Cavi di potenza: dalla linguetta larga (di lato) giù o su fino a metà altezza, lungo il fianco laterale, poi sul fianco
-  // di uscita fino all'angolo scelto. Lì i due cavi si incontrano e proseguono insieme, in una coda libera, fino al connettore.
+  // Cavi di potenza: dalla linguetta larga di ciascun terminale (di lato) giù o su fino a metà altezza, lungo il fianco
+  // laterale, poi sul fianco di uscita fino all'estremità scelta del BMS. P+ non entra nel BMS: passa oltre e prosegue
+  // nella coda. Il negativo entra nel BMS (B−) e ne esce (P−): i due cavi di uscita, P+ e P−, vanno insieme al connettore.
   const terminals = withTab.filter((s) => s.kind !== 'series' && tabsOf(s).some((x) => x.power));
-  const pOf = (s: Strip) => {
-    const t = tabsOf(s).find((x) => x.power)!;
-    return t.holeX * perp.x + t.holeY * perp.y;
-  };
-  const ordered = [...terminals].sort((a, b) => pOf(a) - pOf(b));
-  const extraCable = mount.slackMm + mount.tailMm;
-  const cables: HarnessCable[] = [];
   const high = mount.cablesEnd === 'high';
-  const pCorner = high ? pMax + cableOff : pMin - cableOff;
-  const pTail = pCorner + (high ? 1 : -1) * mount.tailMm;
-  const dyStep = (odMm + 0.4) / 2; // i due cavi stanno uno sopra l'altro, +  sopra e − sotto
+  const pEnd = pc + (high ? 1 : -1) * ((box && size ? size.lengthMm : 30) / 2); // estremità del BMS verso l'uscita dei cavi
+  const pTail = pEnd + (high ? 1 : -1) * mount.tailMm;
+  const dyStep = odMm + 0.4; // tre cavi uno sopra l'altro: P+ sopra, B− al centro, P− sotto
+  const cables: HarnessCable[] = [];
   const connKind = mount.powerConnector === 'none' ? null : mount.powerConnector;
-  ordered.forEach((s) => {
+  const lengthOf = (pts: Pt3[]) => {
+    let l = 0;
+    for (let k = 0; k + 1 < pts.length; k++) l += Math.hypot(pts[k + 1]!.x - pts[k]!.x, pts[k + 1]!.y - pts[k]!.y, pts[k + 1]!.z - pts[k]!.z);
+    return l;
+  };
+  const cutOf = (l: number) => Math.ceil((l + mount.slackMm) / 5 - 1e-9) * 5;
+  for (const s of terminals) {
     const tab = tabsOf(s).find((x) => x.power)!;
     const td = DIR[tab.side];
     const bend = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
@@ -226,18 +230,24 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     const yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
     const pHole = hx * perp.x + hy * perp.y;
     const aBend = hx * d.x + hy * d.y;
-    const label = s.kind === 'terminal-plus' ? 'P+' : 'P−';
-    const y = yMid + (label === 'P+' ? dyStep : -dyStep);
-    // Dal fianco laterale più vicino al foro; se non è quello dell'angolo, il cavo attraversa tutto il fianco di uscita.
-    const pLat = pHole <= pc ? pMin - cableOff : pMax + cableOff;
-    const pts: Pt3[] = [{ x: hx, y: yHole, z: hy }, { x: hx, y, z: hy }, to3(aBend, pLat, y), to3(aCable, pLat, y)];
-    if (Math.abs(pLat - pCorner) > 1e-6) pts.push(to3(aCable, pCorner, y));
-    const tailFrom = pts.length - 1;
-    pts.push(to3(aCable, pTail, y));
-    let lengthMm = 0;
-    for (let k = 0; k + 1 < pts.length; k++) lengthMm += Math.hypot(pts[k + 1]!.x - pts[k]!.x, pts[k + 1]!.y - pts[k]!.y, pts[k + 1]!.z - pts[k]!.z);
-    cables.push({ label, stripId: s.id, face: s.face, points: pts, lengthMm, cutMm: Math.ceil((lengthMm + extraCable) / 5 - 1e-9) * 5, odMm, tailFrom });
-  });
+    const pLat = pHole <= pc ? pMin - cableOff : pMax + cableOff; // fianco laterale più vicino al foro
+    const plus = s.kind === 'terminal-plus';
+    const y = yMid + (plus ? dyStep : 0);
+    const toEnd: Pt3[] = [{ x: hx, y: yHole, z: hy }, { x: hx, y, z: hy }, to3(aBend, pLat, y), to3(aCable, pLat, y), to3(aCable, pEnd, y)];
+    if (plus) {
+      // passa davanti all'estremità del BMS e prosegue nella coda
+      const pts = [...toEnd, to3(aCable, pTail, y)];
+      const lengthMm = lengthOf(pts);
+      cables.push({ label: 'P+', stripId: s.id, face: s.face, points: pts, lengthMm, cutMm: cutOf(lengthMm), odMm, tailFrom: toEnd.length - 1 });
+    } else {
+      // il negativo del pacco entra nel BMS (B−) ed esce da P−, a un livello più basso, verso il connettore
+      const lengthIn = lengthOf(toEnd);
+      cables.push({ label: 'B−', stripId: s.id, face: s.face, points: toEnd, lengthMm: lengthIn, cutMm: cutOf(lengthIn), odMm, tailFrom: toEnd.length - 1 });
+      const out = [to3(aCable, pEnd, yMid - dyStep), to3(aCable, pTail, yMid - dyStep)];
+      const lengthOut = lengthOf(out);
+      cables.push({ label: 'P−', stripId: s.id, face: s.face, points: out, lengthMm: lengthOut, cutMm: cutOf(lengthOut), odMm, tailFrom: 0 });
+    }
+  }
   const connectors: HarnessConnector[] = [];
   if (connKind && cables.length > 0) {
     const cs = CONNECTOR_SIZES[connKind];
@@ -253,7 +263,7 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
         ...size,
       });
     };
-    if (connKind === 'bullet') for (const c of cables) place(c.label, c.points[c.points.length - 1]!.y, cs);
+    if (connKind === 'bullet') for (const c of cables.filter((x) => x.label !== 'B−')) place(c.label === 'P+' ? 'P+' : 'P−', c.points[c.points.length - 1]!.y, cs);
     else place('P±', yMid, { lengthMm: cs.lengthMm, widthMm: cs.heightMm, heightMm: cs.widthMm }); // poli uno sopra l'altro
   }
   let boxOut: BmsBox | null = null;
