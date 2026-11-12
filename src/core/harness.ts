@@ -27,8 +27,8 @@ export interface HarnessWire {
   /** Lamella e faccia a cui è saldato. */
   stripId: string;
   face: Face;
-  /** Percorso: foro della linguetta, piede della discesa, connettore. */
-  points: [Pt3, Pt3, Pt3];
+  /** Percorso: foro della linguetta, piede della discesa, (angolo se la linguetta esce di lato), connettore. */
+  points: Pt3[];
   /** Lunghezza lungo il percorso, mm. */
   lengthMm: number;
   /** Lunghezza da tagliare: percorso più scorta (e coda se esterno), arrotondata a 5 mm per eccesso. */
@@ -119,25 +119,31 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
       // La linguetta che porta il filo di bilanciamento: quella in serie, o la piccola dei terminali (non quella del cavo).
       const tab = tabsOf(s).find((x) => x.balanceHole)!;
       const node = last - s.joint;
+      const td = DIR[tab.side];
       const bend = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
       const bh = tab.balanceHole!;
-      const u = (bh.x - bend.x) * d.x + (bh.y - bend.y) * d.y; // dal piegamento al foro, lungo la linguetta
-      const aBend = bend.x * d.x + bend.y * d.y;
-      const pHole = bh.x * perp.x + bh.y * perp.y;
+      const u = (bh.x - bend.x) * td.x + (bh.y - bend.y) * td.y; // dal piegamento al foro, lungo la linguetta
       const yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
       const pPin = pc + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
-      const p0 = to3(aBend, pHole, yHole);
-      const p1 = to3(aBend, pHole, yMid);
+      // Con la piega il foro scende sulla linea di piega: la sua posizione in pianta è il foro riportato su quella retta.
+      const hx = bh.x - td.x * u;
+      const hy = bh.y - td.y * u;
+      const p0: Pt3 = { x: hx, y: yHole, z: hy };
+      const p1: Pt3 = { x: hx, y: yMid, z: hy };
       const p2 = to3(aConn, pPin, yMid);
+      // Una linguetta che esce di lato porta il filo lungo il fianco laterale fino all'angolo, poi sul fianco di uscita.
+      const lateral = tab.side !== side;
+      const pts: Pt3[] = lateral ? [p0, p1, to3(aWire, hx * perp.x + hy * perp.y, yMid), p2] : [p0, p1, p2];
       const len = (a: Pt3, b: Pt3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-      const lengthMm = len(p0, p1) + len(p1, p2);
+      let lengthMm = 0;
+      for (let i = 0; i + 1 < pts.length; i++) lengthMm += len(pts[i]!, pts[i + 1]!);
       const extra = mount.slackMm + (mount.mode === 'external' ? mount.tailMm : 0);
       return {
         node,
         label: `B${node}`,
         stripId: s.id,
         face: s.face,
-        points: [p0, p1, p2],
+        points: pts,
         lengthMm,
         cutMm: Math.ceil((lengthMm + extra) / 5 - 1e-9) * 5,
       };
