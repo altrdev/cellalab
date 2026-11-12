@@ -19,7 +19,7 @@ export interface WireExit {
   solder: Pt;
   hole?: Pt;
   edge?: Pt;
-  /** Il corridoio dal punto di saldatura al bordo passa sopra un'altra lamella o un'altra apertura di cella. */
+  /** Il corridoio dal punto di saldatura al bordo passa sopra un'altra lamella o un'altra apertura di cella. Non è un errore (il filo è isolato): è solo un percorso meno ordinato, che si sceglie dopo uno libero. */
   blocked?: boolean;
   diameterMm: number;
   /** Spessore della piastra e del suo fondo, mm: il filo entra dalla faccia esterna ed esce dal bordo delle pareti. */
@@ -170,8 +170,9 @@ function distToRect(p: Pt, rect: readonly Pt[]): number {
 
 /**
  * Giro esterno, senza foro né linguetta: il filo si salda sulla lamella, vicino al bordo dal lato di uscita, corre in
- * linea retta sul piano del portacelle fino al bordo della piastra e da lì scende lungo il fianco, all'esterno. Il
- * corridoio deve essere libero: nessun'altra lamella della faccia e nessuna apertura di un'altra cella.
+ * linea retta sul piano del portacelle fino al bordo della piastra e da lì scende lungo il fianco, all'esterno. Si
+ * preferisce un corridoio libero (nessun'altra lamella della faccia, nessuna apertura di un'altra cella) perché il filo
+ * resta ordinato e non finisce schiacciato; il filo è isolato, quindi passare sopra una lamella non è un corto.
  */
 export function findAroundExits(
   project: Project,
