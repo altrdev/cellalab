@@ -116,7 +116,7 @@ function trisGeometry(tris: V3[][], map: (v: V3) => V3): THREE.BufferGeometry {
 export function holderHalfGeometries(model: HolderModel, half: HolderHalf): THREE.BufferGeometry[] {
   const f = model.floorMm;
   const H = model.cellHeightMm;
-  const geos = model.layers.map((l) =>
+  const geos = (model.halfLayers?.[half] ?? model.layers).map((l) =>
     half === 'top'
       ? extrudeDown(l.regions, l.z1 - l.z0, H + f - l.z0)
       : extrudeDown(l.regions, l.z1 - l.z0, l.z1 - f),

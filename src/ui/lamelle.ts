@@ -48,7 +48,7 @@ interface NtcPlan {
   face: Face | null;
 }
 const ntcCache = new WeakMap<Project, { key: string; plan: NtcPlan }>();
-const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [], grooves: [] };
+const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [], grooves: [], half: null };
 
 /**
  * Il posto dell'NTC e il solco del suo filo (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle).
@@ -105,8 +105,8 @@ export function holderCutsOf(project: Project, settings: LamellaSettings, holder
   const hit = cutsCache.get(project);
   if (hit && hit.key === key) return hit.cuts;
   const notches = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon) : [];
-  const { site, route } = ntcPlanOf(project, settings, holder);
-  const cuts = { notches, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [], grooves: route?.found ? route.polygons : [] };
+  const { site, route, face } = ntcPlanOf(project, settings, holder);
+  const cuts = { notches, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [], grooves: route?.found ? route.polygons : [], half: face };
   cutsCache.set(project, { key, cuts });
   return cuts;
 }

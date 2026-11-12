@@ -13,6 +13,8 @@ export const NTC_GROOVE_MM = 1.6;
 /** Margine tra solco e lamella, mm. */
 const AVOID_MARGIN_MM = 0.3;
 const STEP_MM = 0.5;
+/** Fondo che deve restare tra il solco e le aperture delle celle (o il bordo): una parete da stampare, mm. */
+export const FLOOR_MARGIN_MM = 0.5;
 /** Raggio attorno al foro dove non si applica il margine dalle lamelle, mm. */
 const START_FREE_MM = 1.6;
 /** Il bordo di uscita è quello dove la proiezione sul lato è a meno di questo dall'estremo del fondo, mm. */
@@ -69,7 +71,8 @@ const inArea = (p: Pt, a: Area) => inRing(p, a.outline) && !a.holes.some((h) => 
 export function ntcRoute(slab: readonly Region[], avoid: readonly Region[], start: Pt, side: NtcSide, grooveMm = NTC_GROOVE_MM): NtcRoute {
   const none: NtcRoute = { found: false, path: [], lengthMm: 0, polygons: [] };
   const half = grooveMm / 2;
-  const walk = offsetRegions(slab, -half).map(areaOf);
+  const walk = offsetRegions(slab, -(half + FLOOR_MARGIN_MM)).map(areaOf);
+  const floor = slab.map(areaOf);
   const block = avoid.filter((r) => r.outline.length >= 3).map((r) => areaOf(offsetRegion(r, half + AVOID_MARGIN_MM)));
   if (walk.length === 0) return none;
   const d = DIR[side];
@@ -182,6 +185,15 @@ export function ntcRoute(slab: readonly Region[], avoid: readonly Region[], star
     path.push(raw[j]!);
     i = j;
   }
+
+  // Il percorso si ferma a FLOOR_MARGIN_MM dal bordo: l'ultimo tratto va avanti nella stessa direzione fino a uscire dal fondo.
+  const last = path[path.length - 1]!;
+  let out = 0;
+  for (let a = STEP_MM; a <= 12; a += STEP_MM) {
+    if (!floor.some((f) => inArea({ x: last.x + d.x * a, y: last.y + d.y * a }, f))) break;
+    out = a;
+  }
+  path.push({ x: last.x + d.x * (out + 1), y: last.y + d.y * (out + 1) });
 
   let lengthMm = 0;
   const caps = (p: Pt) => circlePoints(p.x, p.y, half, 16);

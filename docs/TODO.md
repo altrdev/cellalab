@@ -31,7 +31,7 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 - [x] Holder grooves for the tabs (depth from the chosen AWG, wall kept at 0.8 mm at least), larger power tabs/holes for P+/P− (chosen AWG). All tabs exit on one side, so the exit is single.
 - [x] NTC pocket: a round hole in the holder walls in the gap between three cells (central cell, towards the wire exit side), setting on/off + sensor diameter, plus a 2 mm wire hole through the floor (gaps not covered by busbars preferred). On both plates.
 - [x] NTC wire groove (1.6 mm wide, half the floor deep) on the outer face from the wire hole to the exit edge, avoiding the busbars of the face; the plate with a free path is suggested.
-- [ ] Still open: balance-wire routing along the pack between the two faces, warning when the wall is too thin for the wire, NTC hole and groove on one plate only (today on both).
+- [ ] Still open: balance-wire routing along the pack between the two faces, warning when the wall is too thin for the wire, (NTC pocket, hole and groove are now on the suggested plate only).
 - [ ] BMS mounted on the pack (pocket + spacers) or external (wire exit with strain relief).
 
 ## Polish (phase 6)

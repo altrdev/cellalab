@@ -163,10 +163,13 @@ export function splitHolder(project: Project, settings: HolderSettings, opts: Bu
       const layers = full.layers
         .map((l) => ({ z0: l.z0, z1: l.z1, regions: intersectRegions(l.regions, masks) }))
         .filter((l) => l.regions.length > 0);
+      const cutLayers = (ls: HolderModel['layers']) =>
+        ls.map((l) => ({ z0: l.z0, z1: l.z1, regions: intersectRegions(l.regions, masks) })).filter((l) => l.regions.length > 0);
+      const halfLayers = full.halfLayers ? Object.fromEntries(Object.entries(full.halfLayers).map(([h, ls]) => [h, cutLayers(ls)])) : undefined;
       const wall = intersectRegions(full.wall, masks);
       const slab = intersectRegions(full.slab, masks);
       const b = bounds(wall.length ? wall : layers.flatMap((l) => l.regions));
-      const model: HolderModel = { ...full, layers, wall, slab, ramp: null, bounds: b };
+      const model: HolderModel = { ...full, layers, ...(halfLayers && { halfLayers }), wall, slab, ramp: null, bounds: b };
       const w = b.maxX - b.minX;
       const d = b.maxY - b.minY;
       const fits = fitsBed(w, d, settings);
