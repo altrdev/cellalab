@@ -194,6 +194,8 @@ export interface BuildOptions {
   /** Forme da incidere sul bordo delle pareti, per `engraveMm` di profondità. */
   engrave?: readonly (readonly Pt[])[];
   engraveMm?: number;
+  /** Tacche da togliere alla sagoma esterna (scanalature per i fili): su tutto lo spessore della piastra. */
+  notches?: readonly (readonly Pt[])[];
 }
 
 /**
@@ -232,6 +234,7 @@ export function buildHolder(
       holes: reg.holes.filter((hole) => regionArea({ outline: hole, holes: [] }) >= MIN_OPEN_GAP_MM2),
     }));
   }
+  if (opts.notches && opts.notches.length > 0) outer = differenceRegions(outer, opts.notches);
   const pockets = cells.map(({ c, r, cl }) => circlePolygon(c.x, c.y, r + cl));
   const openings = cells.map(({ c, r }) => circlePolygon(c.x, c.y, Math.max(r - s.ledgeMm, 1)));
   const wall = differenceRegions(outer, pockets);

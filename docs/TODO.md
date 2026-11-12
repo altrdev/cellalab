@@ -28,7 +28,8 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 - [ ] BMS catalogue still missing: balance connector, size, holes, B-/P-/P+ positions (needed by the mounting step).
 - [x] Checks: pack S = BMS S, current, chemistry, n+1 balance wires (info only).
 - [x] Balance-wire tabs on the busbars: one per joint (S+1), drilled, on a chosen side; part of the busbar outline, so cut and exported with it.
-- [ ] Through holes between faces, wire channels (chosen AWG), single exit in the holder, larger holes for power cables, NTC pocket.
+- [x] Holder grooves for the tabs (depth from the chosen AWG, wall kept at 0.8 mm at least), larger power tabs/holes for P+/P− (chosen AWG). All tabs exit on one side, so the exit is single.
+- [ ] Still open: wire routing along the pack between the two faces, NTC pocket, warning when the wall is too thin for the wire.
 - [ ] BMS mounted on the pack (pocket + spacers) or external (wire exit with strain relief).
 
 ## Polish (phase 6)

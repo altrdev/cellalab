@@ -9,6 +9,8 @@
   import { CUTTER_PROFILES, WELDER_PROFILES } from '../core/profiles';
   import { LAMELLA_MATERIALS } from '../core/materials';
   import { bmsOf } from '../core/bms';
+  import { MIN_PRINT_WALL_MM } from '../core/holder';
+  import { BALANCE_AWGS, POWER_AWGS } from '../core/wire';
   import { history } from '../state';
   import { reportOf } from './lamelle';
   import { ui } from './ui.svelte';
@@ -134,9 +136,21 @@
         <label>{t('lam.tabWidth')}<UnitInput kind="len" min={2} max={30} step={0.5} value={ui.lamella.tabWidthMm} onchange={(v) => { if (v !== null) ui.lamella.tabWidthMm = v; }} /></label>
         <label>{t('lam.tabLength')}<UnitInput kind="len" min={2} max={60} step={0.5} value={ui.lamella.tabLengthMm} onchange={(v) => { if (v !== null) ui.lamella.tabLengthMm = v; }} /></label>
       </div>
+      <div class="row">
+        <label>{t('lam.balanceAwg')}
+          <select value={String(ui.lamella.balanceAwg)} onchange={(e) => (ui.lamella.balanceAwg = Number(e.currentTarget.value))}>
+            {#each BALANCE_AWGS as a (a)}<option value={String(a)}>AWG {a}</option>{/each}
+          </select>
+        </label>
+        <label>{t('lam.powerAwg')}
+          <select value={String(ui.lamella.powerAwg)} onchange={(e) => (ui.lamella.powerAwg = Number(e.currentTarget.value))}>
+            {#each POWER_AWGS as a (a)}<option value={String(a)}>AWG {a}</option>{/each}
+          </select>
+        </label>
+      </div>
       <label>{t('lam.tabBend')}<UnitInput kind="len" min={0.5} max={20} step={0.5} value={ui.lamella.tabBendMm} onchange={(v) => { if (v !== null) ui.lamella.tabBendMm = v; }} /></label>
       <label>{t('lam.tabHole')}<UnitInput kind="len" min={0} max={10} step={0.5} value={ui.lamella.tabHoleMm} onchange={(v) => { if (v !== null) ui.lamella.tabHoleMm = v; }} /></label>
-      <Help label={t('lam.what')}>{t('lam.tabsHelp')}</Help>
+      <Help label={t('lam.what')}>{t('lam.tabsHelp', { min: len(MIN_PRINT_WALL_MM, 1) })}</Help>
     {/if}
   {/if}
 

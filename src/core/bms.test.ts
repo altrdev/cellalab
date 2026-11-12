@@ -5,9 +5,10 @@ import { generateGrid } from './layout';
 import { addCustomBms, removeCustomBms, replaceCells, setBms, setCurrentLimit } from './ops';
 import { createProject, parseProject, serializeProject } from './project';
 import { computeStats } from './stats';
-import { pointInRegions } from './clip';
+import { pointInRegions, regionArea } from './clip';
 import { buildDxf } from './dxf';
 import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
+import { tabNotches } from './tabNotches';
 import { buildSvg } from './lamelleExport';
 import { buildStrips } from './strips';
 import type { Project } from './types';
@@ -106,7 +107,7 @@ describe('salvataggio', () => {
 });
 
 describe('linguette di presa', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1, powerHoleMm: 2.9 } as const;
   const withBms = (p: Project) => setBms(p, 'bms-13s-40a-li-ion');
 
   it('senza BMS non ci sono linguette', () => {
@@ -119,7 +120,7 @@ describe('linguette di presa', () => {
     expect(new Set(withTab.map((s) => s.joint)).size).toBe(5);
     expect(withTab).toHaveLength(5);
     for (const s of withTab) {
-      expect(s.tab!.holeDiameterMm).toBe(2);
+      expect(s.tab!.holeDiameterMm).toBe(s.kind === 'series' ? 2 : 2.9);
       expect(s.holes.length).toBeGreaterThanOrEqual(1);
     }
   });
@@ -144,7 +145,7 @@ describe('linguette di presa', () => {
 });
 
 describe('linea di piega della linguetta', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1, powerHoleMm: 2.9 } as const;
   const strips = buildStrips(setBms(pack(4, 2), 'bms-4s-30a-li-ion'), { tabs });
 
   it('sta sulla linguetta, tra la cella e il foro', () => {
@@ -152,7 +153,8 @@ describe('linea di piega della linguetta', () => {
       const [a, b] = s.tab!.bend;
       expect(a.y).toBeCloseTo(b.y, 6);
       expect(a.y).toBeGreaterThan(s.tab!.holeY); // y verso il basso: la piega è più vicina alla cella del foro
-      expect(Math.abs(a.x - b.x)).toBeCloseTo(6, 6);
+      expect(Math.abs(a.x - b.x)).toBeCloseTo(s.tab!.widthMm, 6);
+      expect(s.tab!.widthMm).toBeCloseTo(s.kind === 'series' ? 6 : 6.9, 6);
     }
   });
 
@@ -164,7 +166,7 @@ describe('linea di piega della linguetta', () => {
 });
 
 describe('piega oltre il holder', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1, powerHoleMm: 2.9 } as const;
   const p = setBms(pack(4, 2), 'bms-4s-30a-li-ion');
 
   it('la piega sta oltre la sagoma del holder, qualunque sia la parete', () => {
@@ -185,5 +187,48 @@ describe('piega oltre il holder', () => {
       return Math.min(...buildStrips(p, { tabs, holderOutline: outline }).flatMap((s) => (s.tab ? [s.tab.bend[0].y] : [])));
     };
     expect(bendY(4)).toBeLessThan(bendY(1.6) - 2);
+  });
+});
+
+describe('tacche del portacelle per le linguette', () => {
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 0.3, powerHoleMm: 2.9 } as const;
+  const wires = { balanceAwg: 26, powerAwg: 12 };
+  const p = setBms(pack(4, 2), 'bms-4s-30a-li-ion');
+  const settings = { ...DEFAULT_HOLDER_SETTINGS, wallMm: 2.4 };
+
+  it('una per linguetta, più profonda per il cavo di potenza', () => {
+    const notches = tabNotches(buildStrips(p, { tabs }), settings, wires);
+    expect(notches).toHaveLength(5);
+    const power = notches.filter((n) => n.stripId.endsWith('-0') || n.stripId.endsWith('-4'));
+    const series = notches.filter((n) => !power.includes(n));
+    expect(Math.max(...series.map((n) => n.depthMm))).toBeLessThan(Math.min(...power.map((n) => n.depthMm)) + 1e-9);
+  });
+
+  it('la parete resta stampabile: profondità al massimo parete − 0,8', () => {
+    for (const wallMm of [1.2, 1.6, 2.4]) {
+      for (const n of tabNotches(buildStrips(p, { tabs }), { ...DEFAULT_HOLDER_SETTINGS, wallMm }, wires)) {
+        expect(n.depthMm).toBeLessThanOrEqual(wallMm - 0.8 + 1e-9);
+      }
+    }
+    expect(tabNotches(buildStrips(p, { tabs }), { ...DEFAULT_HOLDER_SETTINGS, wallMm: 1 }, wires)).toEqual([]);
+  });
+
+  it('il holder con le tacche ha meno materiale e le tasche delle celle restano intatte', () => {
+    const notches = tabNotches(buildStrips(p, { tabs }), settings, wires).map((n) => n.polygon);
+    const plain = buildHolder(p, settings, true)!;
+    const cut = buildHolder(p, settings, true, { notches })!;
+    const area = (m: typeof plain) => m.wall.reduce((a, r) => a + regionArea(r), 0);
+    expect(area(cut)).toBeLessThan(area(plain));
+    expect(cut.wall.flatMap((r) => r.holes)).toHaveLength(plain.wall.flatMap((r) => r.holes).length);
+  });
+
+  it('la piega cade dentro la scanalatura, non fuori dal bordo teorico', () => {
+    const strips0 = buildStrips(p, { tabs });
+    const notches = tabNotches(strips0, settings, wires).map((n) => n.polygon);
+    const outline = buildHolder(p, settings, true, { notches })!.wall.map((r) => ({ outline: r.outline, holes: [] }));
+    const plainOutline = buildHolder(p, settings, true)!.wall.map((r) => ({ outline: r.outline, holes: [] }));
+    const a = buildStrips(p, { tabs, holderOutline: outline }).find((s) => s.tab && s.kind === 'series')!;
+    const b = buildStrips(p, { tabs, holderOutline: plainOutline }).find((s) => s.id === a.id)!;
+    expect(a.tab!.bend[0].y).toBeGreaterThan(b.tab!.bend[0].y);
   });
 });

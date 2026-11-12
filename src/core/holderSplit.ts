@@ -1,6 +1,6 @@
 import { findCellType } from './catalog';
 import { intersectRegions, pointInRegions, unionAll, type Region } from './clip';
-import { buildHolder, fitsBed, type HolderModel, type HolderSettings } from './holder';
+import { buildHolder, fitsBed, type BuildOptions, type HolderModel, type HolderSettings } from './holder';
 import type { Pt } from './polygon';
 import type { Project } from './types';
 
@@ -103,8 +103,8 @@ function bounds(regions: readonly Region[]) {
  * Divide il portacelle in pezzi che entrano nel piano di stampa. Null se non ci sono celle o se la piastra intera
  * entra già nel piano (non c'è niente da dividere).
  */
-export function splitHolder(project: Project, settings: HolderSettings): HolderSplit | null {
-  const full = buildHolder(project, settings, false);
+export function splitHolder(project: Project, settings: HolderSettings, opts: BuildOptions = {}): HolderSplit | null {
+  const full = buildHolder(project, settings, false, opts);
   if (!full) return null;
   const width = full.bounds.maxX - full.bounds.minX;
   const depth = full.bounds.maxY - full.bounds.minY;

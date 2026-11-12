@@ -12,11 +12,18 @@ import type { Project } from '../core/types';
 let last: { project: Project; key: string; model: HolderModel | null; report: HolderReport | null; split: HolderSplit | null } | null = null;
 
 /** `split` c'è solo se la piastra è più grande del piano di stampa e va divisa in pezzi da incollare. */
+/** Scanalature per i fili delle linguette: le calcola il pannello delle lamelle (qui non si può importare senza un giro). */
+let notchSource: (project: Project, settings: HolderSettings) => Pt[][] = () => [];
+export function bindHolderNotches(get: (project: Project, settings: HolderSettings) => Pt[][]): void {
+  notchSource = get;
+}
+
 export function holderOf(project: Project, settings: HolderSettings): { model: HolderModel | null; report: HolderReport | null; split: HolderSplit | null } {
-  const key = renderKey() + JSON.stringify(settings); // i messaggi del rapporto dipendono da lingua e unità
+  const notches = notchSource(project, settings);
+  const key = renderKey() + JSON.stringify(settings) + (notches.length > 0 ? JSON.stringify(notches) : ''); // i messaggi del rapporto dipendono da lingua e unità
   if (last && last.project === project && last.key === key) return last;
-  const model = buildHolder(project, settings, true);
-  const split = model ? splitHolder(project, settings) : null;
+  const model = buildHolder(project, settings, true, { notches });
+  const split = model ? splitHolder(project, settings, { notches }) : null;
   const report = model ? analyzeHolder(project, model, split) : null;
   last = { project, key, model, report, split };
   return last;

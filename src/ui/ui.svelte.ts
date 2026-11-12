@@ -7,8 +7,8 @@ import type { LamellaSettings } from '../core/lamelle';
 import type { LatticeKind } from '../core/lattice';
 import type { Face } from '../core/strips';
 import type { Project } from '../core/types';
-import { loadHolderSettings, loadHolderView, type HolderView } from './holder';
-import { bindHolderSettings, loadLamellaSettings } from './lamelle';
+import { bindHolderNotches, loadHolderSettings, loadHolderView, type HolderView } from './holder';
+import { bindHolderSettings, loadLamellaSettings, notchesOf } from './lamelle';
 
 export type ViewMode = 'draw' | 'split' | '3d';
 export type Tool = 'select' | 'add' | 'series';
@@ -136,3 +136,4 @@ class UiState {
 
 export const ui = new UiState();
 bindHolderSettings(() => ui.holder);
+bindHolderNotches((project, settings) => notchesOf(project, ui.lamella, settings));

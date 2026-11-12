@@ -1,11 +1,13 @@
 import { renderKey } from '../i18n';
 import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf, type LamellaReport, type LamellaSettings } from '../core/lamelle';
 import type { Pt } from '../core/polygon';
+import { AWG_TABLE } from '../core/wire';
 import { COOLING, spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
 import { buildStrips, type Strip } from '../core/strips';
 import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
 import { holderOf } from './holder';
+import { tabNotches } from '../core/tabNotches';
 import type { WelderProfile } from '../core/profiles';
 import type { Project } from '../core/types';
 
@@ -31,6 +33,23 @@ export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
   const strips = buildStrips(project, { ...opts, holderOutline });
   stripCache.set(project, { key, strips });
   return strips;
+}
+
+const notchCache = new WeakMap<Project, { key: string; polygons: Pt[][] }>();
+
+/**
+ * Scanalature del portacelle per le linguette (con un BMS e le linguette accese): si ricavano dalle lamelle senza
+ * holder, perché la posizione delle linguette non dipende da lui. Le usa `holderOf`.
+ */
+export function notchesOf(project: Project, settings: LamellaSettings, holder: HolderSettings): Pt[][] {
+  const opts = stripOptionsOf(settings);
+  if (!opts.tabs || project.bmsId === undefined) return [];
+  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg]);
+  const hit = notchCache.get(project);
+  if (hit && hit.key === key) return hit.polygons;
+  const polygons = tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon);
+  notchCache.set(project, { key, polygons });
+  return polygons;
 }
 
 let last: { project: Project; key: string; report: LamellaReport } | null = null;
@@ -81,6 +100,8 @@ export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
   for (const k of ['tabWidthMm', 'tabLengthMm', 'tabHoleMm', 'tabBendMm'] as const) {
     if (!(base[k] > 0)) base[k] = DEFAULT_LAMELLA_SETTINGS[k];
   }
+  if (!AWG_TABLE.some((a) => a.awg === base.balanceAwg)) base.balanceAwg = DEFAULT_LAMELLA_SETTINGS.balanceAwg;
+  if (!AWG_TABLE.some((a) => a.awg === base.powerAwg)) base.powerAwg = DEFAULT_LAMELLA_SETTINGS.powerAwg;
   if (!(base.cooling in COOLING)) base.cooling = DEFAULT_LAMELLA_SETTINGS.cooling;
   if (base.spotsPerTerminal !== null) base.spotsPerTerminal = Math.min(Math.max(Math.round(base.spotsPerTerminal), 1), 12);
   base.layers = Math.min(Math.max(Math.floor(base.layers) || 1, 1), 5);
