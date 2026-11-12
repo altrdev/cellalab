@@ -40,12 +40,23 @@ export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
 }
 
 const cutsCache = new WeakMap<Project, { key: string; cuts: HolderCuts }>();
-const NO_CUTS: HolderCuts = { notches: [], pockets: [] };
+const ntcCache = new WeakMap<Project, { key: string; site: NtcSite | null }>();
+const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [] };
 
-/** Il posto dell'NTC (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle). */
+/**
+ * Il posto dell'NTC (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle). Evita i vuoti dove il foro
+ * del filo finirebbe sotto una lamella: per le lamelle usa la forma senza holder, che qui basta.
+ */
 export function ntcSiteOf(project: Project, settings: LamellaSettings, holder: HolderSettings): NtcSite | null {
   if (!settings.ntc || !bmsOf(project)?.ntc) return null;
-  return ntcSite(project, tabSideOf(project, settings), settings.ntcMm, holder.clearanceMm);
+  const side = tabSideOf(project, settings);
+  const key = JSON.stringify([stripOptionsOf(settings), side, settings.ntcMm, holder.clearanceMm]);
+  const hit = ntcCache.get(project);
+  if (hit && hit.key === key) return hit.site;
+  const avoid = buildStrips(project, { ...stripOptionsOf(settings), tabs: null }).map((s) => ({ outline: s.outline, holes: s.holes }));
+  const site = ntcSite(project, side, settings.ntcMm, holder.clearanceMm, avoid);
+  ntcCache.set(project, { key, site });
+  return site;
 }
 
 /**
@@ -61,7 +72,7 @@ export function holderCutsOf(project: Project, settings: LamellaSettings, holder
   if (hit && hit.key === key) return hit.cuts;
   const notches = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon) : [];
   const site = ntcSiteOf(project, settings, holder);
-  const cuts = { notches, pockets: site ? [site.polygon] : [] };
+  const cuts = { notches, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
   cutsCache.set(project, { key, cuts });
   return cuts;
 }
@@ -155,9 +166,10 @@ export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
     } else if (typeof v === typeof def && (typeof v !== 'number' || Number.isFinite(v))) out[k] = v;
   }
   if (!['auto', 'top', 'bottom', 'left', 'right'].includes(base.tabSide)) base.tabSide = DEFAULT_LAMELLA_SETTINGS.tabSide;
-  for (const k of ['tabWidthMm', 'tabLengthMm', 'tabBendMm', 'ntcMm'] as const) {
+  for (const k of ['tabWidthMm', 'tabLengthMm', 'ntcMm'] as const) {
     if (!(base[k] > 0)) base[k] = DEFAULT_LAMELLA_SETTINGS[k];
   }
+  if (!(base.tabBendMm >= 0)) base.tabBendMm = DEFAULT_LAMELLA_SETTINGS.tabBendMm;
   if (!AWG_TABLE.some((a) => a.awg === base.balanceAwg)) base.balanceAwg = DEFAULT_LAMELLA_SETTINGS.balanceAwg;
   if (!AWG_TABLE.some((a) => a.awg === base.powerAwg)) base.powerAwg = DEFAULT_LAMELLA_SETTINGS.powerAwg;
   if (!(base.cooling in COOLING)) base.cooling = DEFAULT_LAMELLA_SETTINGS.cooling;

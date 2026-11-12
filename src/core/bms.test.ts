@@ -293,3 +293,30 @@ describe('posto dell’NTC', () => {
     expect(area(cut.slab)).toBeCloseTo(area(plain.slab), 3);
   });
 });
+
+describe('filo dell’NTC', () => {
+  const p = pack(4, 3);
+
+  it('il foro del filo passa anche nel fondo', () => {
+    const site = ntcSite(p, 'top', 5, 0.15)!;
+    const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true)!;
+    const cut = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true, { extraPockets: [site.polygon], throughHoles: [site.wirePolygon] })!;
+    const area = (rs: typeof plain.wall) => rs.reduce((a, r) => a + regionArea(r), 0);
+    expect(area(cut.slab)).toBeLessThan(area(plain.slab));
+  });
+
+  it('preferisce i vuoti non coperti da una lamella', () => {
+    const free = ntcSite(p, 'top', 5, 0.15)!;
+    expect(free.covered).toBe(false);
+    // una lamella finta che copre il vuoto scelto: il sito si sposta
+    const cover = [{ outline: [{ x: free.x - 6, y: free.y - 6 }, { x: free.x + 6, y: free.y - 6 }, { x: free.x + 6, y: free.y + 6 }, { x: free.x - 6, y: free.y + 6 }], holes: [] }];
+    const moved = ntcSite(p, 'top', 5, 0.15, cover)!;
+    expect(Math.hypot(moved.x - free.x, moved.y - free.y)).toBeGreaterThan(6);
+    expect(moved.covered).toBe(false);
+  });
+
+  it('se tutti i vuoti sono coperti lo dice', () => {
+    const all = [{ outline: [{ x: -500, y: -500 }, { x: 500, y: -500 }, { x: 500, y: 500 }, { x: -500, y: 500 }], holes: [] }];
+    expect(ntcSite(p, 'top', 5, 0.15, all)!.covered).toBe(true);
+  });
+});

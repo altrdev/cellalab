@@ -29,7 +29,7 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 - [x] Checks: pack S = BMS S, current, chemistry, n+1 balance wires (info only).
 - [x] Balance-wire tabs on the busbars: one per joint (S+1), drilled, on a chosen side; part of the busbar outline, so cut and exported with it.
 - [x] Holder grooves for the tabs (depth from the chosen AWG, wall kept at 0.8 mm at least), larger power tabs/holes for P+/P− (chosen AWG). All tabs exit on one side, so the exit is single.
-- [x] NTC pocket: a round hole in the holder walls in the gap between three cells (central cell, towards the wire exit side), setting on/off + sensor diameter. On both plates (the floor stays).
+- [x] NTC pocket: a round hole in the holder walls in the gap between three cells (central cell, towards the wire exit side), setting on/off + sensor diameter, plus a 2 mm wire hole through the floor (gaps not covered by busbars preferred). On both plates.
 - [ ] Still open: wire routing along the pack between the two faces, warning when the wall is too thin for the wire, NTC pocket on one plate only.
 - [ ] BMS mounted on the pack (pocket + spacers) or external (wire exit with strain relief).
 

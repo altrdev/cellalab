@@ -154,14 +154,14 @@
           </select>
         </label>
       </div>
-      <label>{t('lam.tabBend')}<UnitInput kind="len" min={0.5} max={20} step={0.5} value={ui.lamella.tabBendMm} onchange={(v) => { if (v !== null) ui.lamella.tabBendMm = v; }} /></label>
+      <label>{t('lam.tabBend')}<UnitInput kind="len" min={0} max={20} step={0.1} value={ui.lamella.tabBendMm} onchange={(v) => { if (v !== null) ui.lamella.tabBendMm = v; }} /></label>
       <Help label={t('lam.what')}>{t('lam.tabsHelp', { min: len(MIN_PRINT_WALL_MM, 1) })}</Help>
     {/if}
     {#if bmsOf(project)?.ntc}
       <label><span><input type="checkbox" bind:checked={ui.lamella.ntc} /> {t('lam.ntc')}</span></label>
       {#if ui.lamella.ntc}
         <label>{t('lam.ntcSize')}<UnitInput kind="len" min={2} max={12} step={0.5} value={ui.lamella.ntcMm} onchange={(v) => { if (v !== null) ui.lamella.ntcMm = v; }} /></label>
-        {#if !ntcSite}<p class="note">{t('lam.ntcNone')}</p>{/if}
+        {#if !ntcSite}<p class="note">{t('lam.ntcNone')}</p>{:else if ntcSite.covered}<p class="note">{t('lam.ntcCovered')}</p>{/if}
         <Help label={t('lam.what')}>{t('lam.ntcHelp')}</Help>
       {/if}
     {/if}

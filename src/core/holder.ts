@@ -198,6 +198,8 @@ export interface BuildOptions {
   notches?: readonly (readonly Pt[])[];
   /** Tasche in più nelle pareti (non nel fondo), per esempio quella dell'NTC: fori tra le tasche delle celle. */
   extraPockets?: readonly (readonly Pt[])[];
+  /** Fori in più che passano anche nel fondo (per esempio il filo dell'NTC). */
+  throughHoles?: readonly (readonly Pt[])[];
 }
 
 /**
@@ -239,9 +241,11 @@ export function buildHolder(
   if (opts.notches && opts.notches.length > 0) outer = differenceRegions(outer, opts.notches);
   const pockets = cells.map(({ c, r, cl }) => circlePolygon(c.x, c.y, r + cl));
   const openings = cells.map(({ c, r }) => circlePolygon(c.x, c.y, Math.max(r - s.ledgeMm, 1)));
-  const wallPockets = [...pockets, ...(opts.extraPockets ?? [])];
+  const through = opts.throughHoles ?? [];
+  const wallPockets = [...pockets, ...(opts.extraPockets ?? []), ...through];
+  const slabOpenings = [...openings, ...through];
   const wall = differenceRegions(outer, wallPockets);
-  const slab = s.lockCells ? differenceRegions(outer, openings) : [];
+  const slab = s.lockCells ? differenceRegions(outer, slabOpenings) : [];
 
   // Smusso a rampa: contorno arretrato e coppie di contorni da raccordare (se la topologia regge).
   let ramp: HolderModel['ramp'] = null;
@@ -285,7 +289,7 @@ export function buildHolder(
     const key = `${inset.toFixed(4)}|${useSlab ? 's' : 'w'}${engraved ? 'e' : ''}`;
     let regions = cache.get(key);
     if (!regions) {
-      regions = differenceRegions(inset > 1e-9 ? offsetRegions(outer, -inset) : outer, useSlab ? openings : wallPockets);
+      regions = differenceRegions(inset > 1e-9 ? offsetRegions(outer, -inset) : outer, useSlab ? slabOpenings : wallPockets);
       if (engraved) regions = differenceRegions(regions, engrave!);
       cache.set(key, regions);
     }
