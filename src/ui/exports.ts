@@ -8,7 +8,8 @@ import { holderOf } from './holder';
 import { zipStore } from '../core/zip';
 import { holderStl, type HolderHalf } from './holderMesh';
 import { buildHarnessCsv, buildHarnessSummary } from '../core/harnessExport';
-import { harnessOf, reportOf, stripsOf } from './lamelle';
+import { clipStl } from './clipMesh';
+import { clipsOf, harnessOf, reportOf, stripsOf } from './lamelle';
 import { ui } from './ui.svelte';
 
 /** Esportazioni dei file (taglio lamelle, stampa 3D): usate dalla scheda «Esporta». */
@@ -74,6 +75,13 @@ export function exportHarness(project: Project) {
   if (!h) return;
   const text = buildHarnessSummary(h, project.name) + '\n' + buildHarnessCsv(h, stripsOf(project, ui.lamella));
   save(text, `${slug(project.name)}-${t('file.harness')}.txt`, 'text/plain');
+}
+
+/** STL del fermacavo (uno solo: se ne stampano tanti quanti indicati nel pannello). */
+export function exportClip(project: Project) {
+  const c = clipsOf(project, ui.lamella)[0];
+  if (!c) return;
+  save(clipStl(c.spec) as BlobPart, `${slug(project.name)}-${t('file.clip')}.stl`, 'model/stl');
 }
 
 export function exportStl(project: Project, half: HolderHalf) {

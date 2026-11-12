@@ -8,7 +8,9 @@ import type { HolderModel } from '../core/holder';
 import { explodeOffsets } from '../core/explode';
 import { intersectRegions, type Region } from '../core/clip';
 import { boundsOfCells } from '../core/geometry';
+import type { CableClip } from '../core/cableClip';
 import type { Harness } from '../core/harness';
+import { clipGeometry } from './clipMesh';
 import { tabsOf, type Strip, type TabSide } from '../core/strips';
 import type { Project } from '../core/types';
 import { groupHue } from './colors';
@@ -43,6 +45,8 @@ export interface SceneOptions {
   holderColor?: string;
   /** BMS e fili da disegnare (null = nascosti). Spariscono nella vista esplosa. */
   harness?: Harness | null;
+  /** Fermacavi a scatto dei cavi di potenza. */
+  clips?: readonly CableClip[];
 }
 
 const RING_COLOR = 0xc9382f; // anello isolante sul lato positivo
@@ -141,6 +145,7 @@ export class PackScene {
   private busRoot = new THREE.Group();
   private harnessRoot = new THREE.Group();
   private harnessShown: Harness | null = null;
+  private clipsShown: readonly CableClip[] | undefined = undefined;
   private harnessMats: THREE.Material[] = [];
   private holderRoot = new THREE.Group();
   private holderShown: HolderModel | null = null;
@@ -509,7 +514,8 @@ export class PackScene {
   private updateHarness(options: SceneOptions) {
     const h = options.harness ?? null;
     this.harnessRoot.visible = !!h && options.explosionMm === 0;
-    if (h === this.harnessShown) return;
+    if (h === this.harnessShown && options.clips === this.clipsShown) return;
+    this.clipsShown = options.clips;
     for (const m of [...this.harnessRoot.children] as THREE.Mesh[]) {
       m.geometry.dispose();
       this.harnessRoot.remove(m);
@@ -552,6 +558,24 @@ export class PackScene {
       for (let i = 0; i + 1 < pts.length; i++) path.add(new THREE.LineCurve3(pts[i]!, pts[i + 1]!));
       const geo = new THREE.TubeGeometry(path, 48, c.odMm / 2, 8, false);
       const mesh = new THREE.Mesh(geo, mat(c.label === 'P+' ? 0xc9382f : 0x222222, 0.5));
+      mesh.castShadow = true;
+      this.harnessRoot.add(mesh);
+    }
+    // Fermacavi: una forma per misura, messa su ogni cella del fianco con la bocca verso l'esterno.
+    const clipGeos = new Map<string, THREE.BufferGeometry>();
+    for (const c of options.clips ?? []) {
+      const key = `${c.spec.cellDiameterMm}|${c.spec.cableOdMm}|${c.spec.thicknessMm}`;
+      let geo = clipGeos.get(key);
+      if (!geo) {
+        geo = clipGeometry(c.spec);
+        clipGeos.set(key, geo);
+      }
+      const mesh = new THREE.Mesh(geo, mat(0x3b82c4, 0.6));
+      const xAxis = new THREE.Vector3(c.along.x, 0, c.along.y);
+      const zAxis = new THREE.Vector3(c.out.x, 0, c.out.y);
+      const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis);
+      mesh.matrixAutoUpdate = false;
+      mesh.matrix.makeBasis(xAxis, yAxis, zAxis).setPosition(c.center.x, c.center.y, c.center.z);
       mesh.castShadow = true;
       this.harnessRoot.add(mesh);
     }

@@ -5,10 +5,10 @@
   import Icon from './Icon.svelte';
   import UnitInput from './UnitInput.svelte';
   import { history } from '../state';
-  import { exportCutList, exportDxf, exportHarness, exportHolderPiece, exportHolderZip, exportStl, exportSvg, exportToleranceTest } from './exports';
+  import { exportClip, exportCutList, exportDxf, exportHarness, exportHolderPiece, exportHolderZip, exportStl, exportSvg, exportToleranceTest } from './exports';
   import { DEFAULT_TEST_CLEARANCES_MM } from '../core/holder';
   import { holderOf } from './holder';
-  import { harnessOf, reportOf, stripsOf } from './lamelle';
+  import { clipsOf, harnessOf, reportOf, stripsOf } from './lamelle';
   import { ui } from './ui.svelte';
 
   let { onSave, onOpen }: { onSave: () => void; onOpen: (e: Event) => void } = $props();
@@ -17,6 +17,7 @@
   const empty = $derived(project.cells.length === 0);
 
   const harness = $derived(harnessOf(project, ui.lamella));
+  const clips = $derived(clipsOf(project, ui.lamella));
   const labelOf = $derived(new Map(stripsOf(project, ui.lamella).map((s) => [s.id, s.label] as const)));
   const stripStatus = $derived(empty ? 'empty' : reportOf(project, ui.lamella).status);
   const holderReport = $derived(holderOf(project, ui.holder).report);
@@ -82,7 +83,10 @@
             {/each}
           </tbody>
         </table>
-        <div class="exp"><button onclick={() => exportHarness(project)}>{t('exp.harnessList')}</button></div>
+        <div class="exp">
+          <button onclick={() => exportHarness(project)}>{t('exp.harnessList')}</button>
+          {#if clips.length > 0}<button onclick={() => exportClip(project)} title={t('exp.clipTitle')}>{t('exp.clipStl', { n: clips.length })}</button>{/if}
+        </div>
         <Help label={t('exp.filesLabel')}>{t('exp.harnessHelp')}</Help>
       {:else}
         <p class="note">{t('exp.harnessEmpty')}</p>

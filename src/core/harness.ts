@@ -80,6 +80,8 @@ export interface Harness {
   side: TabSide;
   /** Punto del connettore (centro delle prese), mm. */
   connector: Pt3;
+  /** Versori nel disegno: uscita (d) e lungo il lato (perp). */
+  axes: { d: Pt; perp: Pt };
   /** La scatola del BMS (solo montato sul pacco e con l'ingombro noto). */
   box: BmsBox | null;
   wires: HarnessWire[];
@@ -91,6 +93,8 @@ export interface Harness {
 
 /** Passo dei contatti del connettore di bilanciamento (JST-XH), mm. */
 export const CONNECTOR_PITCH_MM = 2.5;
+/** Gioco tra il cavo di potenza e il fianco della cella, mm. */
+export const CABLE_GAP_MM = 0.25;
 /** Distanza tra il fianco delle celle e il fascio, mm. */
 const WIRE_CLEARANCE_MM = 1.5;
 
@@ -192,6 +196,9 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   // Cavi di potenza: dalla linguetta larga (lato opposto) giù o su fino a metà altezza, di lato lungo il fianco laterale
   // più vicino, poi sul fianco di uscita fino alle estremità del BMS.
   const odMm = findAwg(awg.powerAwg).outerMm;
+  // Il cavo di potenza corre a filo del fianco, appoggiato alla cella (il fermacavo lo tiene lì).
+  const cableOff = CABLE_GAP_MM + odMm / 2;
+  const aCable = edge + cableOff;
   const sizeLen = box && size ? size.lengthMm : 30;
   const terminals = withTab.filter((s) => s.kind !== 'series' && tabsOf(s).some((x) => x.power));
   const pOf = (s: Strip) => {
@@ -215,13 +222,13 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     const aBend = hx * d.x + hy * d.y;
     // Due cavi: quello con p minore va all'estremità di p minore, passando dal fianco laterale di p minore.
     const low = ordered.length === 1 ? pHole <= pc : i === 0;
-    const pLat = low ? pMin - WIRE_CLEARANCE_MM : pMax + WIRE_CLEARANCE_MM;
+    const pLat = low ? pMin - cableOff : pMax + cableOff;
     const pEnd = pc + (low ? -1 : 1) * (sizeLen / 2);
     const pts: Pt3[] = [
       { x: hx, y: yHole, z: hy },
       { x: hx, y: yMid, z: hy },
       to3(aBend, pLat, yMid),
-      to3(aWire, pLat, yMid),
+      to3(aCable, pLat, yMid),
       to3(aConn, pEnd, yMid),
     ];
     let lengthMm = 0;
@@ -248,5 +255,5 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     const out = to3(aConn + size.thicknessMm / 2, pc, yMid);
     boxOut = { center: out, size: { x: along.x, y: size.widthMm, z: along.z } };
   }
-  return { mount, side, connector, box: boxOut, wires, cables, connectors, totalCutMm: wires.reduce((a, w) => a + w.cutMm, 0) + cables.reduce((a, c) => a + c.cutMm, 0) };
+  return { mount, side, connector, axes: { d, perp }, box: boxOut, wires, cables, connectors, totalCutMm: wires.reduce((a, w) => a + w.cutMm, 0) + cables.reduce((a, c) => a + c.cutMm, 0) };
 }
