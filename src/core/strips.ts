@@ -372,7 +372,8 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
     });
     const reachSpan = 2 * node.reachMm;
     const balHole = o.holeMm;
-    const balW = Math.max(3, balHole + 1.8);
+    // La linguetta di bilanciamento ha la stessa larghezza su tutte le lamelle, terminali compresi.
+    const balW = Math.max(balHole + 1.8, o.widthMm);
     const balSpec: Spec = { lateral: 0, width: Math.min(balW, reachSpan), holeWant: balHole, length: Math.max(o.lengthMm, balHole + 3), power: false, carriesBalance: true };
     let made: Made;
     if (s.kind === 'series') {

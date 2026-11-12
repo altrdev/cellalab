@@ -478,6 +478,10 @@ describe('linguette dei terminali: potenza e bilanciamento separate', () => {
     for (const s of terminals) expect(Math.hypot(s.tab!.anchor.x - s.balanceTab!.anchor.x, s.tab!.anchor.y - s.balanceTab!.anchor.y)).toBeGreaterThan(5);
   });
 
+  it('la linguetta di bilanciamento del terminale ha la stessa larghezza delle altre', () => {
+    for (const s of terminals) expect(s.balanceTab!.widthMm).toBeCloseTo(series[0]!.tab!.widthMm, 6);
+  });
+
   it('nessuna linguetta è intralciata', () => {
     expect(strips.every((s) => tabsOf(s).every((x) => x.blockedBy === null))).toBe(true);
   });
