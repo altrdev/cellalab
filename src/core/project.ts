@@ -1,6 +1,6 @@
 import { findBmsType } from './bms';
 import { findCellType } from './catalog';
-import { DEFAULT_BMS_MOUNT, type BmsType, type CellType, type Chemistry, type PackGenerator, type PlacedCell, type Project } from './types';
+import { DEFAULT_BMS_MOUNT, POWER_CONNECTORS, type BmsType, type CellType, type Chemistry, type PackGenerator, type PlacedCell, type Project } from './types';
 import { t } from '../i18n';
 
 export class ProjectParseError extends Error {
@@ -179,6 +179,7 @@ export function parseProject(json: string): Project {
       along: num(m.along, 0, 1, DEFAULT_BMS_MOUNT.along),
       slackMm: num(m.slackMm, 0, 200, DEFAULT_BMS_MOUNT.slackMm),
       tailMm: num(m.tailMm, 0, 2000, DEFAULT_BMS_MOUNT.tailMm),
+      powerConnector: POWER_CONNECTORS.find((c) => c === m.powerConnector) ?? DEFAULT_BMS_MOUNT.powerConnector,
     };
   }
   // Un BMS scelto che non esiste più (file modificato a mano) si ignora.

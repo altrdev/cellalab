@@ -160,7 +160,7 @@ function optionsOf(project: Project, settings: LamellaSettings): StripOptions {
 export function harnessOf(project: Project, settings: LamellaSettings): Harness | null {
   if (project.bmsId === undefined) return null;
   const report = reportOf(project, settings);
-  return buildHarness(project, stripsOf(project, settings), Math.max(0.3, report.totalThicknessMm ?? report.requiredMm ?? 0.3));
+  return buildHarness(project, stripsOf(project, settings), Math.max(0.3, report.totalThicknessMm ?? report.requiredMm ?? 0.3), settings);
 }
 
 let last: { project: Project; key: string; report: LamellaReport } | null = null;

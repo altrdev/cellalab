@@ -77,6 +77,9 @@
             {#each harness.wires as w (w.node)}
               <tr><td><b>{w.label}</b></td><td>{labelOf.get(w.stripId) ?? ''} · {w.face === 'top' ? t('face.top') : t('face.bottom')}</td><td>{len(w.lengthMm, 0)}</td><td>{len(w.cutMm, 0)}</td></tr>
             {/each}
+            {#each harness.cables as c (c.label)}
+              <tr><td><b>{c.label}</b></td><td>{labelOf.get(c.stripId) ?? ''} · {c.face === 'top' ? t('face.top') : t('face.bottom')}</td><td>{len(c.lengthMm, 0)}</td><td>{len(c.cutMm, 0)}</td></tr>
+            {/each}
           </tbody>
         </table>
         <div class="exp"><button onclick={() => exportHarness(project)}>{t('exp.harnessList')}</button></div>

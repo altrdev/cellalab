@@ -498,3 +498,48 @@ describe('linguette dei terminali: potenza e bilanciamento separate', () => {
     for (const s of terminals) expect(notches.filter((n) => n.stripId === s.id)).toHaveLength(2);
   });
 });
+
+describe('cavi di potenza', () => {
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, powerHoleMm: 2.85 } as const;
+  const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
+  const strips = buildStrips(p, { tabs });
+  const h = buildHarness(p, strips, 0.1)!;
+
+  it('un cavo per terminale, P− e P+, con il diametro dell’AWG scelto', () => {
+    expect(h.cables.map((c) => c.label).sort()).toEqual(['P+', 'P−']);
+    for (const c of h.cables) expect(c.odMm).toBeCloseTo(3.6, 6);
+    expect(buildHarness(p, strips, 0.1, { balanceAwg: 26, powerAwg: 8 })!.cables[0]!.odMm).toBeCloseTo(6, 6);
+  });
+
+  it('i cavi partono dal lato opposto e arrivano al lato di uscita, uno per ciascuna estremità', () => {
+    const [low, high] = [...h.cables].sort((a, b) => a.points[a.points.length - 1]!.x - b.points[b.points.length - 1]!.x);
+    for (const c of h.cables) {
+      const first = c.points[0]!;
+      const end = c.points[c.points.length - 1]!;
+      // il lato di uscita è l'alto del disegno (z minore): il cavo parte in basso (z maggiore) e arriva in alto
+      expect(first.z).toBeGreaterThan(end.z + 40);
+      expect(c.points[1]!.y).toBeCloseTo(35.2, 6);
+    }
+    expect(low!.points[low!.points.length - 1]!.x).toBeLessThan(high!.points[high!.points.length - 1]!.x);
+  });
+
+  it('girano sul fianco laterale e rispettano scorta e arrotondamento', () => {
+    for (const c of h.cables) {
+      const first = c.points[0]!;
+      const end = c.points[c.points.length - 1]!;
+      const direct = Math.hypot(end.x - first.x, end.y - first.y, end.z - first.z);
+      expect(c.lengthMm).toBeGreaterThanOrEqual(direct - 1e-6);
+      expect(c.cutMm).toBeGreaterThanOrEqual(c.lengthMm + h.mount.slackMm - 1e-6);
+      expect(c.cutMm % 5).toBe(0);
+    }
+  });
+
+  it('il connettore sta alla fine del cavo e dipende dalla scelta', () => {
+    expect(h.connectors).toHaveLength(2);
+    expect(h.connectors.every((k) => k.kind === 'xt60')).toBe(true);
+    const none = buildHarness(setBmsMount(p, { powerConnector: 'none' }), strips, 0.1)!;
+    expect(none.connectors).toHaveLength(0);
+    const bullet = buildHarness(setBmsMount(p, { powerConnector: 'bullet' }), strips, 0.1)!;
+    expect(bullet.connectors.every((k) => k.shape === 'cylinder')).toBe(true);
+  });
+});

@@ -545,6 +545,28 @@ export class PackScene {
       mesh.castShadow = true;
       this.harnessRoot.add(mesh);
     }
+    // Cavi di potenza (rosso P+, nero P−) con il loro diametro, e connettori a spina alla fine.
+    for (const c of h.cables) {
+      const path = new THREE.CurvePath<THREE.Vector3>();
+      const pts = c.points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
+      for (let i = 0; i + 1 < pts.length; i++) path.add(new THREE.LineCurve3(pts[i]!, pts[i + 1]!));
+      const geo = new THREE.TubeGeometry(path, 48, c.odMm / 2, 8, false);
+      const mesh = new THREE.Mesh(geo, mat(c.label === 'P+' ? 0xc9382f : 0x222222, 0.5));
+      mesh.castShadow = true;
+      this.harnessRoot.add(mesh);
+    }
+    for (const k of h.connectors) {
+      const color = k.kind === 'bullet' ? 0xd4a73a : 0xe3b504; // ottone / giallo XT
+      const geo = k.shape === 'cylinder' ? new THREE.CylinderGeometry(k.widthMm / 2, k.widthMm / 2, k.lengthMm, 16) : new THREE.BoxGeometry(k.lengthMm, k.heightMm, k.widthMm);
+      const mesh = new THREE.Mesh(geo, mat(color, 0.45));
+      mesh.position.set(k.center.x, k.center.y, k.center.z);
+      // L'asse del connettore segue il lato: i box sono lunghi lungo X, i cilindri lungo Y (si ruotano sull'asse).
+      const axis = new THREE.Vector3(k.axis.x, k.axis.y, k.axis.z).normalize();
+      if (k.shape === 'cylinder') mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+      else mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(Math.abs(axis.x) > 0.5 ? Math.sign(axis.x) || 1 : 0, 0, Math.abs(axis.z) > 0.5 ? Math.sign(axis.z) : 0).normalize());
+      mesh.castShadow = true;
+      this.harnessRoot.add(mesh);
+    }
   }
 
   /** Il sole segue il pacco e la sua ombra copre esattamente l'area utile (più nitida). */

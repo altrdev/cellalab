@@ -87,6 +87,14 @@
       <option value="external">{t('bms.mountExternal')}</option>
     </select>
   </label>
+  <label>{t('bms.connector')}
+    <select value={mount.powerConnector} onchange={(e) => history.commit((p) => setBmsMount(p, { powerConnector: e.currentTarget.value as typeof mount.powerConnector }))}>
+      <option value="none">{t('bms.conn.none')}</option>
+      <option value="bullet">{t('bms.conn.bullet')}</option>
+      <option value="xt60">XT60</option>
+      <option value="xt90">XT90</option>
+    </select>
+  </label>
   <label>
     <span class="top"><span>{t('bms.along')}</span><b>{Math.round(mount.along * 100)}%</b></span>
     <input
