@@ -18,17 +18,15 @@ export interface NtcSite {
   /** Raggio del foro, mm. */
   radiusMm: number;
   polygon: Pt[];
-  /** Foro per il filo del sensore: passa anche nel fondo, così il filo esce sulla faccia esterna. */
+  /** Foro passante nel fondo, largo come la tasca: il sensore si infila da fuori, dopo aver montato il pacco, e il filo esce da lì. */
   wirePolygon: Pt[];
-  /** Il foro del filo cade sotto una lamella: il filo non esce (nessun altro vuoto era libero). */
+  /** Il foro cade sotto una lamella: il sensore non si infila da fuori (nessun altro vuoto era libero). */
   covered: boolean;
   /** Le tre celle che il sensore tocca. */
   cellIds: [string, string, string];
 }
 
 const DIR: Record<NtcSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
-/** Diametro del foro per il filo del sensore (due fili sottili con la guaina), mm. */
-export const NTC_WIRE_HOLE_MM = 2;
 /** Due celle sono vicine se i centri distano al massimo 1,25 volte la distanza minima nel pacco. */
 const NEIGHBOUR_FACTOR = 1.25;
 
@@ -83,13 +81,13 @@ export function ntcSites(project: Project, side: NtcSide, diameterMm: number, cl
         if (seen.has(k)) continue;
         seen.add(k);
         // I vuoti liberi (senza lamelle sopra dove passa il filo) vincono su quelli coperti; poi conta il lato di uscita.
-        const covered = avoid.length > 0 && intersectRegions(avoid, [circlePolygon(p.x, p.y, NTC_WIRE_HOLE_MM / 2)]).some((r) => regionArea(r) > 0.01);
+        const covered = avoid.length > 0 && intersectRegions(avoid, [circlePolygon(p.x, p.y, radiusMm)]).some((r) => regionArea(r) > 0.01);
         mine.push({ p, ids: [c.id, a.id, b.id], score: p.x * d.x + p.y * d.y, covered });
       }
     }
     mine.sort((a, b) => Number(a.covered) - Number(b.covered) || b.score - a.score);
     for (const m of mine) {
-      out.push({ x: m.p.x, y: m.p.y, radiusMm, polygon: circlePolygon(m.p.x, m.p.y, radiusMm), wirePolygon: circlePolygon(m.p.x, m.p.y, NTC_WIRE_HOLE_MM / 2), covered: m.covered, cellIds: m.ids });
+      out.push({ x: m.p.x, y: m.p.y, radiusMm, polygon: circlePolygon(m.p.x, m.p.y, radiusMm), wirePolygon: circlePolygon(m.p.x, m.p.y, radiusMm), covered: m.covered, cellIds: m.ids });
     }
   }
   return out;

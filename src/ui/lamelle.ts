@@ -73,7 +73,7 @@ export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: H
     for (const face of ['top', 'bottom'] as const) {
       const avoid = regionsOf(face);
       for (const cand of ntcSites(project, side, holder.ntcMm, holder.clearanceMm, avoid).filter((c) => !c.covered).slice(0, 16)) {
-        const r = ntcRoute(plain.slab, avoid, { x: cand.x, y: cand.y }, side);
+        const r = ntcRoute(plain.slab, avoid, { x: cand.x, y: cand.y }, side, undefined, cand.radiusMm + 0.4);
         if (!r.found) continue;
         if (!best || r.lengthMm < best.route!.lengthMm) best = { site: cand, route: r, face };
         break;
@@ -86,7 +86,7 @@ export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: H
     // nessuna strada libera: il vuoto migliore, senza solco
     const sites = ntcSites(project, side, holder.ntcMm, holder.clearanceMm, all);
     const site = sites.find((c) => !c.covered) ?? sites[0] ?? null;
-    plan = { site, route: site && plain ? ntcRoute(plain.slab, all, { x: site.x, y: site.y }, side) : null, face: null };
+    plan = { site, route: site && plain ? ntcRoute(plain.slab, all, { x: site.x, y: site.y }, side, undefined, site.radiusMm + 0.4) : null, face: null };
   }
   ntcCache.set(project, { key, plan });
   return plan;

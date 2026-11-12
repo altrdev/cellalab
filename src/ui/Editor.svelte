@@ -9,7 +9,6 @@
   import { drc, history } from '../state';
   import { groupColor } from './colors';
   import { holderOf, packExtent, regionsPath, seamsPath } from './holder';
-  import { NTC_WIRE_HOLE_MM } from '../core/ntc';
   import { ntcPlanOf, pathOf, reportOf, spotMarks, stripsOf } from './lamelle';
   import { ui } from './ui.svelte';
 
@@ -350,8 +349,7 @@
     {#if ntcGroove?.route}
       <path class="ntc-groove" d={regionsPath(ntcGroove.route.polygons.map((outline) => ({ outline, holes: [] })))} pointer-events="none" />
       {#if ntcGroove.site}
-        <circle class="ntc-pocket" cx={ntcGroove.site.x} cy={ntcGroove.site.y} r={ntcGroove.site.radiusMm} pointer-events="none" />
-        <circle class="ntc-wire" cx={ntcGroove.site.x} cy={ntcGroove.site.y} r={NTC_WIRE_HOLE_MM / 2} pointer-events="none" />
+        <circle class="ntc-wire" cx={ntcGroove.site.x} cy={ntcGroove.site.y} r={ntcGroove.site.radiusMm} pointer-events="none" />
       {/if}
     {/if}
     {#if holderSplit}
@@ -584,13 +582,6 @@
     fill: color-mix(in srgb, var(--warn) 55%, transparent);
     stroke: var(--warn);
     stroke-width: 1px;
-    vector-effect: non-scaling-stroke;
-  }
-  .ntc-pocket {
-    fill: none;
-    stroke: var(--warn);
-    stroke-width: 1px;
-    stroke-dasharray: 3 2;
     vector-effect: non-scaling-stroke;
   }
   .ntc-wire {

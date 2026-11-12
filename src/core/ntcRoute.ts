@@ -68,7 +68,7 @@ interface Area {
 const areaOf = (r: Region): Area => ({ outline: ringOf(r.outline), holes: r.holes.map(ringOf) });
 const inArea = (p: Pt, a: Area) => inRing(p, a.outline) && !a.holes.some((h) => inRing(p, h));
 
-export function ntcRoute(slab: readonly Region[], avoid: readonly Region[], start: Pt, side: NtcSide, grooveMm = NTC_GROOVE_MM): NtcRoute {
+export function ntcRoute(slab: readonly Region[], avoid: readonly Region[], start: Pt, side: NtcSide, grooveMm = NTC_GROOVE_MM, startFreeMm = START_FREE_MM): NtcRoute {
   const none: NtcRoute = { found: false, path: [], lengthMm: 0, polygons: [] };
   const half = grooveMm / 2;
   const walk = offsetRegions(slab, -(half + FLOOR_MARGIN_MM)).map(areaOf);
@@ -78,7 +78,7 @@ export function ntcRoute(slab: readonly Region[], avoid: readonly Region[], star
   const d = DIR[side];
 
   // Vicino al foro di partenza il margine dalle lamelle non conta (il foro è già scelto fuori dalle lamelle).
-  const near = (p: Pt) => Math.hypot(p.x - start.x, p.y - start.y) <= START_FREE_MM;
+  const near = (p: Pt) => Math.hypot(p.x - start.x, p.y - start.y) <= startFreeMm;
   const free = (p: Pt) => walk.some((a) => inArea(p, a)) && (near(p) || !block.some((a) => inArea(p, a)));
   if (!free(start)) return none;
 
