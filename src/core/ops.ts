@@ -224,7 +224,7 @@ export function setBmsMount(project: Project, mount: Partial<BmsMount>): Project
   const clamp = (v: number, lo: number, hi: number) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo);
   return {
     ...project,
-    bmsMount: { mode: cur.mode, along: clamp(cur.along, 0, 1), connector: cur.connector === 'end' ? 'end' : 'top', connectorEnd: cur.connectorEnd === 'end' ? 'end' : 'start', slackMm: clamp(cur.slackMm, 0, 200), tailMm: clamp(cur.tailMm, 0, 2000) },
+    bmsMount: { mode: cur.mode, place: cur.place === 'head' ? 'head' : 'flank', along: clamp(cur.along, 0, 1), connector: cur.connector === 'end' ? 'end' : 'top', connectorEnd: cur.connectorEnd === 'end' ? 'end' : 'start', slackMm: clamp(cur.slackMm, 0, 200), tailMm: clamp(cur.tailMm, 0, 2000) },
   };
 }
 

@@ -424,6 +424,64 @@ describe('cablaggio del BMS', () => {
     }
   });
 
+  it('in testa la scatola sta oltre un’estremità del fianco e i fili arrivano lungo il fianco senza toccarsi', () => {
+    const perp = { x: 1, z: 0 }; // lato 'top': il fianco corre lungo X
+    const cells = p.cells;
+    const xs = cells.map((c) => c.x);
+    const pMin = Math.min(...xs) - 10.7;
+    const pMax = Math.max(...xs) + 10.7;
+    for (const end of ['start', 'end'] as const) {
+      const e = buildHarness(setBmsMount(p, { place: 'head', connectorEnd: end }), strips, 0.1)!;
+      const box = e.box!;
+      const half = box.size.x / 2;
+      if (end === 'end') expect(box.center.x - half).toBeGreaterThan(pMax - 1e-6);
+      else expect(box.center.x + half).toBeLessThan(pMin + 1e-6);
+      expect(perp.x).toBe(1);
+      // i pad stanno sulla faccia esterna e sulla parte della scatola verso il pacco
+      for (const w of e.wires) {
+        const pin = w.points[w.points.length - 1]!;
+        expect(Math.abs(pin.x - box.center.x)).toBeLessThan(half);
+        expect(end === 'end' ? pin.x < box.center.x : pin.x > box.center.x).toBe(true);
+      }
+      // nessun filo dentro la scatola e nessuno a meno di un diametro da un altro
+      const sample = (pts: { x: number; y: number; z: number }[]) => {
+        const out: { x: number; y: number; z: number }[] = [];
+        for (let k = 0; k + 1 < pts.length; k++) {
+          const a = pts[k]!;
+          const b = pts[k + 1]!;
+          const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 0.1));
+          for (let t = 0; t <= steps; t++) out.push({ x: a.x + ((b.x - a.x) * t) / steps, y: a.y + ((b.y - a.y) * t) / steps, z: a.z + ((b.z - a.z) * t) / steps });
+        }
+        return out;
+      };
+      const paths = e.wires.map((w) => sample(w.points));
+      let closest = Infinity;
+      for (let i = 0; i < paths.length; i++) for (let j = i + 1; j < paths.length; j++) for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
+      expect(closest).toBeGreaterThanOrEqual(0.9 - 1e-6);
+      for (const path of paths) for (const q of path) {
+        const inside = Math.abs(q.x - box.center.x) < half - 1e-6 && Math.abs(q.y - box.center.y) < box.size.y / 2 - 1e-6 && Math.abs(q.z - box.center.z) < box.size.z / 2 - 1e-6;
+        expect(inside).toBe(false);
+      }
+    }
+  });
+
+  it('le corsie sono ordinate per distanza dal BMS: nessuna discesa dalla linguetta incrocia la corsia di un altro', () => {
+    for (const end of ['start', 'end'] as const) {
+      const e = buildHarness(setBmsMount(p, { place: 'head', connectorEnd: end }), strips, 0.1)!;
+      for (const a of e.wires) {
+        for (const b of e.wires) {
+          if (a === b || a.face !== b.face) continue;
+          // discesa di a: x fisso (foro), y da p0 a piede; corsia di b: y fisso, x da foro di b al pad di b
+          const drop = { x: a.points[0]!.x, y0: a.points[0]!.y, y1: a.points[1]!.y };
+          const lane = { y: b.points[1]!.y, x0: b.points[0]!.x, x1: b.points[3]!.x };
+          const crossesX = drop.x > Math.min(lane.x0, lane.x1) + 1e-6 && drop.x < Math.max(lane.x0, lane.x1) - 1e-6;
+          const crossesY = lane.y > Math.min(drop.y0, drop.y1) + 1e-6 && lane.y < Math.max(drop.y0, drop.y1) - 1e-6;
+          expect(crossesX && crossesY).toBe(false);
+        }
+      }
+    }
+  });
+
   it('nessun filo entra nel volume della scatola', () => {
     const box = h.box!;
     const inside = (q: { x: number; y: number; z: number }) =>

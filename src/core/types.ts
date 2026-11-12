@@ -36,13 +36,17 @@ export interface BmsSize {
 /** Dove sta il BMS rispetto al pacco: sul fianco dal lato delle linguette (a metà altezza) o fuori, solo come punto di uscita dei fili. */
 export type BmsConnectorPlace = 'top' | 'end';
 
+export type BmsPlace = 'flank' | 'head';
+
 export interface BmsMount {
   mode: 'pack' | 'external';
+  /** Sul pacco: sul fianco dal lato delle linguette (a metà altezza) o in testa, oltre un'estremità del fianco, con i fili che arrivano lungo il fianco. */
+  place: BmsPlace;
   /** Posizione lungo il lato di uscita: 0 = un'estremità, 1 = l'altra. */
   along: number;
   /** Dove arrivano i fili sul BMS: sulla faccia superiore (pad o connettore: i fili girano attorno a una testata) o su un connettore oltre la testata. Solo con il BMS sul pacco e l'ingombro noto. */
   connector: BmsConnectorPlace;
-  /** Da quale testata arrivano i fili: 'start' = inizio del lato (`along` 0), 'end' = fine. */
+  /** Da quale testata arrivano i fili: 'start' = inizio del lato (`along` 0), 'end' = fine. In testa: l'estremità del pacco dove sta il BMS. */
   connectorEnd: 'start' | 'end';
   /** Scorta su ogni filo (saldatura e crimpatura del connettore), mm. */
   slackMm: number;
@@ -50,7 +54,7 @@ export interface BmsMount {
   tailMm: number;
 }
 
-export const DEFAULT_BMS_MOUNT: BmsMount = { mode: 'pack', along: 0.5, connector: 'top', connectorEnd: 'start', slackMm: 20, tailMm: 100 };
+export const DEFAULT_BMS_MOUNT: BmsMount = { mode: 'pack', place: 'flank', along: 0.5, connector: 'top', connectorEnd: 'start', slackMm: 20, tailMm: 100 };
 
 /** BMS: quante celle in serie regge, quanta corrente continua e con quale chimica. */
 export interface BmsType {

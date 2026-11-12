@@ -118,15 +118,18 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const size: BmsSize | undefined = bms.sizeMm;
   const box = mount.mode === 'pack' && size !== undefined;
   const aConn = aWire; // il connettore sta sulla faccia del BMS verso il pacco
-  const pc = pMin + mount.along * (pMax - pMin);
+  const boxSize = box ? size : undefined;
+  // In testa la scatola sta oltre un'estremità del fianco (sulla stessa fila), e i fili arrivano lungo il fianco.
+  const head = !!boxSize && mount.place === 'head';
+  const headSgn = mount.connectorEnd === 'end' ? 1 : -1;
+  const pc = head ? (headSgn > 0 ? pMax + WIRE_CLEARANCE_MM + boxSize!.lengthMm / 2 : pMin - WIRE_CLEARANCE_MM - boxSize!.lengthMm / 2) : pMin + mount.along * (pMax - pMin);
   // Con la scatola nota i fili arrivano o sulla faccia superiore (pad o connettore: scavalcano il bordo sopra o sotto la
   // scatola) o a un connettore oltre una testata. Mai dietro: lì c'è la scheda.
   const pins = withTab.length * CONNECTOR_PITCH_MM;
-  const sgn = mount.connectorEnd === 'end' ? 1 : -1;
-  const boxSize = box ? size : undefined;
+  const sgn = head ? -headSgn : mount.connectorEnd === 'end' ? 1 : -1; // in testa i pad stanno sulla parte della scatola verso il pacco
   const pEnd = boxSize ? pc + sgn * (boxSize.lengthMm / 2) : pc; // testata scelta, lungo il lato
-  const onEnd = !!boxSize && mount.connector === 'end';
-  const onTop = !!boxSize && mount.connector === 'top';
+  const onEnd = !!boxSize && !head && mount.connector === 'end';
+  const onTop = !!boxSize && !onEnd;
   const pConn = onEnd ? pEnd + sgn * (pins / 2 + CONNECTOR_END_GAP_MM) : onTop ? pEnd - sgn * Math.min(boxSize!.lengthMm / 2, pins / 2 + TOP_MARGIN_MM) : pc;
   const aTop = aConn + (boxSize?.thicknessMm ?? 0); // faccia superiore della scheda
   const to3 = (a: number, p: number, y: number): Pt3 => ({ x: d.x * a + perp.x * p, y, z: d.y * a + perp.y * p });
@@ -135,10 +138,16 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const joints = withTab.map((s) => s.joint);
   const last = Math.max(...joints);
   const n = last + 1;
-  // Posto del filo tra quelli della stessa faccia, dal nodo più basso: serve a dare una corsia a ciascuno.
+  // Corsia di ogni filo tra quelli della stessa faccia: il più lontano dal BMS sta sulla corsia più vicina alla scatola
+  // (la più bassa per la faccia sopra), quello della linguetta più vicina sulla più alta. Così le discese dalle linguette
+  // non incrociano le corsie degli altri e il nastro si apre come nelle foto dei pacchi veri.
+  const holeP = (x: Strip) => x.tab!.holeX * perp.x + x.tab!.holeY * perp.y;
   const faceRank = new Map<string, number>();
   for (const face of ['top', 'bottom'] as const) {
-    withTab.filter((x) => x.face === face).sort((x, y) => y.joint - x.joint).forEach((x, i) => faceRank.set(x.id, i));
+    withTab
+      .filter((x) => x.face === face)
+      .sort((x, y) => Math.abs(holeP(y) - pConn) - Math.abs(holeP(x) - pConn) || y.joint - x.joint)
+      .forEach((x, i) => faceRank.set(x.id, i));
   }
   // Profondità: corsie vicino alle celle, discese dalle linguette più in fuori, salita al connettore ancora più fuori.
   const bendAt = (s: Strip) => ((s.tab!.bend[0].x + s.tab!.bend[1].x) / 2) * d.x + ((s.tab!.bend[0].y + s.tab!.bend[1].y) / 2) * d.y;

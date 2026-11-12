@@ -176,6 +176,7 @@ export function parseProject(json: string): Project {
     const num = (v: unknown, lo: number, hi: number, def: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def);
     project.bmsMount = {
       mode: m.mode === 'external' ? 'external' : 'pack',
+      place: m.place === 'head' ? 'head' : 'flank',
       along: num(m.along, 0, 1, DEFAULT_BMS_MOUNT.along),
       // vecchi file: 'back' (dietro) non esiste più, 'start'/'end' erano le testate
       connector: m.connector === 'end' || m.connector === 'start' ? 'end' : 'top',

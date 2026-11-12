@@ -88,14 +88,22 @@
     </select>
   </label>
   {#if mount.mode === 'pack' && bms.sizeMm}
+    <label>{t('bms.place')}
+      <select value={mount.place} onchange={(e) => history.commit((p) => setBmsMount(p, { place: e.currentTarget.value === 'head' ? 'head' : 'flank' }))}>
+        <option value="flank">{t('bms.placeFlank')}</option>
+        <option value="head">{t('bms.placeHead')}</option>
+      </select>
+    </label>
     <div class="row">
-      <label>{t('bms.connector')}
-        <select value={mount.connector} onchange={(e) => history.commit((p) => setBmsMount(p, { connector: e.currentTarget.value === 'end' ? 'end' : 'top' }))}>
-          <option value="top">{t('bms.connTop')}</option>
-          <option value="end">{t('bms.connEnd')}</option>
-        </select>
-      </label>
-      <label>{t('bms.connectorEnd')}
+      {#if mount.place === 'flank'}
+        <label>{t('bms.connector')}
+          <select value={mount.connector} onchange={(e) => history.commit((p) => setBmsMount(p, { connector: e.currentTarget.value === 'end' ? 'end' : 'top' }))}>
+            <option value="top">{t('bms.connTop')}</option>
+            <option value="end">{t('bms.connEnd')}</option>
+          </select>
+        </label>
+      {/if}
+      <label>{mount.place === 'head' ? t('bms.headEnd') : t('bms.connectorEnd')}
         <select value={mount.connectorEnd} onchange={(e) => history.commit((p) => setBmsMount(p, { connectorEnd: e.currentTarget.value === 'end' ? 'end' : 'start' }))}>
           <option value="start">{t('bms.endStart')}</option>
           <option value="end">{t('bms.endEnd')}</option>
@@ -103,6 +111,7 @@
       </label>
     </div>
   {/if}
+  {#if mount.place === 'flank' || mount.mode === 'external'}
   <label>
     <span class="top"><span>{t('bms.along')}</span><b>{Math.round(mount.along * 100)}%</b></span>
     <input
@@ -115,6 +124,7 @@
       oninput={(e) => history.commit((p) => setBmsMount(p, { along: e.currentTarget.valueAsNumber / 100 }))}
     />
   </label>
+  {/if}
   <div class="row">
     <label>{t('bms.slack')}<UnitInput kind="len" min={0} max={200} step={5} value={mount.slackMm} onchange={(v) => { if (v !== null) history.commit((p) => setBmsMount(p, { slackMm: v })); }} /></label>
     {#if mount.mode === 'external'}
