@@ -296,6 +296,25 @@ describe('posto dell’NTC', () => {
   });
 });
 
+describe('NTC in una griglia quadrata', () => {
+  const sq = (s: number, pp: number) =>
+    setBms(replaceCells(createProject(), generateGrid({ typeId: T, diameterMm: 21.4, series: s, parallel: pp, kind: 'square', gapMm: 1.5 })), 'bms-4s-30a-li-ion');
+
+  it('usa il vuoto tra quattro celle, già aperto, e non scava nulla', () => {
+    const p = sq(4, 3);
+    const site = ntcSite(p, 'top', 5, 0.15)!;
+    expect(site).not.toBeNull();
+    expect(site.open).toBe(true);
+    // il centro è equidistante da quattro celle
+    const ds = p.cells.map((c) => Math.hypot(c.x - site.x, c.y - site.y)).sort((a, b) => a - b);
+    expect(ds[3]! - ds[0]!).toBeLessThan(1e-6);
+  });
+
+  it('con celle esagonali resta il vuoto tra tre celle', () => {
+    expect(ntcSite(pack(4, 3), 'top', 5, 0.15)!.open).toBe(false);
+  });
+});
+
 describe('filo dell’NTC', () => {
   const p = pack(4, 3);
 

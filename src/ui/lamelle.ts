@@ -77,7 +77,7 @@ export function holderCutsOf(project: Project, settings: LamellaSettings, holder
   if (hit && hit.key === key) return hit.cuts;
   const notches = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon) : [];
   const { site } = ntcPlanOf(project, settings, holder);
-  const cuts = { notches, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
+  const cuts = { notches, pockets: site && !site.open ? [site.polygon] : [], through: site && !site.open ? [site.wirePolygon] : [] };
   cutsCache.set(project, { key, cuts });
   return cuts;
 }

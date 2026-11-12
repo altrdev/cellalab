@@ -24,11 +24,15 @@ export interface NtcSite {
   covered: boolean;
   /** Le tre celle che il sensore tocca. */
   cellIds: [string, string, string];
+  /** Vuoto tra quattro celle (griglia quadrata): è già aperto nel portacelle, la tasca non scava niente. */
+  open: boolean;
 }
 
 const DIR: Record<NtcSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 /** Due celle sono vicine se i centri distano al massimo 1,25 volte la distanza minima nel pacco. */
 const NEIGHBOUR_FACTOR = 1.25;
+/** Nella griglia quadrata le due celle accanto a una terza stanno in diagonale: fino a 1,5 volte il passo. */
+const DIAGONAL_FACTOR = 1.5;
 
 function circumcenter(a: Pt, b: Pt, c: Pt): Pt | null {
   const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
@@ -63,34 +67,39 @@ export function ntcSites(project: Project, side: NtcSide, diameterMm: number, cl
   const d = DIR[side];
   const radiusMm = diameterMm / 2;
   const central = [...cells].sort((a, b) => dist(a, { x: cx, y: cy }) - dist(b, { x: cx, y: cy }));
-  const out: NtcSite[] = [];
-  const seen = new Set<string>();
-  for (const c of central) {
-    const around = cells.filter((o) => o !== c && dist(o, c) <= near);
-    const mine: { p: Pt; ids: [string, string, string]; score: number; covered: boolean }[] = [];
-    for (let i = 0; i < around.length; i++) {
-      for (let j = i + 1; j < around.length; j++) {
-        const a = around[i]!;
-        const b = around[j]!;
-        if (dist(a, b) > near) continue;
-        const p = circumcenter(c, a, b);
-        if (!p) continue;
-        // deve essere un vuoto vero: fuori dalle tasche di tutte le celle
-        if (cells.some((o) => dist(o, p) < o.pocket - 1e-6)) continue;
-        const k = `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
-        if (seen.has(k)) continue;
-        seen.add(k);
-        // I vuoti liberi (senza lamelle sopra dove passa il filo) vincono su quelli coperti; poi conta il lato di uscita.
-        const covered = avoid.length > 0 && intersectRegions(avoid, [circlePolygon(p.x, p.y, radiusMm)]).some((r) => regionArea(r) > 0.01);
-        mine.push({ p, ids: [c.id, a.id, b.id], score: p.x * d.x + p.y * d.y, covered });
+  const collect = (pairNear: number, open: boolean): NtcSite[] => {
+    const out: NtcSite[] = [];
+    const seen = new Set<string>();
+    for (const c of central) {
+      const around = cells.filter((o) => o !== c && dist(o, c) <= near);
+      const mine: { p: Pt; ids: [string, string, string]; score: number; covered: boolean }[] = [];
+      for (let i = 0; i < around.length; i++) {
+        for (let j = i + 1; j < around.length; j++) {
+          const a = around[i]!;
+          const b = around[j]!;
+          if (dist(a, b) > pairNear) continue;
+          const p = circumcenter(c, a, b);
+          if (!p) continue;
+          // deve essere un vuoto vero: fuori dalle tasche di tutte le celle
+          if (cells.some((o) => dist(o, p) < o.pocket - 1e-6)) continue;
+          const k = `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          // I vuoti liberi (senza lamelle sopra dove passa il filo) vincono su quelli coperti; poi conta il lato di uscita.
+          const covered = avoid.length > 0 && intersectRegions(avoid, [circlePolygon(p.x, p.y, radiusMm)]).some((r) => regionArea(r) > 0.01);
+          mine.push({ p, ids: [c.id, a.id, b.id], score: p.x * d.x + p.y * d.y, covered });
+        }
+      }
+      mine.sort((a, b) => Number(a.covered) - Number(b.covered) || b.score - a.score);
+      for (const m of mine) {
+        out.push({ x: m.p.x, y: m.p.y, radiusMm, polygon: circlePolygon(m.p.x, m.p.y, radiusMm), wirePolygon: circlePolygon(m.p.x, m.p.y, radiusMm), covered: m.covered, cellIds: m.ids, open });
       }
     }
-    mine.sort((a, b) => Number(a.covered) - Number(b.covered) || b.score - a.score);
-    for (const m of mine) {
-      out.push({ x: m.p.x, y: m.p.y, radiusMm, polygon: circlePolygon(m.p.x, m.p.y, radiusMm), wirePolygon: circlePolygon(m.p.x, m.p.y, radiusMm), covered: m.covered, cellIds: m.ids });
-    }
-  }
-  return out;
+    return out;
+  };
+  const triples = collect(near, false);
+  // Griglia quadrata: nessun vuoto tra tre celle, ma quello tra quattro (già aperto) va bene.
+  return triples.length > 0 ? triples : collect(pitch * DIAGONAL_FACTOR + 1e-6, true);
 }
 
 /** Il vuoto più adatto per l'NTC, o null se non c'è. */
