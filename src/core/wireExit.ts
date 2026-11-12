@@ -78,7 +78,6 @@ export function findWireExits(
   allowBoss = false,
 ): WireExit[] {
   void project;
-  void findCellType;
   const d = SIDE[side];
   const out: WireExit[] = [];
   const holeR = holeMm / 2;

@@ -5,7 +5,6 @@ import {
   minRadiusForSpots,
   minThicknessConductionMm,
   minThicknessThermalMm,
-  minWidthThermalMm,
   spotCapacity,
   spotPositions,
   spotsNeeded,
@@ -40,11 +39,6 @@ describe('criterio termico', () => {
 
   it('un raffreddamento migliore riduce lo spessore', () => {
     expect(minThicknessThermalMm(10, { ...ni, hWm2K: 25 })).toBeLessThan(minThicknessThermalMm(10, ni));
-  });
-
-  it('larghezza minima e spessore minimo sono coerenti (inversi)', () => {
-    const t = minThicknessThermalMm(12, ni);
-    expect(minWidthThermalMm(t, ni)).toBeCloseTo(12, 6);
   });
 
   it('il ΔT a regime con lo spessore minimo vale il ΔT ammesso', () => {

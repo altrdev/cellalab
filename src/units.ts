@@ -24,12 +24,6 @@ export const lenDigits = (dMm: number): number => (getPrefs().length === 'in' ? 
 export const lenNum = (mm: number, d = 1): string => fmtNum(toLen(mm), lenDigits(d));
 /** «12,3 mm» o «0,484 in». */
 export const len = (mm: number, d = 1): string => `${lenNum(mm, d)} ${lenLabel()}`;
-/** Passo e limiti dei campi numerici: stessa grandezza fisica, nell'unità scelta. */
-export const lenStep = (stepMm: number): number => {
-  const v = toLen(stepMm);
-  return getPrefs().length === 'in' ? Math.round(v * 1000) / 1000 : v;
-};
-
 /** Area: cm² → in². */
 export const areaLabel = (): string => (getPrefs().length === 'in' ? 'in²' : 'cm²');
 export const area = (cm2: number, d = 1): string => `${fmtNum(getPrefs().length === 'in' ? cm2 / CM2_PER_IN2 : cm2, d)} ${areaLabel()}`;
@@ -49,7 +43,6 @@ export const tempDelta = (k: number, d = 0): string => `${fmtNum(toTempDelta(k),
 
 // ---- Peso
 
-export const weightSmallLabel = (): string => (getPrefs().weight === 'imperial' ? 'oz' : 'g');
 /** Peso piccolo (plastica, lamelle): g oppure oz. */
 export const massSmall = (g: number, d = 0): string =>
   getPrefs().weight === 'imperial' ? `${fmtNum(g / G_PER_OZ, Math.max(d, 1))} oz` : `${fmtNum(g, d)} g`;
@@ -62,7 +55,6 @@ export const mass = (g: number, d = 2): string =>
 
 // ---- Valuta (i prezzi del catalogo sono in euro)
 
-export const currencySymbol = (): string => CURRENCIES[getPrefs().currency].symbol;
 export const toMoney = (eur: number): number => eur * getPrefs().rate;
 export const fromMoney = (v: number): number => v / getPrefs().rate;
 /** «12,34 €» (euro, in italiano) oppure «$12.34». */

@@ -110,15 +110,6 @@ export function minThicknessConductionMm(widthMm: number, i: ConductionInput): n
   return MAX_SEARCH_MM;
 }
 
-/** Larghezza minima (mm) per uno spessore dato, con lo stesso criterio. */
-export function minWidthThermalMm(thicknessMm: number, i: ThermalInput): number {
-  if (!(thicknessMm > 0) || !(i.currentA > 0)) return 0;
-  const t = thicknessMm * MM;
-  const k = (i.currentA * i.currentA * i.resistivityOhmM) / (2 * i.hWm2K * i.deltaTK);
-  // t·w² + t²·w − k = 0
-  return ((-t * t + Math.sqrt(t ** 4 + 4 * t * k)) / (2 * t)) / MM;
-}
-
 /** Aumento di temperatura a regime (K) di una lamella larga `widthMm` e spessa `thicknessMm`. */
 export function steadyDeltaTK(
   widthMm: number,
