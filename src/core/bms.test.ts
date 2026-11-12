@@ -338,9 +338,9 @@ describe('cablaggio del BMS', () => {
 
   it('nessun filo attraversa da una piastra all’altra: ogni filo arriva a metà altezza', () => {
     for (const w of h.wires) {
-      expect(w.points[1].y).toBeCloseTo(35.2, 6); // metà dell'altezza delle celle (70,4)
-      expect(w.points[2].y).toBeCloseTo(w.points[1].y, 6);
-      const above = w.points[0].y > w.points[1].y;
+      expect(w.points[1]!.y).toBeCloseTo(35.2, 6); // metà dell'altezza delle celle (70,4)
+      expect(w.points[w.points.length - 1]!.y).toBeCloseTo(w.points[1]!.y, 6);
+      const above = w.points[0]!.y > w.points[1]!.y;
       expect(above).toBe(w.face === 'top');
     }
   });
@@ -356,30 +356,42 @@ describe('cablaggio del BMS', () => {
   });
 
   it('i contatti del connettore sono ordinati e a passo fisso', () => {
-    const xs = h.wires.map((w) => w.points[2].x);
+    const xs = h.wires.map((w) => w.points[w.points.length - 1]!.x);
     for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeCloseTo(2.5, 6);
   });
 
-  it('il connettore su una testata sta oltre la scatola e i fili non la attraversano', () => {
+  it('di default i fili girano attorno alla testata e arrivano sulla faccia superiore della scatola', () => {
     const box = h.box!;
-    const alongX = box.size.x > box.size.z; // il lato di uscita è orizzontale (top/bottom)
+    const alongX = box.size.x > box.size.z;
+    const c = (v: { x: number; z: number }) => (alongX ? v.x : v.z);
+    const o = (v: { x: number; z: number }) => (alongX ? v.z : v.x);
+    const outerFace = o(box.center) + (alongX ? box.size.z : box.size.x) / 2 * Math.sign(o(box.center) - o(h.wires[0]!.points[0]!));
+    for (const w of h.wires) {
+      expect(w.points.length).toBe(5);
+      const pin = w.points[4]!;
+      expect(Math.abs(c(pin) - c(box.center))).toBeLessThan((alongX ? box.size.x : box.size.z) / 2); // sopra la scheda
+      expect(o(pin)).toBeCloseTo(outerFace, 6);
+      const around = w.points[2]!;
+      expect(Math.abs(c(around) - c(box.center))).toBeGreaterThan((alongX ? box.size.x : box.size.z) / 2); // oltre la testata
+    }
+  });
+
+  it('il connettore su una testata sta oltre la scatola, dal lato scelto, e i fili non la attraversano', () => {
+    const box = h.box!;
+    const alongX = box.size.x > box.size.z;
     const half = (alongX ? box.size.x : box.size.z) / 2;
     const c = (v: { x: number; z: number }) => (alongX ? v.x : v.z);
-    for (const place of ['start', 'end'] as const) {
-      const e = buildHarness(setBmsMount(p, { connector: place }), strips, 0.1)!;
-      const off = Math.abs(c(e.connector) - c(box.center));
-      expect(off).toBeGreaterThan(half);
-      expect(Math.sign(c(e.connector) - c(box.center))).not.toBe(0);
+    const o = (v: { x: number; z: number }) => (alongX ? v.z : v.x);
+    for (const end of ['start', 'end'] as const) {
+      const e = buildHarness(setBmsMount(p, { connector: 'end', connectorEnd: end }), strips, 0.1)!;
+      const off = c(e.connector) - c(box.center);
+      expect(Math.abs(off)).toBeGreaterThan(half);
+      expect(off < 0).toBe(end === 'start');
       for (const w of e.wires) {
-        const a = alongX ? w.points[2].z : w.points[2].x;
-        const faceA = alongX ? h.connector.z : h.connector.x;
-        expect(a).toBeCloseTo(faceA, 6); // stessa quota del retro della scatola
+        expect(w.points.length).toBe(3);
+        expect(o(w.points[2]!)).toBeCloseTo(o(e.connector), 6); // stessa quota del retro della scatola
       }
     }
-    const s = buildHarness(setBmsMount(p, { connector: 'start' }), strips, 0.1)!;
-    const e2 = buildHarness(setBmsMount(p, { connector: 'end' }), strips, 0.1)!;
-    expect(c(s.connector)).toBeLessThan(c(box.center));
-    expect(c(e2.connector)).toBeGreaterThan(c(box.center));
   });
 
   it('la posizione lungo il lato sposta il connettore; esterno aggiunge la coda e toglie la scatola', () => {
@@ -389,7 +401,7 @@ describe('cablaggio del BMS', () => {
     expect(h.box).not.toBeNull();
     const ext = buildHarness(setBmsMount(p, { mode: 'external', tailMm: 100 }), strips, 0.1)!;
     expect(ext.box).toBeNull();
-    expect(ext.wires[0]!.cutMm).toBeGreaterThan(h.wires[0]!.cutMm + 90);
+    expect(ext.wires[0]!.cutMm).toBeGreaterThanOrEqual(ext.wires[0]!.lengthMm + ext.mount.slackMm + 100 - 1e-6); // la coda esterna
   });
 
   it('senza BMS o senza linguette non c’è cablaggio', () => {
@@ -448,7 +460,7 @@ describe('fori sulle linguette dei terminali', () => {
       const uPow = midY - s.tab!.holeY;
       expect(uPow).toBeGreaterThan(uBal);
       const expected = w.face === 'top' ? 70.4 + 1.1 + 0.1 - uBal : -1.1 - 0.1 + uBal;
-      expect(w.points[0].y).toBeCloseTo(expected, 6);
+      expect(w.points[0]!.y).toBeCloseTo(expected, 6);
     }
   });
 });

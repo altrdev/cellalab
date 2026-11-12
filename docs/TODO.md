@@ -26,6 +26,7 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 
 - [x] BMS catalogue: generic profiles (supported S range, max current, chemistry, NTC) plus custom entries (`core/bms.ts`, `BmsPanel.svelte`). The BMS current caps the pack current.
 - [ ] BMS catalogue still missing: balance connector, size, holes, B-/P-/P+ positions (needed by the mounting step).
+  - The wire arrival on the BMS is a model choice (`bmsMount.connector`: top face with the wires wrapping round an end, or a connector past an end, from the chosen end); it is not taken from a real board yet.
 - [x] Checks: pack S = BMS S, current, chemistry, n+1 balance wires (info only).
 - [x] Balance-wire tabs on the busbars: one per joint (S+1), drilled, on a chosen side; part of the busbar outline, so cut and exported with it.
 - [x] Holder grooves for the tabs (depth from the chosen AWG, wall kept at 0.8 mm at least), larger power tabs/holes for P+/P− (chosen AWG). All tabs exit on one side, so the exit is single.

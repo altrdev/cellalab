@@ -27,8 +27,8 @@ export interface HarnessWire {
   /** Lamella e faccia a cui è saldato. */
   stripId: string;
   face: Face;
-  /** Percorso: foro della linguetta, piede della discesa, connettore. */
-  points: [Pt3, Pt3, Pt3];
+  /** Percorso: foro della linguetta, piede della discesa, (due punti attorno alla testata se arriva sopra), connettore. */
+  points: Pt3[];
   /** Lunghezza lungo il percorso, mm. */
   lengthMm: number;
   /** Lunghezza da tagliare: percorso più scorta (e coda se esterno), arrotondata a 5 mm per eccesso. */
@@ -58,6 +58,10 @@ export const CONNECTOR_PITCH_MM = 2.5;
 const WIRE_CLEARANCE_MM = 1.5;
 /** Distanza tra la testata del BMS e il connettore di bilanciamento quando sta oltre la testata, mm. */
 const CONNECTOR_END_GAP_MM = 3;
+/** Margine tra la testata e il primo pad sulla faccia superiore, mm. */
+const TOP_MARGIN_MM = 4;
+/** Quanto il filo si tiene lontano dalla testata mentre la gira, mm. */
+const WRAP_CLEARANCE_MM = 2;
 
 const DIR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
@@ -109,11 +113,16 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const box = mount.mode === 'pack' && size !== undefined;
   const aConn = aWire; // il connettore sta sulla faccia del BMS verso il pacco
   const pc = pMin + mount.along * (pMax - pMin);
-  // Il connettore può stare oltre una testata della scatola, alla stessa distanza dal pacco: i fili non entrano mai nella scatola.
+  // Con la scatola nota i fili arrivano da una testata: o su un connettore oltre la testata, o sulla faccia superiore
+  // (pad o connettore) dopo aver girato attorno alla testata. Mai dietro: lì c'è la scheda.
   const pins = withTab.length * CONNECTOR_PITCH_MM;
-  const place = box && size && mount.connector !== 'back' ? mount.connector : 'back';
-  const pConn = place === 'back' || !size ? pc : pc + (place === 'end' ? 1 : -1) * (size.lengthMm / 2 + pins / 2 + CONNECTOR_END_GAP_MM);
-
+  const sgn = mount.connectorEnd === 'end' ? 1 : -1;
+  const boxSize = box ? size : undefined;
+  const pEnd = boxSize ? pc + sgn * (boxSize.lengthMm / 2) : pc; // testata scelta, lungo il lato
+  const onEnd = !!boxSize && mount.connector === 'end';
+  const onTop = !!boxSize && mount.connector === 'top';
+  const pConn = onEnd ? pEnd + sgn * (pins / 2 + CONNECTOR_END_GAP_MM) : onTop ? pEnd - sgn * Math.min(boxSize!.lengthMm / 2, pins / 2 + TOP_MARGIN_MM) : pc;
+  const aTop = aConn + (boxSize?.thicknessMm ?? 0); // faccia superiore della scheda
   const to3 = (a: number, p: number, y: number): Pt3 => ({ x: d.x * a + perp.x * p, y, z: d.y * a + perp.y * p });
 
   // Un nodo per giunzione: B0 è l'ultima (meno del pacco).
@@ -133,23 +142,27 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
       const pPin = pConn + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
       const p0 = to3(aBend, pHole, yHole);
       const p1 = to3(aBend, pHole, yMid);
-      const p2 = to3(aConn, pPin, yMid);
-      const len = (a: Pt3, b: Pt3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-      const lengthMm = len(p0, p1) + len(p1, p2);
+      const len = (x: Pt3, y: Pt3) => Math.hypot(x.x - y.x, x.y - y.y, x.z - y.z);
+      const points: Pt3[] = [p0, p1];
+      if (onTop) {
+        const pAround = pEnd + sgn * WRAP_CLEARANCE_MM;
+        points.push(to3(aConn, pAround, yMid), to3(aTop + WRAP_CLEARANCE_MM, pAround, yMid), to3(aTop, pPin, yMid));
+      } else points.push(to3(aConn, pPin, yMid));
+      const lengthMm = points.slice(1).reduce((acc, q, i) => acc + len(points[i]!, q), 0);
       const extra = mount.slackMm + (mount.mode === 'external' ? mount.tailMm : 0);
       return {
         node,
         label: `B${node}`,
         stripId: s.id,
         face: s.face,
-        points: [p0, p1, p2],
+        points,
         lengthMm,
         cutMm: Math.ceil((lengthMm + extra) / 5 - 1e-9) * 5,
       };
     })
     .sort((a, b) => a.node - b.node);
 
-  const connector = to3(aConn, pConn, yMid);
+  const connector = to3(onTop ? aTop : aConn, pConn, yMid);
   let boxOut: BmsBox | null = null;
   if (box && size) {
     // Lunghezza lungo il lato, larghezza in altezza, spessore verso l'esterno; la faccia verso il pacco è quella del connettore.

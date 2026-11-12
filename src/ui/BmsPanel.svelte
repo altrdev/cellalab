@@ -88,13 +88,20 @@
     </select>
   </label>
   {#if mount.mode === 'pack' && bms.sizeMm}
-    <label>{t('bms.connector')}
-      <select value={mount.connector} onchange={(e) => history.commit((p) => setBmsMount(p, { connector: e.currentTarget.value === 'start' ? 'start' : e.currentTarget.value === 'end' ? 'end' : 'back' }))}>
-        <option value="back">{t('bms.connBack')}</option>
-        <option value="start">{t('bms.connStart')}</option>
-        <option value="end">{t('bms.connEnd')}</option>
-      </select>
-    </label>
+    <div class="row">
+      <label>{t('bms.connector')}
+        <select value={mount.connector} onchange={(e) => history.commit((p) => setBmsMount(p, { connector: e.currentTarget.value === 'end' ? 'end' : 'top' }))}>
+          <option value="top">{t('bms.connTop')}</option>
+          <option value="end">{t('bms.connEnd')}</option>
+        </select>
+      </label>
+      <label>{t('bms.connectorEnd')}
+        <select value={mount.connectorEnd} onchange={(e) => history.commit((p) => setBmsMount(p, { connectorEnd: e.currentTarget.value === 'end' ? 'end' : 'start' }))}>
+          <option value="start">{t('bms.endStart')}</option>
+          <option value="end">{t('bms.endEnd')}</option>
+        </select>
+      </label>
+    </div>
   {/if}
   <label>
     <span class="top"><span>{t('bms.along')}</span><b>{Math.round(mount.along * 100)}%</b></span>
