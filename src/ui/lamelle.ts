@@ -5,12 +5,13 @@ import type { Pt } from '../core/polygon';
 import { AWG_TABLE } from '../core/wire';
 import { COOLING, spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
-import { buildStrips, type Strip, type TabSide } from '../core/strips';
+import { buildStrips, type Face, type Strip, type TabSide } from '../core/strips';
 import { buildHolder } from '../core/holder';
 import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
 import { holderOf, type HolderCuts } from './holder';
 import { bmsOf } from '../core/bms';
-import { ntcSite, type NtcSite } from '../core/ntc';
+import { ntcSites, type NtcSite } from '../core/ntc';
+import { ntcRoute, type NtcRoute } from '../core/ntcRoute';
 import { tabNotches } from '../core/tabNotches';
 import type { WelderProfile } from '../core/profiles';
 import type { Project } from '../core/types';
@@ -40,39 +41,72 @@ export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
 }
 
 const cutsCache = new WeakMap<Project, { key: string; cuts: HolderCuts }>();
-const ntcCache = new WeakMap<Project, { key: string; site: NtcSite | null }>();
-const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [] };
+interface NtcPlan {
+  site: NtcSite | null;
+  route: NtcRoute | null;
+  /** La piastra (faccia) su cui il sensore ha la strada libera; null se nessuna. */
+  face: Face | null;
+}
+const ntcCache = new WeakMap<Project, { key: string; plan: NtcPlan }>();
+const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [], grooves: [] };
 
 /**
- * Il posto dell'NTC (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle). Evita i vuoti dove il foro
- * del filo finirebbe sotto una lamella: per le lamelle usa la forma senza holder, che qui basta.
+ * Il posto dell'NTC e il solco del suo filo (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle).
+ * Evita i vuoti dove il foro del filo finirebbe sotto una lamella e il solco evita le lamelle di entrambe le facce:
+ * per le lamelle usa la forma senza holder, che qui basta.
  */
-export function ntcSiteOf(project: Project, settings: LamellaSettings, holder: HolderSettings): NtcSite | null {
-  if (!settings.ntc || !bmsOf(project)?.ntc) return null;
+export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: HolderSettings): NtcPlan {
+  if (!settings.ntc || !bmsOf(project)?.ntc) return { site: null, route: null, face: null };
   const side = tabSideOf(project, settings);
-  const key = JSON.stringify([stripOptionsOf(settings), side, settings.ntcMm, holder.clearanceMm]);
+  const opts = optionsOf(project, settings);
+  const key = JSON.stringify([opts, side, settings.ntcMm, holder.clearanceMm, holder.wallMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
   const hit = ntcCache.get(project);
-  if (hit && hit.key === key) return hit.site;
-  const avoid = buildStrips(project, { ...stripOptionsOf(settings), tabs: null }).map((s) => ({ outline: s.outline, holes: s.holes }));
-  const site = ntcSite(project, side, settings.ntcMm, holder.clearanceMm, avoid);
-  ntcCache.set(project, { key, site });
-  return site;
+  if (hit && hit.key === key) return hit.plan;
+  const strips = buildStrips(project, opts);
+  const regionsOf = (face: Face) => strips.filter((s) => s.face === face).map((s) => ({ outline: s.outline, holes: s.holes }));
+  const all = strips.map((s) => ({ outline: s.outline, holes: s.holes }));
+  const plain = holder.lockCells ? buildHolder(project, holder, false) : null;
+  // Il sensore si monta su una sola piastra: si cerca, per ciascuna faccia, il primo vuoto da cui il filo arriva al bordo
+  // senza passare sotto le lamelle di quella faccia, e si tiene il percorso più corto. Il foro e il solco ci sono su entrambe.
+  let best: NtcPlan | null = null;
+  if (plain) {
+    for (const face of ['top', 'bottom'] as const) {
+      const avoid = regionsOf(face);
+      for (const cand of ntcSites(project, side, settings.ntcMm, holder.clearanceMm, avoid).filter((c) => !c.covered).slice(0, 16)) {
+        const r = ntcRoute(plain.slab, avoid, { x: cand.x, y: cand.y }, side);
+        if (!r.found) continue;
+        if (!best || r.lengthMm < best.route!.lengthMm) best = { site: cand, route: r, face };
+        break;
+      }
+    }
+  }
+  let plan: NtcPlan;
+  if (best) plan = best;
+  else {
+    // nessuna strada libera: il vuoto migliore, senza solco
+    const sites = ntcSites(project, side, settings.ntcMm, holder.clearanceMm, all);
+    const site = sites.find((c) => !c.covered) ?? sites[0] ?? null;
+    plan = { site, route: site && plain ? ntcRoute(plain.slab, all, { x: site.x, y: site.y }, side) : null, face: null };
+  }
+  ntcCache.set(project, { key, plan });
+  return plan;
 }
 
+
 /**
- * Tagli del portacelle legati al BMS: scanalature per le linguette (con un BMS e le linguette accese) e tasca dell'NTC.
- * Le scanalature si ricavano dalle lamelle senza holder, perché la posizione delle linguette non dipende da lui.
- * Li usa `holderOf`.
+ * Tagli del portacelle legati al BMS: scanalature per le linguette (con un BMS e le linguette accese), tasca dell'NTC
+ * con il suo foro e solco per il filo. Le scanalature si ricavano dalle lamelle senza holder, perché la posizione delle
+ * linguette non dipende da lui. Li usa `holderOf`.
  */
 export function holderCutsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): HolderCuts {
   if (project.bmsId === undefined) return NO_CUTS;
   const opts = optionsOf(project, settings);
-  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg, settings.ntc, settings.ntcMm]);
+  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg, settings.ntc, settings.ntcMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
   const hit = cutsCache.get(project);
   if (hit && hit.key === key) return hit.cuts;
   const notches = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon) : [];
-  const site = ntcSiteOf(project, settings, holder);
-  const cuts = { notches, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
+  const { site, route } = ntcPlanOf(project, settings, holder);
+  const cuts = { notches, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [], grooves: route?.found ? route.polygons : [] };
   cutsCache.set(project, { key, cuts });
   return cuts;
 }

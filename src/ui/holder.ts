@@ -18,8 +18,10 @@ export interface HolderCuts {
   pockets: Pt[][];
   /** Fori che passano anche nel fondo (il filo dell'NTC). */
   through: Pt[][];
+  /** Solco per il filo dell'NTC sulla faccia esterna del fondo. */
+  grooves: Pt[][];
 }
-const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [] };
+const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [], grooves: [] };
 let cutsSource: (project: Project, settings: HolderSettings) => HolderCuts = () => NO_CUTS;
 export function bindHolderCuts(get: (project: Project, settings: HolderSettings) => HolderCuts): void {
   cutsSource = get;
@@ -27,10 +29,10 @@ export function bindHolderCuts(get: (project: Project, settings: HolderSettings)
 
 export function holderOf(project: Project, settings: HolderSettings): { model: HolderModel | null; report: HolderReport | null; split: HolderSplit | null } {
   const cuts = cutsSource(project, settings);
-  const hasCuts = cuts.notches.length > 0 || cuts.pockets.length > 0 || cuts.through.length > 0;
+  const hasCuts = cuts.notches.length > 0 || cuts.pockets.length > 0 || cuts.through.length > 0 || cuts.grooves.length > 0;
   const key = renderKey() + JSON.stringify(settings) + (hasCuts ? JSON.stringify(cuts) : ''); // i messaggi del rapporto dipendono da lingua e unità
   if (last && last.project === project && last.key === key) return last;
-  const build = { notches: cuts.notches, extraPockets: cuts.pockets, throughHoles: cuts.through };
+  const build = { notches: cuts.notches, extraPockets: cuts.pockets, throughHoles: cuts.through, grooves: cuts.grooves };
   const model = buildHolder(project, settings, true, build);
   const split = model ? splitHolder(project, settings, build) : null;
   const report = model ? analyzeHolder(project, model, split) : null;

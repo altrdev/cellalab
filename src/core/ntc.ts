@@ -44,13 +44,16 @@ function circumcenter(a: Pt, b: Pt, c: Pt): Pt | null {
   };
 }
 
-/** Il vuoto più adatto per l'NTC, o null se non c'è (meno di tre celle vicine, tutte in fila…). */
-export function ntcSite(project: Project, side: NtcSide, diameterMm: number, clearanceMm: number, avoid: readonly Region[] = []): NtcSite | null {
+/**
+ * I vuoti adatti all'NTC, dal migliore: prima quelli di una cella centrale, e a parità i liberi da lamelle e più verso il
+ * lato di uscita. Vuota se non ce ne sono (meno di tre celle vicine, tutte in fila…).
+ */
+export function ntcSites(project: Project, side: NtcSide, diameterMm: number, clearanceMm: number, avoid: readonly Region[] = []): NtcSite[] {
   const cells = project.cells.flatMap((c) => {
     const t = findCellType(project, c.typeId);
     return t ? [{ id: c.id, x: c.x, y: c.y, pocket: t.diameterMm / 2 + clearanceMm }] : [];
   });
-  if (cells.length < 3) return null;
+  if (cells.length < 3) return [];
   const cx = cells.reduce((a, c) => a + c.x, 0) / cells.length;
   const cy = cells.reduce((a, c) => a + c.y, 0) / cells.length;
   let pitch = Infinity;
@@ -62,9 +65,11 @@ export function ntcSite(project: Project, side: NtcSide, diameterMm: number, cle
   const d = DIR[side];
   const radiusMm = diameterMm / 2;
   const central = [...cells].sort((a, b) => dist(a, { x: cx, y: cy }) - dist(b, { x: cx, y: cy }));
+  const out: NtcSite[] = [];
+  const seen = new Set<string>();
   for (const c of central) {
     const around = cells.filter((o) => o !== c && dist(o, c) <= near);
-    let best: { p: Pt; ids: [string, string, string]; score: number; covered: boolean } | null = null;
+    const mine: { p: Pt; ids: [string, string, string]; score: number; covered: boolean }[] = [];
     for (let i = 0; i < around.length; i++) {
       for (let j = i + 1; j < around.length; j++) {
         const a = around[i]!;
@@ -72,18 +77,27 @@ export function ntcSite(project: Project, side: NtcSide, diameterMm: number, cle
         if (dist(a, b) > near) continue;
         const p = circumcenter(c, a, b);
         if (!p) continue;
-        // deve essere un vuoto vero: fuori dalle tasche di tutte le celle, e non più largo di quello che il sensore riempie
+        // deve essere un vuoto vero: fuori dalle tasche di tutte le celle
         if (cells.some((o) => dist(o, p) < o.pocket - 1e-6)) continue;
+        const k = `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
         // I vuoti liberi (senza lamelle sopra dove passa il filo) vincono su quelli coperti; poi conta il lato di uscita.
         const covered = avoid.length > 0 && intersectRegions(avoid, [circlePolygon(p.x, p.y, NTC_WIRE_HOLE_MM / 2)]).some((r) => regionArea(r) > 0.01);
-        const score = p.x * d.x + p.y * d.y - (covered ? 1e6 : 0);
-        if (!best || score > best.score) best = { p, ids: [c.id, a.id, b.id], score, covered };
+        mine.push({ p, ids: [c.id, a.id, b.id], score: p.x * d.x + p.y * d.y, covered });
       }
     }
-    if (best) {
-      const { p } = best;
-      return { x: p.x, y: p.y, radiusMm, polygon: circlePolygon(p.x, p.y, radiusMm), wirePolygon: circlePolygon(p.x, p.y, NTC_WIRE_HOLE_MM / 2), covered: best.covered, cellIds: best.ids };
+    mine.sort((a, b) => Number(a.covered) - Number(b.covered) || b.score - a.score);
+    for (const m of mine) {
+      out.push({ x: m.p.x, y: m.p.y, radiusMm, polygon: circlePolygon(m.p.x, m.p.y, radiusMm), wirePolygon: circlePolygon(m.p.x, m.p.y, NTC_WIRE_HOLE_MM / 2), covered: m.covered, cellIds: m.ids });
     }
   }
-  return null;
+  return out;
+}
+
+/** Il vuoto più adatto per l'NTC, o null se non c'è. */
+export function ntcSite(project: Project, side: NtcSide, diameterMm: number, clearanceMm: number, avoid: readonly Region[] = []): NtcSite | null {
+  const all = ntcSites(project, side, diameterMm, clearanceMm, avoid);
+  // una cella centrale con vuoti liberi vince su una più periferica con vuoti coperti
+  return all.find((s) => !s.covered) ?? all[0] ?? null;
 }

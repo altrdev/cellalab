@@ -200,6 +200,9 @@ export interface BuildOptions {
   extraPockets?: readonly (readonly Pt[])[];
   /** Fori in più che passano anche nel fondo (per esempio il filo dell'NTC). */
   throughHoles?: readonly (readonly Pt[])[];
+  /** Solchi sulla faccia esterna del fondo (per i fili): profondi `grooveMm`, solo nel fondo. */
+  grooves?: readonly (readonly Pt[])[];
+  grooveMm?: number;
 }
 
 /**
@@ -257,7 +260,11 @@ export function buildHolder(
   // Fette: ai bordi dello smusso la sagoma esterna si ritira a gradini; sotto `floorMm` si taglia con i fori, sopra con le tasche.
   const engrave = opts.engrave && opts.engrave.length > 0 ? opts.engrave : null;
   const engraveFromZ = totalMm - Math.max(0, Math.min(opts.engraveMm ?? 0, totalMm - floorMm - 0.4));
+  const grooves = s.lockCells && opts.grooves && opts.grooves.length > 0 ? opts.grooves : null;
+  const grooveDepth = Math.max(0, Math.min(opts.grooveMm ?? floorMm / 2, floorMm - 0.2));
+  const groovesOn = !!grooves && grooveDepth > 0.05;
   const cuts = new Set<number>([0, floorMm, totalMm]);
+  if (groovesOn) cuts.add(grooveDepth);
   if (engrave) cuts.add(engraveFromZ);
   if (ramp) {
     cuts.add(chamferMm);
@@ -286,11 +293,13 @@ export function buildHolder(
         : 0;
     const useSlab = s.lockCells && mid < floorMm;
     const engraved = !!engrave && mid > engraveFromZ && !useSlab;
-    const key = `${inset.toFixed(4)}|${useSlab ? 's' : 'w'}${engraved ? 'e' : ''}`;
+    const grooved = groovesOn && useSlab && mid < grooveDepth;
+    const key = `${inset.toFixed(4)}|${useSlab ? 's' : 'w'}${engraved ? 'e' : ''}${grooved ? 'g' : ''}`;
     let regions = cache.get(key);
     if (!regions) {
       regions = differenceRegions(inset > 1e-9 ? offsetRegions(outer, -inset) : outer, useSlab ? slabOpenings : wallPockets);
       if (engraved) regions = differenceRegions(regions, engrave!);
+      if (grooved) regions = differenceRegions(regions, grooves!);
       cache.set(key, regions);
     }
     const prev = layers[layers.length - 1];
