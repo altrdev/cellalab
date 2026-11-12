@@ -1,7 +1,7 @@
 import { findBmsType, bmsOf } from './bms';
 import { findCellType } from './catalog';
 import type { Pt } from './polygon';
-import type { Face, Strip, TabSide } from './strips';
+import { tabsOf, type Face, type Strip, type TabSide } from './strips';
 import { DEFAULT_BMS_MOUNT, type BmsMount, type BmsSize, type Project } from './types';
 
 /**
@@ -77,7 +77,7 @@ export const bmsMountOf = (project: Project): BmsMount => ({ ...DEFAULT_BMS_MOUN
  */
 export function buildHarness(project: Project, strips: readonly Strip[], thicknessMm: number): Harness | null {
   const bms = bmsOf(project) ?? (project.bmsId ? findBmsType(project, project.bmsId) : undefined);
-  const withTab = strips.filter((s) => s.tab);
+  const withTab = strips.filter((s) => s.tab && tabsOf(s).some((x) => x.balanceHole));
   if (!bms || withTab.length === 0 || project.cells.length === 0) return null;
   const mount = bmsMountOf(project);
   const side = withTab[0]!.tab!.side;
@@ -116,10 +116,11 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const n = last + 1;
   const wires: HarnessWire[] = withTab
     .map((s): HarnessWire => {
-      const tab = s.tab!;
+      // La linguetta che porta il filo di bilanciamento: quella in serie, o la piccola dei terminali (non quella del cavo).
+      const tab = tabsOf(s).find((x) => x.balanceHole)!;
       const node = last - s.joint;
       const bend = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
-      const bh = tab.balanceHole; // il filo di bilanciamento sta nel suo foro, non in quello del cavo di potenza
+      const bh = tab.balanceHole!;
       const u = (bh.x - bend.x) * d.x + (bh.y - bend.y) * d.y; // dal piegamento al foro, lungo la linguetta
       const aBend = bend.x * d.x + bend.y * d.y;
       const pHole = bh.x * perp.x + bh.y * perp.y;

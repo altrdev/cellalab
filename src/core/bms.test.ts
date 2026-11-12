@@ -15,7 +15,7 @@ import { tabNotches } from './tabNotches';
 import { DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './lamelle';
 import { holeForWireMm } from './wire';
 import { buildSvg } from './lamelleExport';
-import { buildStrips } from './strips';
+import { buildStrips, tabsOf } from './strips';
 import type { Project } from './types';
 
 const T = '21700-5000-10a';
@@ -159,7 +159,8 @@ describe('linea di piega della linguetta', () => {
       expect(a.y).toBeCloseTo(b.y, 6);
       expect(a.y).toBeGreaterThan(s.tab!.holeY); // y verso il basso: la piega è più vicina alla cella del foro
       expect(Math.abs(a.x - b.x)).toBeCloseTo(s.tab!.widthMm, 6);
-      expect(s.tab!.widthMm).toBeCloseTo(s.kind === 'series' ? 6 : 6.9, 6);
+      if (s.kind === 'series') expect(s.tab!.widthMm).toBeCloseTo(6, 6);
+      else expect(s.tab!.widthMm).toBeGreaterThanOrEqual(2.85 + 2.4 - 1e-6);
     }
   });
 
@@ -431,53 +432,68 @@ describe('cablaggio del BMS', () => {
   });
 });
 
-describe('fori sulle linguette dei terminali', () => {
+describe('linguette dei terminali: potenza e bilanciamento separate', () => {
   const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, powerHoleMm: 2.85 } as const;
   const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
   const strips = buildStrips(p, { tabs });
+  const terminals = strips.filter((x) => x.tab && x.kind !== 'series');
+  const series = strips.filter((x) => x.tab && x.kind === 'series');
 
-  it('i terminali hanno due fori: bilanciamento vicino alla piega, potenza più in fuori', () => {
+  it('i terminali hanno due linguette affiancate, le lamelle in serie una', () => {
+    expect(terminals.length).toBe(2);
+    for (const s of terminals) {
+      expect(tabsOf(s)).toHaveLength(2);
+      expect(s.tab!.power).toBe(true);
+      expect(s.balanceTab!.power).toBe(false);
+      expect(s.tab!.balanceHole).toBeUndefined();
+      expect(s.balanceTab!.balanceHole!.diameterMm).toBeCloseTo(1.21, 6);
+      expect(s.tab!.holeDiameterMm).toBeCloseTo(2.85, 6);
+    }
+    for (const s of series) {
+      expect(tabsOf(s)).toHaveLength(1);
+      expect(s.tab!.balanceHole!.diameterMm).toBeCloseTo(1.21, 6);
+    }
+  });
+
+  it('le due linguette non si toccano e hanno la stessa linea di piega', () => {
+    for (const s of terminals) {
+      const [pw, bl] = [s.tab!, s.balanceTab!];
+      expect(Math.abs(pw.lateralMm - bl.lateralMm)).toBeGreaterThanOrEqual((pw.widthMm + bl.widthMm) / 2 + 1.4);
+      // la linea di piega è la stessa retta: i punti hanno la stessa quota lungo l'uscita (y, lato alto)
+      expect(pw.bend[0].y).toBeCloseTo(bl.bend[0].y, 6);
+      expect(pw.widthMm).toBeGreaterThan(bl.widthMm);
+      // il foro del cavo di potenza sta nella sua linguetta e quello piccolo nella sua
+      expect(pw.holeDiameterMm).toBeGreaterThan(bl.holeDiameterMm);
+    }
+  });
+
+  it('ogni foro è un buco della lamella', () => {
     const plain = buildStrips(p, {});
-    for (const s of strips.filter((x) => x.tab)) {
-      const base = plain.find((x) => x.id === s.id)!.holes.length;
-      const bh = s.tab!.balanceHole;
-      if (s.kind === 'series') {
-        expect(s.holes.length).toBe(base + 1);
-        expect(bh.x).toBeCloseTo(s.tab!.holeX, 6);
-        expect(bh.diameterMm).toBeCloseTo(1.21, 6);
-      } else {
-        expect(s.holes.length).toBe(base + 2);
-        expect(s.tab!.holeDiameterMm).toBeCloseTo(2.85, 6);
-        expect(bh.diameterMm).toBeCloseTo(1.21, 6);
-        // il foro piccolo sta più vicino alla piega (verso l'alto del disegno, y minore, il foro grande più in fuori)
-        expect(Math.hypot(bh.x - s.tab!.holeX, bh.y - s.tab!.holeY)).toBeGreaterThan((1.21 + 2.85) / 2);
-        const bend = s.tab!.bend;
-        const dist = (x: number, y: number) => Math.hypot(x - (bend[0].x + bend[1].x) / 2, y - (bend[0].y + bend[1].y) / 2);
-        expect(dist(bh.x, bh.y)).toBeLessThan(dist(s.tab!.holeX, s.tab!.holeY));
-      }
-    }
+    for (const s of terminals) expect(s.holes.length).toBe(plain.find((x) => x.id === s.id)!.holes.length + 2);
+    for (const s of series) expect(s.holes.length).toBe(plain.find((x) => x.id === s.id)!.holes.length + 1);
   });
 
-  it('la linguetta del terminale è lunga abbastanza per i due fori', () => {
-    for (const s of strips.filter((x) => x.tab && x.kind !== 'series')) {
-      const bend = s.tab!.bend;
-      const mid = { x: (bend[0].x + bend[1].x) / 2, y: (bend[0].y + bend[1].y) / 2 };
-      const far = Math.hypot(s.tab!.holeX - mid.x, s.tab!.holeY - mid.y) + s.tab!.holeDiameterMm / 2;
-      expect(far).toBeLessThanOrEqual(Math.max(...s.tab!.rect.map((q) => Math.hypot(q.x - mid.x, q.y - mid.y))) + 1e-6);
-    }
-  });
-
-  it('il filo di bilanciamento di B0 e BS parte dall’altezza del foro piccolo, non da quella del cavo', () => {
+  it('il filo di bilanciamento di B0 e BS parte dalla linguetta piccola', () => {
     const h = buildHarness(p, strips, 0.1)!;
     for (const w of [h.wires[0]!, h.wires[h.wires.length - 1]!]) {
       const s = strips.find((x) => x.id === w.stripId)!;
-      const bend = s.tab!.bend;
-      const midY = (bend[0].y + bend[1].y) / 2;
-      const uBal = midY - s.tab!.balanceHole.y; // lato alto del disegno: la linguetta esce verso y minore
-      const uPow = midY - s.tab!.holeY;
-      expect(uPow).toBeGreaterThan(uBal);
-      const expected = w.face === 'top' ? 70.4 + 1.1 + 0.1 - uBal : -1.1 - 0.1 + uBal;
-      expect(w.points[0].y).toBeCloseTo(expected, 6);
+      const bt = s.balanceTab!;
+      const perp = { x: 1, y: 0 }; // lato alto: il lato della linguetta è l'asse x
+      const pHole = bt.balanceHole!.x * perp.x;
+      expect(w.points[0].x).toBeCloseTo(pHole, 6);
+      // e non da quella del cavo, che sta di lato
+      expect(Math.abs(w.points[0].x - s.tab!.holeX)).toBeGreaterThan(2);
+    }
+  });
+
+  it('una sola scanalatura per terminale, larga quanto le due linguette', () => {
+    const notches = tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26, powerAwg: 12 });
+    expect(notches).toHaveLength(5);
+    for (const s of terminals) {
+      const n = notches.find((x) => x.stripId === s.id)!;
+      const xs = n.polygon.map((q) => q.x);
+      const width = Math.max(...xs) - Math.min(...xs);
+      expect(width).toBeGreaterThanOrEqual(s.tab!.widthMm + s.balanceTab!.widthMm + 1.5 - 1e-6);
     }
   });
 });

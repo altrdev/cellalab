@@ -5,7 +5,7 @@ import type { Pt } from '../core/polygon';
 import { AWG_TABLE } from '../core/wire';
 import { COOLING, spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
-import { buildStrips, type Face, type Strip, type TabSide } from '../core/strips';
+import { buildStrips, tabsOf, type Face, type Strip, type TabSide } from '../core/strips';
 import { buildHolder } from '../core/holder';
 import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
 import { holderOf, type HolderCuts } from './holder';
@@ -131,7 +131,7 @@ function tabBlocks(project: Project, settings: LamellaSettings): Record<TabSide,
   const holderOutline = model ? model.wall.map((r) => ({ outline: r.outline, holes: [] })) : null;
   const blocks = { ...none };
   for (const side of TAB_SIDES) {
-    blocks[side] = buildStrips(project, { ...opts, tabs: { ...opts.tabs, side }, holderOutline }).filter((s) => s.tab?.blockedBy).length;
+    blocks[side] = buildStrips(project, { ...opts, tabs: { ...opts.tabs, side }, holderOutline }).filter((s) => tabsOf(s).some((x) => x.blockedBy)).length;
   }
   blocksCache.set(project, { key, blocks });
   return blocks;
