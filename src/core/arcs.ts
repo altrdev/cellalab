@@ -86,6 +86,87 @@ export function ringWithArcs(ring: readonly Pt[], circles: readonly Circle[], to
   return out;
 }
 
+/**
+ * Cerchi non noti: una catena di lati corti consecutivi i cui vertici stanno su uno stesso cerchio (per esempio un angolo
+ * arrotondato dal kerf, che arriva dal calcolo come una spezzata di 8–12 lati) diventa un arco solo. Lascia stare i lati
+ * già archi e le catene quasi dritte; ogni arco fa al massimo 90°.
+ */
+export function fitFreeArcs(ring: readonly ArcVertex[], tolMm = DEFAULT_TOL_MM): ArcVertex[] {
+  const n = ring.length;
+  if (n < 4) return ring.map((v) => ({ ...v }));
+  const short = (i: number) => {
+    const a = ring[i % n]!;
+    const b = ring[(i + 1) % n]!;
+    return a.bulge === 0 && Math.hypot(a.x - b.x, a.y - b.y) <= MAX_CHORD_MM;
+  };
+  // si parte dopo un lato che non può far parte di un arco, così nessuna catena attraversa l'inizio (se sono tutti corti, da 0)
+  let start = 0;
+  for (let i = 0; i < n; i++) {
+    if (!short(i)) {
+      start = (i + 1) % n;
+      break;
+    }
+  }
+  const at = (k: number) => ring[(start + k) % n]!;
+  /** Cerchio per tre punti, o null se sono quasi allineati. */
+  const circle3 = (a: Pt, b: Pt, c: Pt): Circle | null => {
+    const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+    if (Math.abs(d) < 1e-9) return null;
+    const a2 = a.x * a.x + a.y * a.y;
+    const b2 = b.x * b.x + b.y * b.y;
+    const c2 = c.x * c.x + c.y * c.y;
+    const cx = (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d;
+    const cy = (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d;
+    return { cx, cy, r: Math.hypot(a.x - cx, a.y - cy) };
+  };
+  /** La catena dal punto i al punto j sta su un cerchio e gira sempre dalla stessa parte, per un angolo ≤ 90°? */
+  const fit = (i: number, j: number): { c: Circle; sweepRad: number } | null => {
+    const a = at(i);
+    const b = at(j);
+    const m = at(Math.floor((i + j) / 2));
+    const c = circle3(a, m, b);
+    if (!c || c.r > 80 || c.r < 0.05) return null;
+    let total = 0;
+    let sign = 0;
+    for (let k = i; k < j; k++) {
+      const p = at(k);
+      if (Math.abs(Math.hypot(p.x - c.cx, p.y - c.cy) - c.r) > tolMm) return null;
+      const d = sweep(p, at(k + 1), c);
+      if (sign === 0) sign = Math.sign(d);
+      if (Math.sign(d) !== sign || d === 0) return null;
+      total += d;
+    }
+    if (Math.abs(Math.hypot(b.x - c.cx, b.y - c.cy) - c.r) > tolMm) return null;
+    return Math.abs(total) <= MAX_SWEEP + 1e-6 ? { c, sweepRad: total } : null;
+  };
+
+  const out: ArcVertex[] = [];
+  let i = 0;
+  while (i < n) {
+    if (!short(start + i)) {
+      out.push({ ...at(i) });
+      i++;
+      continue;
+    }
+    // la catena più lunga che sta su un cerchio (almeno 3 lati e un po' di curva)
+    let best: { j: number; sweepRad: number } | null = null;
+    for (let j = i + 3; j <= n && j - i <= 64; j++) {
+      if (j > i + 3 && !short(start + j - 1)) break;
+      const f = fit(i, j);
+      if (f) best = { j, sweepRad: f.sweepRad };
+      else if (best) break;
+    }
+    if (best && Math.abs(best.sweepRad) > 0.15) {
+      out.push({ x: at(i).x, y: at(i).y, bulge: Math.tan(best.sweepRad / 4) });
+      i = best.j;
+    } else {
+      out.push({ ...at(i) });
+      i++;
+    }
+  }
+  return out;
+}
+
 /** Riporta una polilinea con archi a punti (per verificarla e per i programmi che non leggono il bulge). */
 export function expandArcs(ring: readonly ArcVertex[], stepRad = 0.05): Pt[] {
   const out: Pt[] = [];

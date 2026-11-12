@@ -1,5 +1,5 @@
 import { t } from '../i18n';
-import { ringWithArcs, type Circle } from './arcs';
+import { fitFreeArcs, ringWithArcs, type Circle } from './arcs';
 import { offsetRegion, regionRings } from './clip';
 import { spotPositions } from './sizing';
 import { tabsOf, type Face, type Strip } from './strips';
@@ -222,9 +222,12 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
       if (fit) circles.push({ cx: fit.x, cy: Y(fit.y), r: fit.r - k });
     }
     for (const ring of regionRings(offsetRegion(s, k))) {
-      const arcs = ringWithArcs(
-        ring.map((p) => ({ x: p.x, y: Y(p.y) })),
-        circles,
+      // prima i cerchi noti (celle, bande, fori), poi gli angoli arrotondati dal kerf e simili
+      const arcs = fitFreeArcs(
+        ringWithArcs(
+          ring.map((p) => ({ x: p.x, y: Y(p.y) })),
+          circles,
+        ),
       );
       polyline('CUT', arcs.map((v) => ({ x: v.x, y: Y(v.y), bulge: v.bulge })));
     }

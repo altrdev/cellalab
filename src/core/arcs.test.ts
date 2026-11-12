@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expandArcs, ringWithArcs, type Circle } from './arcs';
+import { expandArcs, fitFreeArcs, ringWithArcs, type Circle } from './arcs';
 import { circlePoints } from './polygon';
 
 describe('ringWithArcs', () => {
@@ -55,5 +55,47 @@ describe('ringWithArcs', () => {
     const out = ringWithArcs(ring, []);
     expect(out).toHaveLength(12);
     expect(out.every((v) => v.bulge === 0)).toBe(true);
+  });
+});
+
+describe('fitFreeArcs', () => {
+  /** Rettangolo con gli angoli arrotondati da un raggio, ogni angolo come spezzata di `n` lati (come esce dal kerf). */
+  function roundedRect(w: number, h: number, r: number, n: number) {
+    const pts: { x: number; y: number; bulge: number }[] = [];
+    const corner = (cx: number, cy: number, a0: number) => {
+      for (let k = 0; k <= n; k++) {
+        const a = a0 + (Math.PI / 2) * (k / n);
+        pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a), bulge: 0 });
+      }
+    };
+    corner(w - r, h - r, 0);
+    corner(r, h - r, Math.PI / 2);
+    corner(r, r, Math.PI);
+    corner(w - r, r, (3 * Math.PI) / 2);
+    return pts;
+  }
+
+  it('gli angoli arrotondati a spezzata diventano un arco ciascuno', () => {
+    const ring = roundedRect(30, 10, 0.5, 11);
+    const out = fitFreeArcs(ring);
+    expect(out.filter((v) => v.bulge !== 0)).toHaveLength(4);
+    expect(out.length).toBeLessThan(ring.length / 2);
+    // ogni arco da 90°: bulge = tan(90°/4)
+    for (const v of out.filter((q) => q.bulge !== 0)) expect(Math.abs(v.bulge)).toBeCloseTo(Math.tan(Math.PI / 8), 3);
+  });
+
+  it('la forma resta la stessa (scarto sotto i 0,02 mm)', () => {
+    const ring = roundedRect(30, 10, 0.5, 11);
+    const back = expandArcs(fitFreeArcs(ring), 0.02);
+    const dist = (a: { x: number; y: number }[], b: { x: number; y: number }[]) => Math.max(...a.map((p) => Math.min(...b.map((q) => Math.hypot(p.x - q.x, p.y - q.y)))));
+    expect(dist(ring, back)).toBeLessThan(0.02);
+  });
+
+  it('un cerchio a spezzata diventa archi da 90° al massimo, e i lati dritti restano dritti', () => {
+    const out = fitFreeArcs(circlePoints(0, 0, 3, 48).map((p) => ({ ...p, bulge: 0 })));
+    expect(out.length).toBeLessThanOrEqual(8);
+    expect(out.every((v) => v.bulge !== 0)).toBe(true);
+    const sq = [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 1, y: 0 }, { x: 1.5, y: 0 }, { x: 1.5, y: 5 }, { x: 0, y: 5 }].map((p) => ({ ...p, bulge: 0 }));
+    expect(fitFreeArcs(sq).every((v) => v.bulge === 0)).toBe(true);
   });
 });
