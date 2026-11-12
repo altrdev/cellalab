@@ -530,7 +530,9 @@ export class PackScene {
       const pts = w.points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
       for (let i = 0; i + 1 < pts.length; i++) path.add(new THREE.LineCurve3(pts[i]!, pts[i + 1]!));
       const geo = new THREE.TubeGeometry(path, 24 * path.curves.length, 0.45, 6, false);
-      const color = w.node === 0 ? 0x1b1b1b : new THREE.Color().setHSL(groupHue(w.node) / 360, 0.75, 0.5).getHex();
+      // Colori come in un pacco vero: B0 (meno) nero, BS (più) rosso, gli intermedi bianchi.
+      const last = Math.max(...h.wires.map((x) => x.node));
+      const color = w.node === 0 ? 0x1b1b1b : w.node === last ? 0xd32f2f : 0xf2f2f2;
       const mesh = new THREE.Mesh(geo, mat(color, 0.55));
       mesh.castShadow = true;
       this.harnessRoot.add(mesh);
