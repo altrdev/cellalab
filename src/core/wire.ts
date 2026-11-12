@@ -24,6 +24,21 @@ export const AWG_TABLE: readonly Awg[] = [
   { awg: 8, copperMm: 3.26, outerMm: 6.0 },
 ];
 
+/**
+ * Portata continua prudente del cavo di potenza (A), per un cavo corto dentro un pacco chiuso: la colonna per isolante da 60 gradi delle
+ * tabelle di portata (senza declassamento per la temperatura), arrotondata per difetto. Sono valori guida, non un calcolo.
+ */
+export const POWER_AMPACITY_A: Readonly<Record<number, number>> = { 16: 10, 14: 15, 12: 20, 10: 30, 8: 40 };
+
+/** Portata del cavo AWG scelto, A; 0 se non è una sezione per la potenza. */
+export const powerAmpacityA = (awg: number): number => POWER_AMPACITY_A[awg] ?? 0;
+
+/** La sezione più sottile (AWG più alto) che regge `currentA`, o null se nemmeno la più grossa basta. */
+export function powerAwgFor(currentA: number): number | null {
+  const sorted = [...POWER_AWGS].sort((a, b) => b - a); // dal più sottile al più grosso
+  return sorted.find((awg) => powerAmpacityA(awg) >= currentA) ?? null;
+}
+
 export const BALANCE_AWGS: readonly number[] = [28, 26, 24, 22, 20];
 export const POWER_AWGS: readonly number[] = [16, 14, 12, 10, 8];
 

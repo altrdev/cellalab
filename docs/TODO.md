@@ -33,6 +33,7 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
 - [x] NTC pocket: a round hole in the holder walls in the gap between three cells (central cell, towards the wire exit side), setting on/off + sensor diameter, plus a 2 mm wire hole through the floor (gaps not covered by busbars preferred).
 - [ ] Still open: balance-wire routing along the pack between the two faces, warning when the wall is too thin for the wire, (the NTC pocket and hole are on both plates; the floor groove for the NTC wire was dropped as over-engineered).
 - [x] BMS position and wiring: BMS on the flank at mid height (or external exit point), position along the side, wire lengths B0..BS in the Export tab, BMS box and wires in the 3D view. Generic BMS sizes are class estimates.
+- [x] "Positive and negative cables" section in the Busbars tab: gauge choice (AWG 16–8) with a prudent ampacity table (`POWER_AMPACITY_A`, 60-degree column, guide values) and a warning in the report when it does not carry the design current. Still open: cable lengths in the wire list, connector choice, pad drawing.
 - [ ] Mark a power-cable pad on the P+/P− busbars, wide enough and thick enough for the current (thin nickel at a tab neck would overheat at 30 A).
 - [ ] BMS mounting hardware in the holder (pocket + spacers, strain relief) and the BMS's real holes/connector/B-/P-/P+ positions in the catalogue.
 

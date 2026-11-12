@@ -10,7 +10,7 @@
   import { LAMELLA_MATERIALS } from '../core/materials';
   import { bmsOf } from '../core/bms';
   import { MIN_PRINT_WALL_MM } from '../core/holder';
-  import { BALANCE_AWGS } from '../core/wire';
+  import { BALANCE_AWGS, POWER_AWGS, powerAmpacityA } from '../core/wire';
   import { history } from '../state';
   import { freeTabSides, reportOf, tabSideOf } from './lamelle';
   import { ui } from './ui.svelte';
@@ -169,6 +169,21 @@
     <input use:rangeFill={ui.stripOpacity} type="range" min="0.2" max="1" step="0.05" bind:value={ui.stripOpacity} style="direction: rtl" />
   </label>
 
+  </section>
+
+  <section class="sec">
+    <h3><Icon name="bolt" /> {t('lam.powerTitle')}</h3>
+    <label>{t('lam.powerAwg')}
+      <select value={String(ui.lamella.powerAwg)} onchange={(e) => (ui.lamella.powerAwg = Number(e.currentTarget.value))}>
+        {#each POWER_AWGS as a (a)}<option value={String(a)}>AWG {a} · ~{powerAmpacityA(a)} A</option>{/each}
+      </select>
+    </label>
+    {#if report.currentA > 0}
+      <p class="note" class:warn={powerAmpacityA(ui.lamella.powerAwg) < report.currentA}>{t('lam.powerCap', { cap: powerAmpacityA(ui.lamella.powerAwg), current: fmt(report.currentA, 0) })}</p>
+    {:else}
+      <p class="note">{t('lam.powerNone')}</p>
+    {/if}
+    <Help label={t('lam.what')}>{t('lam.powerHelp')}</Help>
   </section>
 
   {#if report.status !== 'empty'}
@@ -373,6 +388,9 @@
     font-size: 0.78rem;
     color: var(--muted);
     line-height: 1.4;
+  }
+  .note.warn {
+    color: var(--warn);
   }
   .top {
     display: flex;

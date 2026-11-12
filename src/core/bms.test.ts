@@ -11,8 +11,8 @@ import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { buildHarness } from './harness';
 import { ntcSite, ntcSites } from './ntc';
 import { tabNotches } from './tabNotches';
-import { DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './lamelle';
-import { holeForWireMm } from './wire';
+import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './lamelle';
+import { holeForWireMm, powerAmpacityA, powerAwgFor } from './wire';
 import { buildSvg } from './lamelleExport';
 import { buildStrips } from './strips';
 import type { Project } from './types';
@@ -253,6 +253,27 @@ describe('fori dalle sezioni dei fili', () => {
     expect(holeForWireMm(26)).toBe(1.21);
     expect(holeForWireMm(12)).toBe(2.85);
     expect(stripOptionsOf({ ...DEFAULT_LAMELLA_SETTINGS, balanceAwg: 22 }).tabs?.holeMm).toBe(1.44);
+  });
+});
+
+describe('cavi di potenza', () => {
+  it('la portata cresce con la sezione e la scelta minima segue la corrente', () => {
+    expect(powerAmpacityA(16)).toBeLessThan(powerAmpacityA(12));
+    expect(powerAmpacityA(12)).toBeLessThan(powerAmpacityA(8));
+    expect(powerAmpacityA(26)).toBe(0); // non è un cavo di potenza
+    expect(powerAwgFor(8)).toBe(16);
+    expect(powerAwgFor(30)).toBe(10);
+    expect(powerAwgFor(31)).toBe(8);
+    expect(powerAwgFor(500)).toBeNull();
+  });
+
+  it('il rapporto avvisa se il cavo non regge la corrente di progetto', () => {
+    const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
+    const strips = buildStrips(p, {});
+    const warn = (awg: number) => analyzeLamelle(p, strips, { ...DEFAULT_LAMELLA_SETTINGS, powerAwg: awg }, 30).issues.some((i) => i.message.includes(`AWG ${awg}`) && i.message.includes('30'));
+    expect(warn(16)).toBe(true);
+    expect(warn(12)).toBe(true);
+    expect(warn(10)).toBe(false); // regge 30 A
   });
 });
 

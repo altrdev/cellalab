@@ -2,7 +2,7 @@ import { renderKey } from '../i18n';
 import type { StripOptions } from '../core/strips';
 import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf, type LamellaReport, type LamellaSettings } from '../core/lamelle';
 import type { Pt } from '../core/polygon';
-import { AWG_TABLE } from '../core/wire';
+import { AWG_TABLE, POWER_AWGS } from '../core/wire';
 import { COOLING, spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
 import { buildStrips, type Face, type Strip, type TabSide } from '../core/strips';
@@ -183,6 +183,7 @@ export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
   }
   if (!(base.tabBendMm >= 0)) base.tabBendMm = DEFAULT_LAMELLA_SETTINGS.tabBendMm;
   if (!AWG_TABLE.some((a) => a.awg === base.balanceAwg)) base.balanceAwg = DEFAULT_LAMELLA_SETTINGS.balanceAwg;
+  if (!POWER_AWGS.includes(base.powerAwg)) base.powerAwg = DEFAULT_LAMELLA_SETTINGS.powerAwg;
   if (!(base.cooling in COOLING)) base.cooling = DEFAULT_LAMELLA_SETTINGS.cooling;
   if (base.spotsPerTerminal !== null) base.spotsPerTerminal = Math.min(Math.max(Math.round(base.spotsPerTerminal), 1), 12);
   base.layers = Math.min(Math.max(Math.floor(base.layers) || 1, 1), 5);

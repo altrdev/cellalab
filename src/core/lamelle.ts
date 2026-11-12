@@ -20,7 +20,7 @@ import {
   spotsNeeded,
   type CoolingId,
 } from './sizing';
-import { holeForWireMm } from './wire';
+import { holeForWireMm, powerAmpacityA, powerAwgFor } from './wire';
 import { neckWidthMm, type Strip, type StripOptions, type TabSide } from './strips';
 import type { Project } from './types';
 import { len, tempDelta } from '../units';
@@ -67,6 +67,8 @@ export interface LamellaSettings {
   tabLengthMm: number;
   /** Sezione AWG del filo di bilanciamento. */
   balanceAwg: number;
+  /** Sezione AWG dei cavi di potenza (P+ e P−). */
+  powerAwg: number;
   /** Di quanto la piega supera il bordo del holder, mm. */
   tabBendMm: number;
 }
@@ -95,6 +97,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   tabLengthMm: 8,
   tabBendMm: 0.3,
   balanceAwg: 26,
+  powerAwg: 10,
 };
 
 /** Parametri di forma delle lamelle ricavati dalle impostazioni. */
@@ -253,6 +256,18 @@ export function analyzeLamelle(
   }
   if (!(currentA > 0)) {
     issues.push({ severity: 'error', message: t('lamelle.issue.currentZero'), stripIds: [] });
+  } else if (powerAmpacityA(settings.powerAwg) < currentA) {
+    const need = powerAwgFor(currentA);
+    issues.push({
+      severity: 'warning',
+      message: t('lamelle.issue.powerCable', {
+        awg: settings.powerAwg,
+        cap: powerAmpacityA(settings.powerAwg),
+        current: fmt(currentA, 0),
+        hint: need === null ? t('lamelle.issue.powerCableMore') : t('lamelle.issue.powerCableAwg', { need }),
+      }),
+      stripIds: [],
+    });
   }
 
   // --- Requisiti per ogni lamella
