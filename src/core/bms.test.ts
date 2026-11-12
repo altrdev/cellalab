@@ -632,11 +632,31 @@ describe('uscita dei fili dal portacelle, senza linguette', () => {
     }
   });
 
+  it('i fori stanno il più possibile sul bordo: a una parete stampabile dal contorno', () => {
+    const dist = (q: { x: number; y: number }, ring: { x: number; y: number }[]) => {
+      let best = Infinity;
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i]!;
+        const b = ring[(i + 1) % ring.length]!;
+        const ex = b.x - a.x;
+        const ey = b.y - a.y;
+        const t = Math.max(0, Math.min(1, ((q.x - a.x) * ex + (q.y - a.y) * ey) / (ex * ex + ey * ey)));
+        best = Math.min(best, Math.hypot(q.x - (a.x + t * ex), q.y - (a.y + t * ey)));
+      }
+      return best;
+    };
+    for (const e of exits) {
+      const toEdge = Math.min(...plain.wall.map((r) => dist(e.hole!, r.outline)));
+      // bordo del foro a circa 0,8 mm dal contorno (un po' di più dove il contorno è curvo)
+      expect(toEdge - e.diameterMm / 2).toBeLessThan(0.8 + 1.0);
+    }
+  });
+
   it('con uno smusso grande il foro resta in plastica e il contorno non cambia mai (niente rinforzi)', () => {
     for (const chamferMm of [0.6, 2]) {
       const st = { ...ROUND, chamferMm };
       const base = buildHolder(p, st, false)!;
-      const ex = findWireExits(p, strips, base.wall, 'bottom', 1.21, base.totalMm, base.floorMm, chamferMm);
+      const ex = findWireExits(p, strips, base.wall, 'bottom', 1.21, base.totalMm, base.floorMm);
       expect(ex.length).toBe(5);
       for (const e of ex) {
         // almeno la parete stampabile attorno al foro, dentro il contorno del portacelle (che resta quello senza fori)
@@ -651,7 +671,7 @@ describe('uscita dei fili dal portacelle, senza linguette', () => {
 
   it('con il profilo della cella dove la plastica è sottile il giunto fa il giro esterno: nessun filo manca', () => {
     const prof = buildHolder(p, { ...DEFAULT_HOLDER_SETTINGS, shape: 'profile' }, false)!;
-    const routes = findWireRoutes(p, strips, prof.wall, 'bottom', 1.21, prof.totalMm, prof.floorMm, 0.6, 0.3);
+    const routes = findWireRoutes(p, strips, prof.wall, 'bottom', 1.21, prof.totalMm, prof.floorMm, 0.3);
     expect(routes).toHaveLength(5);
     expect(routes.every((e) => e.hole || e.edge)).toBe(true);
     expect(new Set(routes.map((e) => e.stripId)).size).toBe(5);

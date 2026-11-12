@@ -72,7 +72,7 @@ export function wireExitsOf(project: Project, settings: LamellaSettings, holder:
   const strips = plain && opts.tabs ? buildStrips(project, opts) : [];
   // Con i fori nel portacelle il filo passa da lì; senza fori né linguette fa il giro esterno sul piano del portacelle.
   const exits = !plain || !opts.tabs ? [] : holder.wireHoles
-    ? findWireRoutes(project, strips, plain.wall, opts.tabs.side, holeForWireMm(settings.balanceAwg), plain.totalMm, plain.floorMm, holder.chamferMm, settings.tabBendMm)
+    ? findWireRoutes(project, strips, plain.wall, opts.tabs.side, holeForWireMm(settings.balanceAwg), plain.totalMm, plain.floorMm, settings.tabBendMm)
     : findAroundExits(project, strips, plain.wall, opts.tabs.side, plain.totalMm, plain.floorMm, settings.tabBendMm);
   exitCache.set(project, { key, exits });
   return exits;
