@@ -328,6 +328,19 @@ describe('NTC in una griglia quadrata', () => {
     expect(ds[3]! - ds[0]!).toBeLessThan(1e-6);
   });
 
+  it('con la sagoma arrotondata il vuoto è riempito e il foro toglie materiale; con quella a profilo no', () => {
+    const p = sq(4, 3);
+    const site = ntcSite(p, 'top', 5, 0.15)!;
+    const volume = (m: { layers: { z0: number; z1: number; regions: Parameters<typeof regionArea>[0][] }[] }) =>
+      m.layers.reduce((a, l) => a + (l.z1 - l.z0) * l.regions.reduce((b, r) => b + regionArea(r), 0), 0);
+    const removed = (shape: 'profile' | 'rounded') => {
+      const st = { ...DEFAULT_HOLDER_SETTINGS, shape };
+      return volume(buildHolder(p, st, true)!) - volume(buildHolder(p, st, true, { extraPockets: [site.polygon], throughHoles: [site.wirePolygon] })!);
+    };
+    expect(removed('rounded')).toBeGreaterThan(10);
+    expect(removed('profile')).toBeLessThan(1e-6);
+  });
+
   it('con celle esagonali resta il vuoto tra tre celle', () => {
     expect(ntcSite(pack(4, 3), 'top', 5, 0.15)!.open).toBe(false);
   });

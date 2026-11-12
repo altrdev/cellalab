@@ -450,7 +450,7 @@ export const it = {
   'hold.ntc': 'Tasca per il sensore NTC',
   'hold.ntcSize': 'Ø foro sensore (mm)',
   'hold.ntcNone': 'Nessun vuoto tra tre celle vicine: la tasca non c’è. Il sensore va incollato su una cella.',
-  'hold.ntcOpen': 'Griglia quadrata: il sensore sta nel vuoto tra quattro celle, che è già aperto, quindi non serve nessun foro. Fissalo con silicone a una cella.',
+  'hold.ntcOpen': 'Griglia quadrata: il sensore sta nel vuoto tra quattro celle, che con questa sagoma è già aperto, quindi il foro non toglie niente. Fissalo con silicone a una cella.',
   'hold.ntcCovered': 'Ogni vuoto libero è sotto una lamella: il foro da cui infilare il sensore cadrebbe sotto un collegamento. Sposta il lato di uscita o allarga le finestre delle lamelle.',
   'hold.ntcHelp': 'Il sensore di temperatura sta nel vuoto tra tre celle, dove tocca i fianchi di tutte e tre. L’app sceglie una cella centrale (la più calda) e il vuoto più verso il lato di uscita dei fili, e lo apre con un foro tondo che attraversa la piastra: il sensore si infila da fuori, a pacco già montato e lamelle già saldate, e il filo esce dallo stesso foro. Si scelgono vuoti non coperti dalle lamelle. Il foro è su entrambe le piastre. Fissa il sensore con silicone e il filo con una goccia di colla.',
   'lam.tabWidth': 'Larghezza linguetta (mm)',

@@ -24,7 +24,7 @@ export interface NtcSite {
   covered: boolean;
   /** Le tre celle che il sensore tocca. */
   cellIds: [string, string, string];
-  /** Vuoto tra quattro celle (griglia quadrata): è già aperto nel portacelle, la tasca non scava niente. */
+  /** Vuoto tra quattro celle (griglia quadrata): con la sagoma «a profilo» è già aperto e il foro non toglie niente; con quella arrotondata il contorno lo riempie e il foro serve. */
   open: boolean;
 }
 
