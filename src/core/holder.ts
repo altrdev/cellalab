@@ -96,6 +96,8 @@ export interface HolderModel {
   wall: Region[];
   /** Fette della piastra, dalla faccia esterna al bordo delle pareti. */
   layers: HolderLayer[];
+  /** Le due piastre quando non sono uguali (scanalature solo dove passano le linguette): ciascuna è un modello completo; il resto di questo modello è quello della piastra sopra. */
+  halves?: { top: HolderModel; bottom: HolderModel };
   /**
    * Smusso a rampa continua (solo con `smooth`): le fette arretrano di `chamferMm` sulle due facce e lo smusso
    * è il raccordo inclinato tra il contorno pieno (`a`) e quello arretrato (`b`). Coppie di contorni corrispondenti.

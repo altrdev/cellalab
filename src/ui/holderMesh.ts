@@ -113,7 +113,8 @@ function trisGeometry(tris: V3[][], map: (v: V3) => V3): THREE.BufferGeometry {
  * Le fette di una piastra, nel sistema della scena. La faccia esterna del fondo sta dalla parte
  * opposta alle celle: in alto per la piastra sopra, in basso per quella sotto.
  */
-export function holderHalfGeometries(model: HolderModel, half: HolderHalf): THREE.BufferGeometry[] {
+export function holderHalfGeometries(whole: HolderModel, half: HolderHalf): THREE.BufferGeometry[] {
+  const model = whole.halves?.[half] ?? whole;
   const f = model.floorMm;
   const H = model.cellHeightMm;
   const geos = model.layers.map((l) =>

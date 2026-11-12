@@ -101,7 +101,8 @@ export interface StripOptions {
   /** Linguette di presa per il BMS: solo se il progetto ha un BMS; assente o null = nessuna. */
   tabs?: TabOptions | null;
   /** Sagoma esterna del holder (senza le tasche): la piega sta oltre questo limite. Assente = parete e gioco di default. */
-  holderOutline?: readonly Region[] | null;
+  /** Sagoma del holder, per mettere la piega oltre il bordo: una sola per tutte le lamelle o una per faccia (le due piastre possono avere scanalature diverse). */
+  holderOutline?: readonly Region[] | Partial<Record<Face, readonly Region[]>> | null;
 }
 
 export interface TabOptions {
@@ -272,7 +273,7 @@ const SIDE_VECTOR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0,
  * all'appoggio. P+ e P− hanno in più la linguetta di potenza: esce a 90° rispetto a quella di bilanciamento, dal lato
  * libero più vicino alla lamella.
  */
-function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: readonly Region[] | null): void {
+function addTabs(project: Project, strips: Strip[], o: TabOptions, holderOpt: StripOptions['holderOutline']): void {
   const byJoint = new Map<number, Strip>();
   for (const s of strips) {
     const cur = byJoint.get(s.joint);
@@ -320,6 +321,7 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
 
   for (const s of strips) {
     if (!chosen.has(s)) continue;
+    const holder: readonly Region[] | null = (Array.isArray(holderOpt) ? holderOpt : (holderOpt as Partial<Record<Face, readonly Region[]>> | null | undefined)?.[s.face]) ?? null;
     const bNode = frontNode(s, o.side);
     const plans: Plan[] = [];
     const bW = Math.min(o.widthMm, 2 * bNode.reachMm);

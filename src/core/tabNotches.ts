@@ -1,6 +1,6 @@
 import { MIN_PRINT_WALL_MM, type HolderSettings } from './holder';
 import type { Pt } from './polygon';
-import { tabsOf, type Strip } from './strips';
+import { tabsOf, type Face, type Strip } from './strips';
 import { findAwg } from './wire';
 
 /** Gioco di lato tra linguetta e scanalatura, mm. */
@@ -14,6 +14,8 @@ const DIR: Record<'top' | 'bottom' | 'left' | 'right', Pt> = { top: { x: 0, y: -
 
 export interface Notch {
   stripId: string;
+  /** Faccia della lamella: la scanalatura serve solo alla piastra di quella faccia. */
+  face: Face;
   polygon: Pt[];
   /** Profondità reale nella parete, mm. */
   depthMm: number;
@@ -45,7 +47,7 @@ export function tabNotches(strips: readonly Strip[], holder: HolderSettings, wir
       const a1 = a0 + depth + 2;
       const v = tab.widthMm / 2 + SIDE_CLEARANCE_MM;
       const at = (a: number, p: number): Pt => ({ x: tab.anchor.x + d.x * a + perp.x * p, y: tab.anchor.y + d.y * a + perp.y * p });
-      out.push({ stripId: s.id, polygon: [at(a0, -v), at(a1, -v), at(a1, v), at(a0, v)], depthMm: depth, shallow: depth < wanted - 1e-9 });
+      out.push({ stripId: s.id, face: s.face, polygon: [at(a0, -v), at(a1, -v), at(a1, v), at(a0, v)], depthMm: depth, shallow: depth < wanted - 1e-9 });
     }
   }
   return out;

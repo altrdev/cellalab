@@ -23,9 +23,11 @@
   const viewBox = $derived(`${ui.view.x} ${ui.view.y} ${ui.view.w} ${vh}`);
 
   /** Lamelle della faccia visibile, con l'esito dell'analisi per evidenziare quelle con problemi. */
-  const holderModel = $derived(
-    ui.showHolder && (ui.face === 'top' ? ui.holderView.showTop : ui.holderView.showBottom) ? holderOf(project, ui.holder).model : null,
-  );
+  const holderModel = $derived.by(() => {
+    if (!ui.showHolder || !(ui.face === 'top' ? ui.holderView.showTop : ui.holderView.showBottom)) return null;
+    const m = holderOf(project, ui.holder).model;
+    return m?.halves?.[ui.face] ?? m; // le due piastre possono avere scanalature diverse
+  });
   /** Piastra troppo grande per il piano: le linee di taglio e le sigle dei pezzi. */
   const holderSplit = $derived(
     ui.showHolder && (ui.face === 'top' ? ui.holderView.showTop : ui.holderView.showBottom) ? holderOf(project, ui.holder).split : null,

@@ -7,7 +7,9 @@ import { createProject } from '../core/project';
 import { buildStrips } from '../core/strips';
 import { DEFAULT_HOLDER_SETTINGS } from '../core/holder';
 import { intersectRegions, regionArea } from '../core/clip';
-import { freeTabSides, ntcPlanOf, stripsOf, tabSideOf } from './lamelle';
+import { bindHolderSettings, freeTabSides, holderCutsOf, ntcPlanOf, stripsOf, tabSideOf } from './lamelle';
+import { bindHolderCuts, holderOf } from './holder';
+import { tabsOf } from '../core/strips';
 
 const pack = (s: number, p: number) =>
   setBms(replaceCells(createProject(), generateGrid({ typeId: '21700-5000-10a', diameterMm: 21.4, series: s, parallel: p, kind: 'hex', gapMm: 1 })), 'bms-4s-30a-li-ion');
@@ -57,5 +59,29 @@ describe('impostazioni NTC nel portacelle', () => {
     expect(sanitizeHolderSettings({ ntc: false, ntcMm: 6 })).toMatchObject({ ntc: false, ntcMm: 6 });
     expect(sanitizeHolderSettings({})).toMatchObject({ ntc: true, ntcMm: 5 });
     expect(sanitizeHolderSettings({ ntc: 'sì', ntcMm: 99 })).toMatchObject({ ntc: true, ntcMm: 12 });
+  });
+});
+
+describe('scanalature solo dove passano le linguette', () => {
+  const p = pack(4, 3);
+  bindHolderSettings(() => DEFAULT_HOLDER_SETTINGS);
+  bindHolderCuts((pr, st) => holderCutsOf(pr, DEFAULT_LAMELLA_SETTINGS, st));
+  const area = (m: { wall: { outline: { x: number; y: number }[]; holes: { x: number; y: number }[][] }[] }) => m.wall.reduce((a, r) => a + regionArea(r), 0);
+
+  it('la piastra senza linguette non ha scanalature', () => {
+    const strips = stripsOf(p, DEFAULT_LAMELLA_SETTINGS);
+    const facesWithTabs = new Set(strips.flatMap((st) => (tabsOf(st).length > 0 ? [st.face] : [])));
+    const { model } = holderOf(p, DEFAULT_HOLDER_SETTINGS);
+    expect(model).not.toBeNull();
+    if (facesWithTabs.size === 2) {
+      // linguette su entrambe le facce: due modelli, ognuno con le sue scanalature
+      expect(model!.halves).toBeDefined();
+      return;
+    }
+    // linguette su una faccia sola: l'altra piastra resta intera (più materiale)
+    const withTabs = [...facesWithTabs][0]!;
+    const without = withTabs === 'top' ? 'bottom' : 'top';
+    expect(model!.halves).toBeDefined();
+    expect(area(model!.halves![without]!)).toBeGreaterThan(area(model!.halves![withTabs]!));
   });
 });

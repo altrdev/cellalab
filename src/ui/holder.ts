@@ -14,12 +14,13 @@ let last: { project: Project; key: string; model: HolderModel | null; report: Ho
 /** `split` c'è solo se la piastra è più grande del piano di stampa e va divisa in pezzi da incollare. */
 /** Tagli del portacelle legati al BMS: scanalature per i fili e tasca dell'NTC. Li calcola il pannello delle lamelle (qui non si può importare senza un giro). */
 export interface HolderCuts {
-  notches: Pt[][];
+  /** Scanalature per le linguette, per piastra: solo dove passano le lamelle di quella faccia. */
+  notches: { top: Pt[][]; bottom: Pt[][] };
   pockets: Pt[][];
   /** Fori che passano anche nel fondo (il filo dell'NTC). */
   through: Pt[][];
 }
-const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [] };
+const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, pockets: [], through: [] };
 let cutsSource: (project: Project, settings: HolderSettings) => HolderCuts = () => NO_CUTS;
 export function bindHolderCuts(get: (project: Project, settings: HolderSettings) => HolderCuts): void {
   cutsSource = get;
@@ -27,12 +28,19 @@ export function bindHolderCuts(get: (project: Project, settings: HolderSettings)
 
 export function holderOf(project: Project, settings: HolderSettings): { model: HolderModel | null; report: HolderReport | null; split: HolderSplit | null } {
   const cuts = cutsSource(project, settings);
-  const hasCuts = cuts.notches.length > 0 || cuts.pockets.length > 0 || cuts.through.length > 0;
+  const hasCuts = cuts.notches.top.length > 0 || cuts.notches.bottom.length > 0 || cuts.pockets.length > 0 || cuts.through.length > 0;
   const key = renderKey() + JSON.stringify(settings) + (hasCuts ? JSON.stringify(cuts) : ''); // i messaggi del rapporto dipendono da lingua e unità
   if (last && last.project === project && last.key === key) return last;
-  const build = { notches: cuts.notches, extraPockets: cuts.pockets, throughHoles: cuts.through };
-  const model = buildHolder(project, settings, true, build);
-  const split = model ? splitHolder(project, settings, build) : null;
+  const buildFor = (notches: Pt[][]) => ({ notches, extraPockets: cuts.pockets, throughHoles: cuts.through });
+  const same = JSON.stringify(cuts.notches.top) === JSON.stringify(cuts.notches.bottom);
+  const topModel = buildHolder(project, settings, true, buildFor(cuts.notches.top));
+  let model = topModel;
+  if (!same && topModel) {
+    const bottomModel = buildHolder(project, settings, true, buildFor(cuts.notches.bottom));
+    if (bottomModel) model = { ...topModel, halves: { top: topModel, bottom: bottomModel } };
+  }
+  // Le piastre a pezzi (troppo grandi per il piano) hanno ancora le scanalature di entrambe le facce.
+  const split = model ? splitHolder(project, settings, buildFor(same ? cuts.notches.top : [...cuts.notches.top, ...cuts.notches.bottom])) : null;
   const report = model ? analyzeHolder(project, model, split) : null;
   last = { project, key, model, report, split };
   return last;

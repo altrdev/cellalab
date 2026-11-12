@@ -34,7 +34,9 @@ export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
   if (hit && hit.key === key) return hit.strips;
   // Le linguette si piegano oltre il holder: serve la sua sagoma esterna (senza le tasche delle celle).
   const model = hs ? holderOf(project, hs).model : null;
-  const holderOutline = model ? model.wall.map((r) => ({ outline: r.outline, holes: [] })) : null;
+  const outlineOf = (m: typeof model) => (m ? m.wall.map((r) => ({ outline: r.outline, holes: [] })) : null);
+  // Le due piastre possono avere scanalature diverse: ogni lamella si piega oltre il bordo della sua.
+  const holderOutline = model ? { top: outlineOf(model.halves?.top ?? model)!, bottom: outlineOf(model.halves?.bottom ?? model)! } : null;
   const strips = buildStrips(project, { ...opts, holderOutline });
   stripCache.set(project, { key, strips });
   return strips;
@@ -45,7 +47,7 @@ interface NtcPlan {
   site: NtcSite | null;
 }
 const ntcCache = new WeakMap<Project, { key: string; plan: NtcPlan }>();
-const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [], };
+const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, pockets: [], through: [] };
 
 /**
  * Il posto dell'NTC (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle). Preferisce i vuoti dove il
@@ -75,7 +77,8 @@ export function holderCutsOf(project: Project, settings: LamellaSettings, holder
   const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg, holder.ntc, holder.ntcMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
   const hit = cutsCache.get(project);
   if (hit && hit.key === key) return hit.cuts;
-  const notches = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon) : [];
+  const all = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings) : [];
+  const notches = { top: all.filter((n) => n.face === 'top').map((n) => n.polygon), bottom: all.filter((n) => n.face === 'bottom').map((n) => n.polygon) };
   const { site } = ntcPlanOf(project, settings, holder);
   const cuts = { notches, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
   cutsCache.set(project, { key, cuts });

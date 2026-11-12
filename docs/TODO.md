@@ -29,6 +29,7 @@ Open items, roughly in priority order. Keep this file up to date; `CLAUDE.md` on
   - The wire arrival on the BMS is a model choice (`bmsMount.connector`: top face with the wires wrapping round an end, or a connector past an end, from the chosen end); it is not taken from a real board yet.
 - [x] Checks: pack S = BMS S, current, chemistry, n+1 balance wires (info only).
 - [x] Balance-wire tabs on the busbars: one per joint (S+1), drilled, on a chosen side; part of the busbar outline, so cut and exported with it.
+- [x] Per-plate grooves: a groove is cut only on the plate whose face carries the tab (`HolderModel.halves`); the other plate stays whole. Split plates still carry the grooves of both faces.
 - [x] Holder grooves for the tabs (depth from the chosen AWG, wall kept at 0.8 mm at least). All balance tabs are identical; P+ and P− also get a power tab (width and hole from the cable gauge) leaving at 90° from the balance side, on the free side nearest the busbar (each folds on its own line, with its own holder groove). The 3D view folds each tab on its own fold line.
 - [x] NTC pocket: a round hole in the holder walls in the gap between three cells (central cell, towards the wire exit side), setting on/off + sensor diameter, plus a 2 mm wire hole through the floor (gaps not covered by busbars preferred).
 - [ ] Still open: balance-wire routing along the pack between the two faces, warning when the wall is too thin for the wire, (the NTC pocket and hole are on both plates; the floor groove for the NTC wire was dropped as over-engineered).
