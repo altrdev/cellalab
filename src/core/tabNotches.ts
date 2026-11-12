@@ -27,7 +27,7 @@ export interface Notch {
  * parete della cella da cui esce la linguetta e vanno verso l'esterno. Se la linguetta è intralciata (passa sopra altre
  * celle) la scanalatura non c'è: taglierebbe le pareti delle celle vicine.
  */
-export function tabNotches(strips: readonly Strip[], holder: HolderSettings, wires: { balanceAwg: number; powerAwg: number }): Notch[] {
+export function tabNotches(strips: readonly Strip[], holder: HolderSettings, wires: { balanceAwg: number }): Notch[] {
   const out: Notch[] = [];
   const maxDepth = holder.wallMm - MIN_PRINT_WALL_MM;
   for (const s of strips) {
@@ -36,7 +36,7 @@ export function tabNotches(strips: readonly Strip[], holder: HolderSettings, wir
     if (!tab || tab.blockedBy) continue;
     const node = s.nodes.find((n) => Math.hypot(n.x - tab.anchor.x, n.y - tab.anchor.y) < 1e-6);
     if (!node) continue;
-    const wanted = findAwg(tab.power ? wires.powerAwg : wires.balanceAwg).outerMm + DEPTH_EXTRA_MM;
+    const wanted = findAwg(wires.balanceAwg).outerMm + DEPTH_EXTRA_MM;
     const depth = Math.min(wanted, maxDepth);
     if (depth < MIN_DEPTH_MM) continue;
     const d = DIR[tab.side];

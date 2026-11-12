@@ -42,8 +42,6 @@ export type TabSide = 'top' | 'bottom' | 'left' | 'right';
 /** Linguetta di presa per il filo di bilanciamento del BMS: sporge dalla lamella (e ne fa parte) ed è forata. */
 export interface StripTab {
   side: TabSide;
-  /** Linguetta dei terminali (P+/P−): più larga e con il foro per il cavo di potenza. */
-  power: boolean;
   /** Centro della cella da cui parte e larghezza effettiva, mm. */
   anchor: Pt;
   widthMm: number;
@@ -53,8 +51,6 @@ export interface StripTab {
   holeX: number;
   holeY: number;
   holeDiameterMm: number;
-  /** Foro dove si salda il filo di bilanciamento: sulle linguette in serie è il foro stesso, su quelle dei terminali è un foro piccolo a parte dal cavo di potenza. */
-  balanceHole: { x: number; y: number; diameterMm: number };
   /** Linea di piega consigliata (oltre il bordo del holder, prima del foro), da segnare e non da tagliare. */
   bend: [Pt, Pt];
   /** Cosa intralcia la linguetta: un'altra lamella della stessa faccia o una cella; null = libera. */
@@ -110,8 +106,6 @@ export interface TabOptions {
   /** Lunghezza della parte piegata, oltre la linea di piega, mm. */
   lengthMm: number;
   holeMm: number;
-  /** Foro delle linguette dei terminali (cavo di potenza), mm. */
-  powerHoleMm: number;
   /** Margine della piega oltre il bordo del holder, mm. */
   bendMm: number;
 }
@@ -293,12 +287,9 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
       if (Math.abs(ea - eb) > 1e-6) return eb > ea ? b : a;
       return Math.abs(side(b) - meanSide) < Math.abs(side(a) - meanSide) ? b : a;
     });
-    const power = s.kind !== 'series';
-    const holeWant = power ? o.powerHoleMm : o.holeMm;
-    const w = Math.min(power ? Math.max(o.widthMm, holeWant + 4) : o.widthMm, 2 * node.reachMm);
-    // I terminali hanno due fori in fila lungo la linguetta: filo di bilanciamento (vicino alla piega) e cavo di potenza.
-    const balWant = Math.min(o.holeMm, w - 1);
-    const lengthMm = Math.max(o.lengthMm, power ? balWant + holeWant + 4.5 : 1);
+    // Tutte le linguette sono uguali, anche P+ e P−: un foro per il filo di bilanciamento. Il cavo di potenza non passa di qui.
+    const w = Math.min(o.widthMm, 2 * node.reachMm);
+    const lengthMm = Math.max(o.lengthMm, 1);
     // Fin dove arriva il holder lungo la linguetta (controllando il centro e i due bordi): la piega sta oltre.
     let exit = node.cellRadiusMm + DEFAULT_HOLDER_EDGE_MM;
     if (holder && holder.length > 0) {
@@ -312,21 +303,16 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
     const reach = bendAlong + lengthMm;
     const at = (a: number, p: number): Pt => ({ x: node.x + d.x * a + perp.x * p, y: node.y + d.y * a + perp.y * p });
     const rect = convexHull([at(0, -w / 2), at(0, w / 2), at(reach, w / 2), at(reach, -w / 2)]);
-    const hole = Math.min(holeWant, w - 1, lengthMm - 1);
-    // Posizione dei fori lungo la linguetta, dalla piega: la linguetta in serie ne ha uno al centro; il terminale due in fila.
-    const balAt = power ? bendAlong + 1.5 + balWant / 2 : bendAlong + lengthMm / 2;
-    const powAt = power ? bendAlong + 1.5 + balWant + 1.5 + hole / 2 : bendAlong + lengthMm / 2;
-    const hc = at(powAt, 0);
-    const bc = at(balAt, 0);
+    const hole = Math.min(o.holeMm, w - 1, lengthMm - 1);
+    const hc = at(bendAlong + lengthMm / 2, 0); // il foro sta a metà della parte piegata
     const region: Region = unionPolygons([s.outline, rect]);
     const holes = [...s.holes];
     if (hole >= 0.5) holes.push(circlePoints(hc.x, hc.y, hole / 2, circleSegments(hole / 2)));
-    if (power && balWant >= 0.5) holes.push(circlePoints(bc.x, bc.y, balWant / 2, circleSegments(balWant / 2)));
     s.outline = region.outline;
     s.holes = holes;
     s.areaMm2 = regionArea({ outline: s.outline, holes });
     const bend: [Pt, Pt] = [at(bendAlong, -w / 2), at(bendAlong, w / 2)];
-    s.tab = { side: o.side, power, anchor: { x: node.x, y: node.y }, widthMm: w, rect, holeX: hc.x, holeY: hc.y, holeDiameterMm: hole >= 0.5 ? hole : 0, balanceHole: { x: bc.x, y: bc.y, diameterMm: power ? (balWant >= 0.5 ? balWant : 0) : hole >= 0.5 ? hole : 0 }, bend, blockedBy: null };
+    s.tab = { side: o.side, anchor: { x: node.x, y: node.y }, widthMm: w, rect, holeX: hc.x, holeY: hc.y, holeDiameterMm: hole >= 0.5 ? hole : 0, bend, blockedBy: null };
   }
   // Intralci: celle dell'altra parte e lamelle della stessa faccia (con le loro linguette).
   for (const s of strips) {

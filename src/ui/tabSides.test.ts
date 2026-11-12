@@ -34,7 +34,7 @@ describe('lati delle linguette', () => {
 describe('NTC sotto le lamelle', () => {
   const p = pack(4, 3);
   const plan = ntcPlanOf(p, DEFAULT_LAMELLA_SETTINGS, DEFAULT_HOLDER_SETTINGS);
-  const strips = buildStrips(p, { tabs: { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.2, bendMm: 0.3, powerHoleMm: 2.85 } });
+  const strips = buildStrips(p, { tabs: { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.2, bendMm: 0.3 } });
 
   it('c’è un vuoto per il sensore', () => {
     expect(plan.site).not.toBeNull();

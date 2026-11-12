@@ -10,7 +10,7 @@
   import { LAMELLA_MATERIALS } from '../core/materials';
   import { bmsOf } from '../core/bms';
   import { MIN_PRINT_WALL_MM } from '../core/holder';
-  import { BALANCE_AWGS, POWER_AWGS } from '../core/wire';
+  import { BALANCE_AWGS } from '../core/wire';
   import { history } from '../state';
   import { freeTabSides, reportOf, tabSideOf } from './lamelle';
   import { ui } from './ui.svelte';
@@ -145,11 +145,6 @@
         <label>{t('lam.balanceAwg')}
           <select value={String(ui.lamella.balanceAwg)} onchange={(e) => (ui.lamella.balanceAwg = Number(e.currentTarget.value))}>
             {#each BALANCE_AWGS as a (a)}<option value={String(a)}>AWG {a}</option>{/each}
-          </select>
-        </label>
-        <label>{t('lam.powerAwg')}
-          <select value={String(ui.lamella.powerAwg)} onchange={(e) => (ui.lamella.powerAwg = Number(e.currentTarget.value))}>
-            {#each POWER_AWGS as a (a)}<option value={String(a)}>AWG {a}</option>{/each}
           </select>
         </label>
       </div>

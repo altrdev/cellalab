@@ -111,7 +111,7 @@ describe('salvataggio', () => {
 });
 
 describe('linguette di presa', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1, powerHoleMm: 2.9 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1 } as const;
   const withBms = (p: Project) => setBms(p, 'bms-13s-40a-li-ion');
 
   it('senza BMS non ci sono linguette', () => {
@@ -124,7 +124,7 @@ describe('linguette di presa', () => {
     expect(new Set(withTab.map((s) => s.joint)).size).toBe(5);
     expect(withTab).toHaveLength(5);
     for (const s of withTab) {
-      expect(s.tab!.holeDiameterMm).toBe(s.kind === 'series' ? 2 : 2.9);
+      expect(s.tab!.holeDiameterMm).toBe(2);
       expect(s.holes.length).toBeGreaterThanOrEqual(1);
     }
   });
@@ -149,7 +149,7 @@ describe('linguette di presa', () => {
 });
 
 describe('linea di piega della linguetta', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1, powerHoleMm: 2.9 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1 } as const;
   const strips = buildStrips(setBms(pack(4, 2), 'bms-4s-30a-li-ion'), { tabs });
 
   it('sta sulla linguetta, tra la cella e il foro', () => {
@@ -158,7 +158,7 @@ describe('linea di piega della linguetta', () => {
       expect(a.y).toBeCloseTo(b.y, 6);
       expect(a.y).toBeGreaterThan(s.tab!.holeY); // y verso il basso: la piega è più vicina alla cella del foro
       expect(Math.abs(a.x - b.x)).toBeCloseTo(s.tab!.widthMm, 6);
-      expect(s.tab!.widthMm).toBeCloseTo(s.kind === 'series' ? 6 : 6.9, 6);
+      expect(s.tab!.widthMm).toBeCloseTo(6, 6);
     }
   });
 
@@ -170,7 +170,7 @@ describe('linea di piega della linguetta', () => {
 });
 
 describe('piega oltre il holder', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1, powerHoleMm: 2.9 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 1 } as const;
   const p = setBms(pack(4, 2), 'bms-4s-30a-li-ion');
 
   it('la piega sta oltre la sagoma del holder, qualunque sia la parete', () => {
@@ -195,17 +195,15 @@ describe('piega oltre il holder', () => {
 });
 
 describe('tacche del portacelle per le linguette', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 0.3, powerHoleMm: 2.9 } as const;
-  const wires = { balanceAwg: 26, powerAwg: 12 };
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 0.3 } as const;
+  const wires = { balanceAwg: 26 };
   const p = setBms(pack(4, 2), 'bms-4s-30a-li-ion');
   const settings = { ...DEFAULT_HOLDER_SETTINGS, wallMm: 2.4 };
 
-  it('una per linguetta, più profonda per il cavo di potenza', () => {
+  it('una per linguetta, tutte uguali (anche P+ e P−)', () => {
     const notches = tabNotches(buildStrips(p, { tabs }), settings, wires);
     expect(notches).toHaveLength(5);
-    const power = notches.filter((n) => n.stripId.endsWith('-0') || n.stripId.endsWith('-4'));
-    const series = notches.filter((n) => !power.includes(n));
-    expect(Math.max(...series.map((n) => n.depthMm))).toBeLessThan(Math.min(...power.map((n) => n.depthMm)) + 1e-9);
+    expect(new Set(notches.map((n) => n.depthMm.toFixed(6))).size).toBe(1);
   });
 
   it('la parete resta stampabile: profondità al massimo parete − 0,8', () => {
@@ -238,14 +236,14 @@ describe('tacche del portacelle per le linguette', () => {
 });
 
 describe('tacche con linguette intralciate', () => {
-  const tabs = { side: 'left', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 0.3, powerHoleMm: 2.9 } as const;
+  const tabs = { side: 'left', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 0.3 } as const;
   const p = setBms(pack(4, 2), 'bms-4s-30a-li-ion');
 
   it('nessuna scanalatura per le linguette che passano sopra altre celle', () => {
     const strips = buildStrips(p, { tabs });
     const blocked = strips.filter((s) => s.tab?.blockedBy);
     expect(blocked.length).toBeGreaterThan(0);
-    const ids = tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26, powerAwg: 12 }).map((n) => n.stripId);
+    const ids = tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26 }).map((n) => n.stripId);
     for (const s of blocked) expect(ids).not.toContain(s.id);
   });
 });
@@ -255,7 +253,6 @@ describe('fori dalle sezioni dei fili', () => {
     expect(holeForWireMm(26)).toBe(1.21);
     expect(holeForWireMm(12)).toBe(2.85);
     expect(stripOptionsOf({ ...DEFAULT_LAMELLA_SETTINGS, balanceAwg: 22 }).tabs?.holeMm).toBe(1.44);
-    expect(stripOptionsOf({ ...DEFAULT_LAMELLA_SETTINGS, powerAwg: 10 }).tabs?.powerHoleMm).toBe(3.39);
   });
 });
 
@@ -343,7 +340,7 @@ describe('filo dell’NTC', () => {
 });
 
 describe('cablaggio del BMS', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.2, bendMm: 0.3, powerHoleMm: 2.85 } as const;
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.2, bendMm: 0.3 } as const;
   const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
   const strips = buildStrips(p, { tabs });
   const h = buildHarness(p, strips, 0.1)!;
@@ -457,52 +454,30 @@ describe('cablaggio del BMS', () => {
   });
 });
 
-describe('fori sulle linguette dei terminali', () => {
-  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, powerHoleMm: 2.85 } as const;
+describe('linguette dei terminali', () => {
+  const tabs = { side: 'top', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3 } as const;
   const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
   const strips = buildStrips(p, { tabs });
 
-  it('i terminali hanno due fori: bilanciamento vicino alla piega, potenza più in fuori', () => {
+  it('P+ e P− hanno la stessa linguetta delle serie: un solo foro piccolo per il filo di bilanciamento', () => {
     const plain = buildStrips(p, {});
-    for (const s of strips.filter((x) => x.tab)) {
-      const base = plain.find((x) => x.id === s.id)!.holes.length;
-      const bh = s.tab!.balanceHole;
-      if (s.kind === 'series') {
-        expect(s.holes.length).toBe(base + 1);
-        expect(bh.x).toBeCloseTo(s.tab!.holeX, 6);
-        expect(bh.diameterMm).toBeCloseTo(1.21, 6);
-      } else {
-        expect(s.holes.length).toBe(base + 2);
-        expect(s.tab!.holeDiameterMm).toBeCloseTo(2.85, 6);
-        expect(bh.diameterMm).toBeCloseTo(1.21, 6);
-        // il foro piccolo sta più vicino alla piega (verso l'alto del disegno, y minore, il foro grande più in fuori)
-        expect(Math.hypot(bh.x - s.tab!.holeX, bh.y - s.tab!.holeY)).toBeGreaterThan((1.21 + 2.85) / 2);
-        const bend = s.tab!.bend;
-        const dist = (x: number, y: number) => Math.hypot(x - (bend[0].x + bend[1].x) / 2, y - (bend[0].y + bend[1].y) / 2);
-        expect(dist(bh.x, bh.y)).toBeLessThan(dist(s.tab!.holeX, s.tab!.holeY));
-      }
+    const withTab = strips.filter((x) => x.tab);
+    expect(withTab).toHaveLength(5);
+    for (const s of withTab) {
+      expect(s.holes.length).toBe(plain.find((x) => x.id === s.id)!.holes.length + 1);
+      expect(s.tab!.holeDiameterMm).toBeCloseTo(1.21, 6);
+      expect(s.tab!.widthMm).toBeCloseTo(withTab[0]!.tab!.widthMm, 6);
     }
   });
 
-  it('la linguetta del terminale è lunga abbastanza per i due fori', () => {
-    for (const s of strips.filter((x) => x.tab && x.kind !== 'series')) {
-      const bend = s.tab!.bend;
-      const mid = { x: (bend[0].x + bend[1].x) / 2, y: (bend[0].y + bend[1].y) / 2 };
-      const far = Math.hypot(s.tab!.holeX - mid.x, s.tab!.holeY - mid.y) + s.tab!.holeDiameterMm / 2;
-      expect(far).toBeLessThanOrEqual(Math.max(...s.tab!.rect.map((q) => Math.hypot(q.x - mid.x, q.y - mid.y))) + 1e-6);
-    }
-  });
-
-  it('il filo di bilanciamento di B0 e BS parte dall’altezza del foro piccolo, non da quella del cavo', () => {
+  it('il filo di bilanciamento parte dall’altezza del foro della linguetta', () => {
     const h = buildHarness(p, strips, 0.1)!;
     for (const w of [h.wires[0]!, h.wires[h.wires.length - 1]!]) {
       const s = strips.find((x) => x.id === w.stripId)!;
       const bend = s.tab!.bend;
       const midY = (bend[0].y + bend[1].y) / 2;
-      const uBal = midY - s.tab!.balanceHole.y; // lato alto del disegno: la linguetta esce verso y minore
-      const uPow = midY - s.tab!.holeY;
-      expect(uPow).toBeGreaterThan(uBal);
-      const expected = w.face === 'top' ? 70.4 + 1.1 + 0.1 - uBal : -1.1 - 0.1 + uBal;
+      const u = midY - s.tab!.holeY; // lato alto del disegno: la linguetta esce verso y minore
+      const expected = w.face === 'top' ? 70.4 + 1.1 + 0.1 - u : -1.1 - 0.1 + u;
       expect(w.points[0]!.y).toBeCloseTo(expected, 6);
     }
   });
