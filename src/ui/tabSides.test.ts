@@ -79,3 +79,12 @@ describe('NTC sotto le lamelle', () => {
     expect(stripsOf(p, DEFAULT_LAMELLA_SETTINGS).some((s) => s.tab)).toBe(true);
   });
 });
+
+describe('impostazioni NTC nel portacelle', () => {
+  it('si leggono dal file con valori validi e tornano al default se mancano o sono sbagliate', async () => {
+    const { sanitizeHolderSettings } = await import('./holder');
+    expect(sanitizeHolderSettings({ ntc: false, ntcMm: 6 })).toMatchObject({ ntc: false, ntcMm: 6 });
+    expect(sanitizeHolderSettings({})).toMatchObject({ ntc: true, ntcMm: 5 });
+    expect(sanitizeHolderSettings({ ntc: 'sì', ntcMm: 99 })).toMatchObject({ ntc: true, ntcMm: 12 });
+  });
+});

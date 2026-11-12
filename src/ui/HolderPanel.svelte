@@ -4,12 +4,16 @@
   import Help from './Help.svelte';
   import Icon from './Icon.svelte';
   import UnitInput from './UnitInput.svelte';
+  import { bmsOf } from '../core/bms';
   import { DEFAULT_HOLDER_SETTINGS } from '../core/holder';
+  import { ntcPlanOf } from './lamelle';
   import { history } from '../state';
   import { clampHolder, holderOf } from './holder';
   import { ui } from './ui.svelte';
 
   const project = $derived($history.present);
+  const ntcPlan = $derived(ntcPlanOf(project, ui.lamella, ui.holder));
+  const ntcSite = $derived(ntcPlan.site);
   const built = $derived(holderOf(project, ui.holder));
   const model = $derived(built.model);
   const report = $derived(built.report);
@@ -143,6 +147,18 @@
   <Help label={t('hold.lockLabel')}>{noteLock}</Help>
 
   </section>
+
+  {#if bmsOf(project)?.ntc}
+  <section class="sec">
+    <h3><Icon name="ruler" /> {t('hold.ntcSection')}</h3>
+    <label><span><input type="checkbox" bind:checked={ui.holder.ntc} /> {t('hold.ntc')}</span></label>
+    {#if ui.holder.ntc}
+      <label>{t('hold.ntcSize')}<UnitInput kind="len" min={2} max={12} step={0.5} value={ui.holder.ntcMm} onchange={(v) => { if (v !== null) ui.holder.ntcMm = v; }} /></label>
+      {#if !ntcSite}<p class="note">{t('hold.ntcNone')}</p>{:else if ntcSite.covered}<p class="note">{t('hold.ntcCovered')}</p>{:else if ntcPlan.route?.found}<p class="note">{t('hold.ntcRoute', { len: len(ntcPlan.route.lengthMm, 0), face: ntcPlan.face === 'bottom' ? t('face.bottom') : t('face.top') })}</p>{:else if ntcPlan.route}<p class="note">{t('hold.ntcNoRoute')}</p>{/if}
+      <Help label={t('hold.what')}>{t('hold.ntcHelp')}</Help>
+    {/if}
+  </section>
+  {/if}
 
   <details class="adv">
     <summary>{t('hold.advanced')}</summary>

@@ -56,10 +56,10 @@ const NO_CUTS: HolderCuts = { notches: [], pockets: [], through: [], grooves: []
  * per le lamelle usa la forma senza holder, che qui basta.
  */
 export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: HolderSettings): NtcPlan {
-  if (!settings.ntc || !bmsOf(project)?.ntc) return { site: null, route: null, face: null };
+  if (!holder.ntc || !bmsOf(project)?.ntc) return { site: null, route: null, face: null };
   const side = tabSideOf(project, settings);
   const opts = optionsOf(project, settings);
-  const key = JSON.stringify([opts, side, settings.ntcMm, holder.clearanceMm, holder.wallMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
+  const key = JSON.stringify([opts, side, holder.ntcMm, holder.clearanceMm, holder.wallMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
   const hit = ntcCache.get(project);
   if (hit && hit.key === key) return hit.plan;
   const strips = buildStrips(project, opts);
@@ -72,7 +72,7 @@ export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: H
   if (plain) {
     for (const face of ['top', 'bottom'] as const) {
       const avoid = regionsOf(face);
-      for (const cand of ntcSites(project, side, settings.ntcMm, holder.clearanceMm, avoid).filter((c) => !c.covered).slice(0, 16)) {
+      for (const cand of ntcSites(project, side, holder.ntcMm, holder.clearanceMm, avoid).filter((c) => !c.covered).slice(0, 16)) {
         const r = ntcRoute(plain.slab, avoid, { x: cand.x, y: cand.y }, side);
         if (!r.found) continue;
         if (!best || r.lengthMm < best.route!.lengthMm) best = { site: cand, route: r, face };
@@ -84,7 +84,7 @@ export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: H
   if (best) plan = best;
   else {
     // nessuna strada libera: il vuoto migliore, senza solco
-    const sites = ntcSites(project, side, settings.ntcMm, holder.clearanceMm, all);
+    const sites = ntcSites(project, side, holder.ntcMm, holder.clearanceMm, all);
     const site = sites.find((c) => !c.covered) ?? sites[0] ?? null;
     plan = { site, route: site && plain ? ntcRoute(plain.slab, all, { x: site.x, y: site.y }, side) : null, face: null };
   }
@@ -101,7 +101,7 @@ export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: H
 export function holderCutsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): HolderCuts {
   if (project.bmsId === undefined) return NO_CUTS;
   const opts = optionsOf(project, settings);
-  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg, settings.ntc, settings.ntcMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
+  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg, holder.ntc, holder.ntcMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
   const hit = cutsCache.get(project);
   if (hit && hit.key === key) return hit.cuts;
   const notches = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon) : [];
@@ -200,7 +200,7 @@ export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
     } else if (typeof v === typeof def && (typeof v !== 'number' || Number.isFinite(v))) out[k] = v;
   }
   if (!['auto', 'top', 'bottom', 'left', 'right'].includes(base.tabSide)) base.tabSide = DEFAULT_LAMELLA_SETTINGS.tabSide;
-  for (const k of ['tabWidthMm', 'tabLengthMm', 'ntcMm'] as const) {
+  for (const k of ['tabWidthMm', 'tabLengthMm'] as const) {
     if (!(base[k] > 0)) base[k] = DEFAULT_LAMELLA_SETTINGS[k];
   }
   if (!(base.tabBendMm >= 0)) base.tabBendMm = DEFAULT_LAMELLA_SETTINGS.tabBendMm;

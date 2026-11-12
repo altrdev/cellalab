@@ -41,6 +41,9 @@ export interface HolderSettings {
   /** Piano di stampa (area utile), mm. */
   bedXMm: number;
   bedYMm: number;
+  /** Tasca per il sensore NTC (solo se il BMS ha l'ingresso NTC) e diametro del sensore, mm. */
+  ntc: boolean;
+  ntcMm: number;
 }
 
 export const DEFAULT_HOLDER_SETTINGS: HolderSettings = {
@@ -55,6 +58,8 @@ export const DEFAULT_HOLDER_SETTINGS: HolderSettings = {
   lockCells: true,
   bedXMm: 220,
   bedYMm: 220,
+  ntc: true,
+  ntcMm: 5,
 };
 
 /** Spessore minimo di parete tra due tasche per stamparla bene (due passate con ugello da 0,4). */

@@ -12,15 +12,13 @@
   import { MIN_PRINT_WALL_MM } from '../core/holder';
   import { BALANCE_AWGS, POWER_AWGS } from '../core/wire';
   import { history } from '../state';
-  import { freeTabSides, ntcPlanOf, reportOf, tabSideOf } from './lamelle';
+  import { freeTabSides, reportOf, tabSideOf } from './lamelle';
   import { ui } from './ui.svelte';
 
   const project = $derived($history.present);
   const report = $derived(reportOf(project, ui.lamella));
   const sides = $derived(freeTabSides(project, ui.lamella));
   const sideName = { top: t('lam.tabSide.top'), bottom: t('lam.tabSide.bottom'), left: t('lam.tabSide.left'), right: t('lam.tabSide.right') } as const;
-  const ntcPlan = $derived(ntcPlanOf(project, ui.lamella, ui.holder));
-  const ntcSite = $derived(ntcPlan.site);
   const tabSide = $derived(tabSideOf(project, ui.lamella));
   const material = $derived(report.material);
   const weldLabel = { good: t('lam.weld.good'), fair: t('lam.weld.fair'), poor: t('lam.weld.poor') } as const;
@@ -157,14 +155,6 @@
       </div>
       <label>{t('lam.tabBend')}<UnitInput kind="len" min={0} max={20} step={0.1} value={ui.lamella.tabBendMm} onchange={(v) => { if (v !== null) ui.lamella.tabBendMm = v; }} /></label>
       <Help label={t('lam.what')}>{t('lam.tabsHelp', { min: len(MIN_PRINT_WALL_MM, 1) })}</Help>
-    {/if}
-    {#if bmsOf(project)?.ntc}
-      <label><span><input type="checkbox" bind:checked={ui.lamella.ntc} /> {t('lam.ntc')}</span></label>
-      {#if ui.lamella.ntc}
-        <label>{t('lam.ntcSize')}<UnitInput kind="len" min={2} max={12} step={0.5} value={ui.lamella.ntcMm} onchange={(v) => { if (v !== null) ui.lamella.ntcMm = v; }} /></label>
-        {#if !ntcSite}<p class="note">{t('lam.ntcNone')}</p>{:else if ntcSite.covered}<p class="note">{t('lam.ntcCovered')}</p>{:else if ntcPlan.route?.found}<p class="note">{t('lam.ntcRoute', { len: len(ntcPlan.route.lengthMm, 0), face: ntcPlan.face === 'bottom' ? t('face.bottom') : t('face.top') })}</p>{:else if ntcPlan.route}<p class="note">{t('lam.ntcNoRoute')}</p>{/if}
-        <Help label={t('lam.what')}>{t('lam.ntcHelp')}</Help>
-      {/if}
     {/if}
   {/if}
 

@@ -70,9 +70,6 @@ export interface LamellaSettings {
   powerAwg: number;
   /** Di quanto la piega supera il bordo del holder, mm. */
   tabBendMm: number;
-  /** Tasca per il sensore NTC nel portacelle (solo se il BMS ha l'ingresso NTC) e diametro del sensore, mm. */
-  ntc: boolean;
-  ntcMm: number;
 }
 
 export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
@@ -98,8 +95,6 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   tabWidthMm: 6,
   tabLengthMm: 8,
   tabBendMm: 0.3,
-  ntc: true,
-  ntcMm: 5,
   balanceAwg: 26,
   powerAwg: 12,
 };

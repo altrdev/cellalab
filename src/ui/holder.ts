@@ -76,7 +76,7 @@ export const regionsPath = (regions: readonly Region[]) => regions.flatMap((r) =
 // ---- Impostazioni del portacelle: ricordate nel browser e scritte anche nel file del progetto
 
 const KEY = 'cellalab:holder:v2';
-type NumKey = Exclude<keyof HolderSettings, 'lockCells' | 'shape'>;
+type NumKey = Exclude<keyof HolderSettings, 'lockCells' | 'shape' | 'ntc'>;
 const LIMITS: Record<NumKey, [number, number]> = {
   wallMm: [0.8, 6],
   clearanceMm: [0, 1],
@@ -87,6 +87,7 @@ const LIMITS: Record<NumKey, [number, number]> = {
   chamferMm: [0, 2],
   bedXMm: [50, 1000],
   bedYMm: [50, 1000],
+  ntcMm: [2, 12],
 };
 
 export const clampHolder = (key: NumKey, v: number): number =>
@@ -102,6 +103,7 @@ export function sanitizeHolderSettings(raw: unknown): HolderSettings {
     if (typeof v === 'number' && Number.isFinite(v)) base[k] = clampHolder(k, v);
   }
   if (typeof data.lockCells === 'boolean') base.lockCells = data.lockCells;
+  if (typeof data.ntc === 'boolean') base.ntc = data.ntc;
   if (data.shape === 'profile' || data.shape === 'rounded') base.shape = data.shape;
   return base;
 }
