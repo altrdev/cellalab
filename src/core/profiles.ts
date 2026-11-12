@@ -1,6 +1,6 @@
 /**
- * Profili degli strumenti del maker: saldatrice a punti e metodo di taglio.
- * I valori di default sono prudenti e MODIFICABILI: ogni saldatrice è diversa.
+ * Maker tool profiles: spot welder and cutting method.
+ * The default values are cautious and EDITABLE: every welder is different.
  */
 
 import { t } from '../i18n';
@@ -8,16 +8,16 @@ import { t } from '../i18n';
 export interface WelderProfile {
   id: string;
   name: string;
-  /** Spessore complessivo massimo che salda in modo affidabile (somma degli strati), mm. */
+  /** Maximum total thickness it welds reliably (sum of the layers), mm. */
   maxThicknessMm: number;
   maxLayers: number;
-  /** Corrente che un singolo punto di saldatura può portare in modo continuo, A. */
+  /** Current a single weld spot can carry continuously, A. */
   spotCurrentA: number;
-  /** Distanza minima tra i centri di due punti, mm. */
+  /** Minimum distance between the centres of two spots, mm. */
   spotSpacingMm: number;
-  /** Diametro di un punto, mm. */
+  /** Diameter of a spot, mm. */
   spotDiameterMm: number;
-  /** Punti minimi per ogni terminale, per ridondanza. */
+  /** Minimum spots per terminal, for redundancy. */
   minSpotsPerTerminal: number;
 }
 
@@ -66,9 +66,9 @@ export interface CutterProfile {
   id: string;
   kind: CutterKind;
   name: string;
-  /** Larghezza del taglio (kerf), mm: l'esportazione compensa il contorno di metà. */
+  /** Cut width (kerf), mm: the export compensates the outline by half of it. */
   kerfMm: number;
-  /** Distanza minima tra due pezzi (o dettaglio minimo) per un taglio pulito, mm. */
+  /** Minimum distance between two pieces (or minimum detail) for a clean cut, mm. */
   minGapMm: number;
 }
 

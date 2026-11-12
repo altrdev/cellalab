@@ -1,6 +1,6 @@
 /**
- * Archivio ZIP senza compressione («store»): basta per mettere insieme gli STL di un portacelle diviso in pezzi,
- * senza dipendenze. Nomi in UTF-8, data fissa (così lo stesso contenuto dà lo stesso file).
+ * ZIP archive without compression ("store"): enough to bundle the STLs of a holder split into pieces,
+ * with no dependencies. UTF-8 names, fixed date (so the same content gives the same file).
  */
 
 export interface ZipEntry {
@@ -56,7 +56,7 @@ export function zipStore(entries: readonly ZipEntry[]): Uint8Array {
     const cd = new Uint8Array(46 + name.length);
     const cv = new DataView(cd.buffer);
     cv.setUint32(0, 0x02014b50, true);
-    cv.setUint16(4, 20, true); // versione che l'ha creato
+    cv.setUint16(4, 20, true); // version that created it
     cv.setUint16(6, 20, true);
     cv.setUint16(8, UTF8_FLAG, true);
     cv.setUint16(10, 0, true);

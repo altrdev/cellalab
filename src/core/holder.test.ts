@@ -11,7 +11,7 @@ const pack = (series: number, parallel: number, gapMm = 1, kind: 'hex' | 'square
   replaceCells(createProject(), generateGrid({ typeId: T, diameterMm: 21.4, series, parallel, kind, gapMm }));
 
 describe('differenceRegions', () => {
-  it('un cerchio meno un cerchio più piccolo: corona con un buco', () => {
+  it('a circle minus a smaller circle: ring with a hole', () => {
     const outer = { outline: circlePolygon(0, 0, 10), holes: [] };
     const r = differenceRegions(outer, [circlePolygon(0, 0, 6)]);
     expect(r).toHaveLength(1);
@@ -19,8 +19,8 @@ describe('differenceRegions', () => {
     expect(regionArea(r[0]!)).toBeCloseTo(Math.PI * (100 - 36), -1);
   });
 
-  it('se il buco isola una parte, questa resta come forma a sé', () => {
-    // anello di tasche attorno a un'isola centrale
+  it('if the hole isolates a part, it remains as a shape of its own', () => {
+    // ring of pockets around a central island
     const outer = { outline: circlePolygon(0, 0, 20), holes: [] };
     const ring = differenceRegions({ outline: circlePolygon(0, 0, 10), holes: [] }, [circlePolygon(0, 0, 5)]);
     expect(ring).toHaveLength(1);
@@ -33,11 +33,11 @@ describe('differenceRegions', () => {
 });
 
 describe('buildHolder', () => {
-  it('senza celle non c\'è nulla da costruire', () => {
+  it('with no cells there is nothing to build', () => {
     expect(buildHolder(createProject())).toBeNull();
   });
 
-  it('3S2P: una piastra con 6 fori e 6 tasche, più larga delle sole celle', () => {
+  it('3S2P: a plate with 6 holes and 6 pockets, wider than the cells alone', () => {
     const p = pack(3, 2);
     const h = buildHolder(p)!;
     expect(h.slab).toHaveLength(1);
@@ -46,20 +46,20 @@ describe('buildHolder', () => {
     expect(h.wall[0]!.holes).toHaveLength(6);
     const s = DEFAULT_HOLDER_SETTINGS;
     const r = analyzeHolder(p, h);
-    // ingombro celle 77,4 × 40,8 + parete e gioco da ogni lato
+    // cell footprint 77.4 × 40.8 + wall and clearance on every side
     expect(r.widthMm).toBeCloseTo(77.4 + 2 * (s.wallMm + s.clearanceMm), 0);
     expect(r.depthMm).toBeCloseTo(40.8 + 2 * (s.wallMm + s.clearanceMm), 0);
     expect(r.totalHeightMm).toBeCloseTo(70.4 + 2 * s.floorMm, 6); // 21700: 70,4 mm
   });
 
-  it('le fessure minuscole tra tre celle si riempiono, i vuoti grandi tra quattro restano', () => {
+  it('the tiny slits between three cells are filled, the big gaps between four stay', () => {
     const hex = buildHolder(pack(3, 3))!;
-    expect(hex.slab[0]!.holes).toHaveLength(9); // solo i fori dei terminali
+    expect(hex.slab[0]!.holes).toHaveLength(9); // only the terminal holes
     const sq = buildHolder(pack(3, 3, 1, 'square'))!;
-    expect(sq.slab[0]!.holes.length).toBeGreaterThan(9); // + i vuoti al centro dei quadrati
+    expect(sq.slab[0]!.holes.length).toBeGreaterThan(9); // + the gaps at the centre of the squares
   });
 
-  it('i fori del fondo hanno raggio R − bordo, le tasche R + gioco', () => {
+  it('the floor holes have radius R − rim, the pockets R + clearance', () => {
     const p = pack(1, 1);
     const h = buildHolder(p)!;
     const s = DEFAULT_HOLDER_SETTINGS;
@@ -69,34 +69,34 @@ describe('buildHolder', () => {
     expect(hole(h.wall[0]!.holes[0]!)).toBeCloseTo(R + s.clearanceMm, 1);
   });
 
-  it('le pareti non superano metà cella', () => {
+  it('the walls do not exceed half a cell', () => {
     const h = buildHolder(pack(2, 1), { ...DEFAULT_HOLDER_SETTINGS, lipMm: 500 })!;
     expect(h.lipMm).toBeLessThanOrEqual(h.cellHeightMm / 2 - 1 + 1e-9);
   });
 });
 
 describe('analyzeHolder', () => {
-  it('spazio di 1 mm e gioco 0,15: parete di 0,7 mm, avviso di fragilità', () => {
+  it('1 mm space and 0.15 clearance: 0.7 mm wall, fragility warning', () => {
     const p = pack(2, 2, 1);
     const r = analyzeHolder(p, buildHolder(p)!);
     expect(r.minWallBetweenMm).toBeCloseTo(0.7, 2);
     expect(r.issues.some((i) => i.level === 'warning' && i.text.includes('parete'))).toBe(true);
   });
 
-  it('spazio di 2 mm: nessun avviso sulle pareti', () => {
+  it('2 mm space: no warning about the walls', () => {
     const p = pack(2, 2, 2);
     const r = analyzeHolder(p, buildHolder(p)!);
     expect(r.minWallBetweenMm).toBeCloseTo(1.7, 2);
     expect(r.issues.some((i) => i.text.includes('parete'))).toBe(false);
   });
 
-  it('tasche che si sovrappongono: errore', () => {
+  it('overlapping pockets: error', () => {
     const p = pack(2, 1, 0.1);
     const r = analyzeHolder(p, buildHolder(p)!);
     expect(r.issues.some((i) => i.level === 'error')).toBe(true);
   });
 
-  it('un pacco grande non sta nel piano di stampa', () => {
+  it('a large pack does not fit the print bed', () => {
     const p = pack(13, 4);
     const r = analyzeHolder(p, buildHolder(p)!);
     expect(r.issues.some((i) => i.text.includes('piano di stampa'))).toBe(true);
@@ -104,12 +104,12 @@ describe('analyzeHolder', () => {
     expect(analyzeHolder(small, buildHolder(small)!).issues.some((i) => i.text.includes('piano di stampa'))).toBe(false);
   });
 
-  it('consiglia sempre materiali che reggono il calore', () => {
+  it('always recommends materials that withstand the heat', () => {
     const p = pack(1, 1);
     expect(analyzeHolder(p, buildHolder(p)!).issues.some((i) => i.text.includes('PETG'))).toBe(true);
   });
 
-  it('il volume è positivo e cresce con lo spessore del fondo', () => {
+  it('the volume is positive and grows with the floor thickness', () => {
     const p = pack(2, 2, 2);
     const a = analyzeHolder(p, buildHolder(p)!).volumeMm3;
     const b = analyzeHolder(p, buildHolder(p, { ...DEFAULT_HOLDER_SETTINGS, floorMm: 2 })!).volumeMm3;
@@ -119,36 +119,36 @@ describe('analyzeHolder', () => {
 });
 
 describe('stlBinary', () => {
-  it('un triangolo: 84 + 50 byte, normale +z', () => {
+  it('one triangle: 84 + 50 bytes, normal +z', () => {
     const out = stlBinary([0, 0, 0, 1, 0, 0, 0, 1, 0]);
     expect(out.byteLength).toBe(134);
     const v = new DataView(out.buffer);
     expect(v.getUint32(80, true)).toBe(1);
     expect(v.getFloat32(84 + 8, true)).toBeCloseTo(1, 6); // nz
-    expect(v.getFloat32(84 + 12 + 12, true)).toBeCloseTo(1, 6); // x del secondo vertice
+    expect(v.getFloat32(84 + 12 + 12, true)).toBeCloseTo(1, 6); // x of the second vertex
   });
 });
 
-describe('raccordo e gruppi lontani', () => {
-  it('unionAll tiene separate le forme che non si toccano', () => {
+describe('fillet and distant groups', () => {
+  it('unionAll keeps shapes that do not touch separate', () => {
     const two = unionAll([circlePolygon(0, 0, 10), circlePolygon(21, 0, 10)]);
     expect(two).toHaveLength(2); // distanza 21 > 20: forme separate
   });
 
-  it('un cerchio solo non cambia', () => {
+  it('a single circle does not change', () => {
     const one = unionAll([circlePolygon(0, 0, 10)]);
     const closed = closeRegions(one, 3);
     expect(regionArea(closed[0]!)).toBeCloseTo(regionArea(one[0]!), -1);
   });
 
-  it('due cerchi sovrapposti: il raccordo riempie l\'incavo (area maggiore)', () => {
+  it('two overlapping circles: the fillet fills the notch (larger area)', () => {
     const u = unionAll([circlePolygon(0, 0, 10), circlePolygon(16, 0, 10)]);
     const closed = closeRegions(u, 3);
     expect(closed).toHaveLength(1);
     expect(regionArea(closed[0]!)).toBeGreaterThan(regionArea(u[0]!) + 1);
   });
 
-  it('celle in due gruppi lontani: il portacelle ha le pareti di entrambi', () => {
+  it('cells in two distant groups: the holder has the walls of both', () => {
     const base = pack(2, 1, 2);
     const far = { ...base, cells: base.cells.map((c, i) => ({ ...c, x: c.x + i * 300 })) };
     const h = buildHolder(far)!;
@@ -157,10 +157,10 @@ describe('raccordo e gruppi lontani', () => {
   });
 });
 
-describe('fette e smusso', () => {
+describe('slices and chamfer', () => {
   const s = DEFAULT_HOLDER_SETTINGS;
 
-  it('le fette coprono tutto lo spessore, senza buchi', () => {
+  it('the slices cover the whole thickness, with no gaps', () => {
     const h = buildHolder(pack(2, 2, 2))!;
     expect(h.layers[0]!.z0).toBe(0);
     expect(h.layers[h.layers.length - 1]!.z1).toBeCloseTo(h.totalMm, 6);
@@ -168,15 +168,15 @@ describe('fette e smusso', () => {
     expect(h.totalMm).toBeCloseTo(s.floorMm + s.lipMm, 6);
   });
 
-  it('sulla faccia esterna del fondo la sagoma è ritirata di circa lo smusso', () => {
+  it('on the outer face of the floor the outline is set back by about the chamfer', () => {
     const h = buildHolder(pack(1, 1))!;
     const width = (rs: { outline: { x: number }[] }[]) => Math.max(...rs.flatMap((r) => r.outline.map((p) => p.x))) - Math.min(...rs.flatMap((r) => r.outline.map((p) => p.x)));
     const full = width(h.wall);
     const first = width(h.layers[0]!.regions);
-    expect(first).toBeCloseTo(full - 2 * 0.5, 1); // primo gradino a metà di 0,2 mm → ritiro 0,5
+    expect(first).toBeCloseTo(full - 2 * 0.5, 1); // first step halfway through 0.2 mm → shrink 0.5
   });
 
-  it('smusso a rampa: poche fette, contorni accoppiati e volume vicino a quello a gradini', () => {
+  it('ramp chamfer: few slices, paired outlines and volume close to the stepped one', () => {
     const p = pack(2, 2, 2);
     const stairs = buildHolder(p)!;
     const smooth = buildHolder(p, s, true)!;
@@ -191,30 +191,30 @@ describe('fette e smusso', () => {
     expect(Math.abs(vr - vs) / vs).toBeLessThan(0.02);
   });
 
-  it('senza smusso la rampa non c\'è', () => {
+  it('without a chamfer there is no ramp', () => {
     expect(buildHolder(pack(2, 1, 2), { ...s, chamferMm: 0 }, true)!.ramp).toBeNull();
   });
 
-  it('senza smusso restano due fette: fondo e pareti', () => {
+  it('without a chamfer two slices remain: floor and walls', () => {
     const h = buildHolder(pack(2, 1, 2), { ...s, chamferMm: 0 })!;
     expect(h.layers).toHaveLength(2);
   });
 
-  it('lo smusso toglie plastica', () => {
+  it('the chamfer removes plastic', () => {
     const p = pack(2, 2, 2);
     const withC = analyzeHolder(p, buildHolder(p)!).volumeMm3;
     const without = analyzeHolder(p, buildHolder(p, { ...s, chamferMm: 0 })!).volumeMm3;
     expect(withC).toBeLessThan(without);
   });
 
-  it('lo smusso non supera i tre quarti della parete', () => {
+  it('the chamfer does not exceed three quarters of the wall', () => {
     const h = buildHolder(pack(1, 1), { ...s, chamferMm: 2 })!;
     expect(h.chamferMm).toBeLessThanOrEqual(s.wallMm * 0.75 + 1e-9);
   });
 });
 
-describe('senza blocco celle', () => {
-  it('niente fondo: spessore = pareti, pacco alto come le celle, nessun foro', () => {
+describe('without cell lock', () => {
+  it('no floor: thickness = walls, pack as tall as the cells, no holes', () => {
     const p = pack(2, 2, 2);
     const h = buildHolder(p, { ...DEFAULT_HOLDER_SETTINGS, lockCells: false })!;
     expect(h.floorMm).toBe(0);
@@ -224,32 +224,32 @@ describe('senza blocco celle', () => {
     expect(analyzeHolder(p, h).issues.some((i) => i.text.includes('non le bloccano'))).toBe(true);
   });
 
-  it('con il blocco il foro è 2·(R − bordo)', () => {
+  it('with the lock the hole is 2·(R − rim)', () => {
     const h = buildHolder(pack(1, 1))!;
     expect(h.openingDiameterMm).toBeCloseTo(2 * (10.7 - DEFAULT_HOLDER_SETTINGS.ledgeMm), 6);
   });
 });
 
-describe('geometria arrotondata', () => {
+describe('rounded geometry', () => {
   const rounded = { ...DEFAULT_HOLDER_SETTINGS, shape: 'rounded' as const };
 
-  it('il contorno è convesso: l\'area è quella del suo inviluppo, maggiore del profilo cella', () => {
+  it('the outline is convex: the area is that of its hull, larger than the cell profile', () => {
     const p = pack(3, 3, 1.5, 'square');
     const prof = buildHolder(p)!;
     const rnd = buildHolder(p, rounded)!;
     const area = (h: typeof prof) => h.wall.reduce((a, r) => a + regionArea(r), 0);
     expect(rnd.wall).toHaveLength(1);
-    expect(rnd.wall[0]!.holes).toHaveLength(9); // solo le tasche: niente vuoti tra le celle
+    expect(rnd.wall[0]!.holes).toHaveLength(9); // only the pockets: no gaps between the cells
     expect(area(rnd)).toBeGreaterThanOrEqual(area(prof) - 1e-6);
   });
 
-  it('gruppi di celle lontani restano separati', () => {
+  it('distant cell groups stay separate', () => {
     const base = pack(2, 1, 2);
     const far = { ...base, cells: base.cells.map((c, i) => ({ ...c, x: c.x + i * 300 })) };
     expect(buildHolder(far, rounded)!.wall).toHaveLength(2);
   });
 
-  it('con una cella sola è un cerchio, come nel profilo', () => {
+  it('with a single cell it is a circle, as in the profile', () => {
     const p = pack(1, 1);
     const a = regionArea(buildHolder(p, rounded)!.slab[0]!);
     const b = regionArea(buildHolder(p)!.slab[0]!);
@@ -260,12 +260,12 @@ describe('geometria arrotondata', () => {
 describe('buildToleranceTest', () => {
   const none = { customCellTypes: [] };
 
-  it('tipo di cella sconosciuto o nessun gioco: niente', () => {
+  it('unknown cell type or no clearance: nothing', () => {
     expect(buildToleranceTest(none, 'non-esiste')).toBeNull();
     expect(buildToleranceTest(none, T, [])).toBeNull();
   });
 
-  it('una tasca per gioco, ognuna larga quanto cella + 2 giochi', () => {
+  it('one pocket per clearance, each as wide as cell + 2 clearances', () => {
     const h = buildToleranceTest(none, T, [0.3, 0.1, 0.2])!;
     expect(h.wall).toHaveLength(1);
     const widths = h.wall[0]!.holes
@@ -278,13 +278,13 @@ describe('buildToleranceTest', () => {
     [0.1, 0.2, 0.3].forEach((cl, i) => expect(widths[i]).toBeCloseTo(21.4 + 2 * cl, 1));
   });
 
-  it('pareti basse: fondo + 4 mm al massimo', () => {
+  it('low walls: floor + 4 mm at most', () => {
     const h = buildToleranceTest(none, T)!;
     expect(h.lipMm).toBeLessThanOrEqual(4);
     expect(h.totalMm).toBeCloseTo(DEFAULT_HOLDER_SETTINGS.floorMm + h.lipMm, 6);
   });
 
-  it('i giochi sono incisi sul bordo delle pareti, solo negli strati alti', () => {
+  it('the clearances are engraved on the wall rim, only in the upper layers', () => {
     const h = buildToleranceTest(none, T)!;
     const holes = (l: { regions: { holes: unknown[] }[] }) => l.regions.reduce((n, r) => n + r.holes.length, 0);
     const top = h.layers[h.layers.length - 1]!;
@@ -294,7 +294,7 @@ describe('buildToleranceTest', () => {
     expect(clearanceLabel(0.15)).toBe('15');
   });
 
-  it('i giochi si ordinano: il più stretto a sinistra', () => {
+  it('the clearances are ordered: the tightest on the left', () => {
     const h = buildToleranceTest(none, T, [0.3, 0.1])!;
     const holes = h.wall[0]!.holes.map((ring) => ({
       cx: (Math.max(...ring.map((p) => p.x)) + Math.min(...ring.map((p) => p.x))) / 2,

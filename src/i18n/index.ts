@@ -3,13 +3,13 @@ import { en } from './en';
 import { it } from './it';
 
 /**
- * Traduzioni dell'interfaccia e dei messaggi del core. Modulo senza DOM né dipendenze: la lingua corrente è una
- * variabile del modulo, quindi `t()` si può usare anche nel core. L'interfaccia si rimonta quando la lingua cambia
- * (`{#key ui.locale}` in App.svelte), così non serve altra reattività.
+ * Translations of the interface and of the core messages. Module with no DOM and no dependencies: the current language is a
+ * module variable, so `t()` can be used in the core too. The interface remounts when the language changes
+ * (`{#key ui.locale}` in App.svelte), so no other reactivity is needed.
  *
- * Le chiavi sono in `it.ts` (lingua di partenza); `en.ts` è tipizzato su di esse, quindi una chiave mancante
- * in inglese non compila. Nei testi i parametri si scrivono `{nome}`; per i plurali si usano le chiavi
- * `base_one` e `base_other` con `tn(base, n)`.
+ * The keys are in `it.ts` (source language); `en.ts` is typed on them, so a missing key
+ * in English does not compile. In the texts parameters are written `{name}`; for plurals use the keys
+ * `base_one` and `base_other` with `tn(base, n)`.
  */
 
 export type Locale = 'it' | 'en';
@@ -24,13 +24,13 @@ type Params = Record<string, string | number>;
 const dictionaries: Record<Locale, Record<MsgKey, string>> = { it, en };
 const STORAGE_KEY = 'cellalab:lang';
 
-// nel browser la lingua è quella salvata o del browser fin dal primo import; fuori (test, node) resta l'italiano
+// in the browser the language is the saved or browser one from the first import; outside (tests, node) it stays Italian
 let current: Locale = typeof window === 'undefined' ? 'it' : loadLocale();
 
 export const getLocale = (): Locale => current;
 
 const listeners = new Set<() => void>();
-/** Chiama `cb` quando la lingua cambia: serve a ricalcolare i risultati che contengono testo (verifiche, rapporti). */
+/** Calls `cb` when the language changes: used to recompute results that contain text (checks, reports). */
 export function onLocaleChange(cb: () => void): () => void {
   listeners.add(cb);
   return () => listeners.delete(cb);
@@ -45,7 +45,7 @@ export function setLocale(l: Locale): void {
 const fill = (text: string, params?: Params) =>
   params ? text.replace(/\{(\w+)\}/g, (m, k: string) => (k in params ? String(params[k]) : m)) : text;
 
-/** Le etichette dei campi portano l'unità tra parentesi, scritta in metrico: «(mm)», «(°C)», «(g)», «(€/cella)». */
+/** Field labels carry the unit in brackets, written in metric: "(mm)", "(°C)", "(g)", "(€/cell)". */
 function unitize(text: string): string {
   const p = getPrefs();
   if (!text.includes('(')) return text;
@@ -56,37 +56,37 @@ function unitize(text: string): string {
     .replace(/\(€\//, `(${CURRENCIES[p.currency].symbol}/`);
 }
 
-/** Testo nella lingua corrente; se manca (non dovrebbe) ripiega sull'italiano. */
+/** Text in the current language; if missing (it should not be) falls back to Italian. */
 export function t(key: MsgKey, params?: Params): string {
   return unitize(fill(dictionaries[current][key] ?? it[key] ?? key, params));
 }
 
-/** Plurale: usa `base_one` per 1 e `base_other` altrimenti; `{n}` è disponibile nel testo. */
+/** Plural: uses `base_one` for 1 and `base_other` otherwise; `{n}` is available in the text. */
 export function tn(base: PluralBase, n: number, params?: Params): string {
   return t(`${base}_${n === 1 ? 'one' : 'other'}` as MsgKey, { n, ...params });
 }
 
-/** Numero con `d` decimali e il separatore della lingua (virgola in italiano, punto in inglese). */
+/** Number with `d` decimals and the language's separator (comma in Italian, dot in English). */
 export function fmtNum(n: number, d = 2): string {
   const s = n.toFixed(d);
   return current === 'it' ? s.replace('.', ',') : s;
 }
 
-/** Lingua del browser: italiano se è «it», altrimenti inglese. */
+/** Browser language: Italian if it is "it", otherwise English. */
 export function browserLocale(): Locale {
-  // fuori dal browser (test, node) si resta sull'italiano di partenza
+  // outside the browser (tests, node) it stays on the source Italian
   if (typeof window === 'undefined') return 'it';
   const lang = typeof navigator !== 'undefined' ? (navigator.languages?.[0] ?? navigator.language ?? '') : '';
   return lang.toLowerCase().startsWith('it') ? 'it' : 'en';
 }
 
-/** Lingua scelta e salvata dall'utente, altrimenti quella del browser. */
+/** Language chosen and saved by the user, otherwise the browser's. */
 export function loadLocale(): Locale {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === 'it' || saved === 'en') return saved;
   } catch {
-    /* storage non disponibile */
+    /* storage not available */
   }
   return browserLocale();
 }
@@ -95,9 +95,9 @@ export function saveLocale(l: Locale): void {
   try {
     localStorage.setItem(STORAGE_KEY, l);
   } catch {
-    /* storage non disponibile: la scelta vale per questa sessione */
+    /* storage not available: the choice holds for this session */
   }
 }
 
-/** Cambia quando cambia la lingua o una preferenza: chiave per le cache di risultati che contengono testo formattato. */
+/** Changes when the language or a preference changes: key for caches of results that contain formatted text. */
 export const renderKey = (): string => current + JSON.stringify(getPrefs());

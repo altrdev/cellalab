@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS } from '../core/lamelle';
-import { buildCutSummary } from '../core/lamelleExport';
+import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS } from '../core/busbar';
+import { buildCutSummary } from '../core/busbarExport';
 import { runDrc } from '../core/drc';
 import { buildHolder, analyzeHolder, DEFAULT_HOLDER_SETTINGS } from '../core/holder';
 import { generateGrid } from '../core/layout';
@@ -10,7 +10,7 @@ import { buildStrips } from '../core/strips';
 import { findMaterial } from '../core/materials';
 import { BUILTIN_CELL_TYPES } from '../core/catalog';
 import { drc, history } from '../state';
-import { reportOf } from '../ui/lamelle';
+import { reportOf } from '../ui/busbar';
 import { en } from './en';
 import { it as itDict } from './it';
 import { setLocale } from './index';
@@ -24,8 +24,8 @@ afterEach(() => {
 const pack = (series: number, parallel: number, gapMm = 1) =>
   replaceCells(createProject(), generateGrid({ typeId: '21700-5000-10a', diameterMm: 21.4, series, parallel, kind: 'hex', gapMm }));
 
-describe('messaggi in inglese', () => {
-  it('le verifiche sul pacco', () => {
+describe('messages in English', () => {
+  it('the pack checks', () => {
     const p = pack(3, 2, 0);
     setLocale('en');
     const messages = runDrc(p).map((i) => i.message);
@@ -34,7 +34,7 @@ describe('messaggi in inglese', () => {
     expect(messages.join(' ')).not.toMatch(/celle|coppie/i);
   });
 
-  it('le verifiche sulle lamelle: spessore insufficiente e saldatrice', () => {
+  it('the strip checks: insufficient thickness and welder', () => {
     const p = pack(4, 3);
     const strips = buildStrips(p);
     setLocale('en');
@@ -42,12 +42,12 @@ describe('messaggi in inglese', () => {
     const text = r.issues.map((i) => i.message).join(' ');
     expect(text).toMatch(/Thickness|thickness/);
     expect(text).not.toMatch(/Spessore|lamella/);
-    // i decimali usano il punto
+    // decimals use the dot
     expect(text).toMatch(/\d\.\d/);
     expect(r.alternatives.join(' ')).toMatch(/Two-level structure/);
   });
 
-  it('materiali, saldatrici e raffreddamento seguono la lingua', () => {
+  it('materials, welders and cooling follow the language', () => {
     expect(findMaterial('nichel-puro')!.name).toBe('Nichel puro (Ni 99,6%)');
     setLocale('en');
     expect(findMaterial('nichel-puro')!.name).toBe('Pure nickel (Ni 99.6%)');
@@ -55,7 +55,7 @@ describe('messaggi in inglese', () => {
     expect(BUILTIN_CELL_TYPES[0]!.name).toMatch(/\(energy\)/);
   });
 
-  it('le verifiche sul portacelle', () => {
+  it('the holder checks', () => {
     const p = pack(3, 2, 0.1);
     setLocale('en');
     const h = buildHolder(p, DEFAULT_HOLDER_SETTINGS, false)!;
@@ -64,7 +64,7 @@ describe('messaggi in inglese', () => {
     expect(text).not.toMatch(/Stampa/);
   });
 
-  it('riepilogo di taglio, errori di lettura del file e nome predefinito', () => {
+  it('cut summary, file read errors and default name', () => {
     const p = pack(4, 3);
     const strips = buildStrips(p);
     const report = analyzeLamelle(p, strips, DEFAULT_LAMELLA_SETTINGS, 30);
@@ -77,8 +77,8 @@ describe('messaggi in inglese', () => {
   });
 });
 
-describe('messaggi con le unità scelte', () => {
-  it('lamelle: spessori in pollici e salti di temperatura in °F', () => {
+describe('messages with the chosen units', () => {
+  it('strips: thicknesses in inches and temperature jumps in °F', () => {
     const p = pack(4, 3);
     const strips = buildStrips(p);
     setPrefs({ length: 'in', temp: 'F' });
@@ -89,7 +89,7 @@ describe('messaggi con le unità scelte', () => {
     expect(text).not.toMatch(/\bmm\b|°C|\bK\b/);
   });
 
-  it('portacelle: piano di stampa e materiale nelle unità scelte', () => {
+  it('holder: print bed and material in the chosen units', () => {
     const p = pack(3, 2, 0.1);
     setPrefs({ length: 'in', temp: 'F' });
     const h = buildHolder(p, { ...DEFAULT_HOLDER_SETTINGS, bedXMm: 50, bedYMm: 50 }, false)!;
@@ -99,7 +99,7 @@ describe('messaggi con le unità scelte', () => {
     expect(text).not.toMatch(/\bmm\b|°C/);
   });
 
-  it('verifiche sul pacco: lo spazio minimo in pollici', () => {
+  it('pack checks: the minimum space in inches', () => {
     const p = pack(3, 2, 0.3);
     setPrefs({ length: 'in' });
     const text = runDrc(p).map((i) => i.message).join(' ');
@@ -108,10 +108,10 @@ describe('messaggi con le unità scelte', () => {
   });
 });
 
-describe('cambio lingua a interfaccia aperta', () => {
-  it('il rapporto delle lamelle in cache si ricalcola nella nuova lingua', () => {
+describe('language change with the interface open', () => {
+  it('the cached strip report is recomputed in the new language', () => {
     const p = pack(4, 3);
-    const settings = { ...DEFAULT_LAMELLA_SETTINGS, layers: 5 }; // più strati di quanti ne salda la saldatrice
+    const settings = { ...DEFAULT_LAMELLA_SETTINGS, layers: 5 }; // more layers than the welder can weld
     const itText = reportOf(p, settings).issues.map((i) => i.message).join(' ');
     expect(itText).toMatch(/strati/);
     setLocale('en');
@@ -120,7 +120,7 @@ describe('cambio lingua a interfaccia aperta', () => {
     expect(enText).not.toMatch(/strati/);
   });
 
-  it('lo store delle verifiche emette di nuovo i testi nella nuova lingua', () => {
+  it('the checks store emits the texts again in the new language', () => {
     history.reset(pack(3, 2, 0));
     const seen: string[] = [];
     const unsubscribe = drc.subscribe((issues) => seen.push(issues.map((i) => i.message).join(' | ')));
@@ -135,8 +135,8 @@ describe('cambio lingua a interfaccia aperta', () => {
   });
 });
 
-describe('dizionari', () => {
-  // tutti i sorgenti (non i test e non i dizionari) come testo
+describe('dictionaries', () => {
+  // all the sources (not the tests nor the dictionaries) as text
   const files = import.meta.glob(['../**/*.ts', '../**/*.svelte', '!../**/*.test.ts', '!../i18n/**', '!../**/*.d.ts'], {
     query: '?raw',
     import: 'default',
@@ -144,7 +144,7 @@ describe('dizionari', () => {
   }) as Record<string, string>;
   const code = Object.values(files).join('\n');
 
-  it('ogni chiave è usata da qualche parte nel codice', () => {
+  it('every key is used somewhere in the code', () => {
     const unused = Object.keys(itDict).filter((k) => {
       const base = k.replace(/_(one|other)$/, '');
       return !code.includes(`'${k}'`) && !code.includes(`'${base}'`) && !code.includes(`"${k}"`) && !code.includes(`\`${k}\``);
@@ -152,8 +152,8 @@ describe('dizionari', () => {
     expect(unused).toEqual([]);
   });
 
-  it('nessun testo ha unità fisse: i valori arrivano già con la loro unità', () => {
-    // eccezioni volute: l'incisione del pezzo test è in centesimi di mm, le note sulle impostazioni parlano di mm e kg
+  it('no text has fixed units: values arrive already with their unit', () => {
+    // intended exceptions: the test piece engraving is in hundredths of a mm, the settings notes talk about mm and kg
     const allowed = new Set(['exp.testHelp', 'settings.weightMetric', 'settings.rate', 'settings.exportNote']);
     const strip = (v: string) => v.replace('(mm)', '').replace('(°C)', '').replace('(g)', '').replace('(€/', '(');
     for (const dict of [itDict, en] as Record<string, string>[]) {
@@ -164,7 +164,7 @@ describe('dizionari', () => {
     }
   });
 
-  it('i testi inglesi non contengono lettere accentate italiane', () => {
+  it('the English texts contain no Italian accented letters', () => {
     for (const [k, v] of Object.entries(en)) expect(v, k).not.toMatch(/[àèéìòù]/);
   });
 });

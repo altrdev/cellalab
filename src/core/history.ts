@@ -1,7 +1,7 @@
 /**
- * Store con undo/redo. Lo stato è immutabile: ogni modifica è una funzione pura
- * `(stato) => nuovoStato`. Compatibile con il contratto degli store di Svelte
- * (`subscribe`), quindi in un componente si usa con `$history`.
+ * Store with undo/redo. The state is immutable: every change is a pure function
+ * `(state) => newState`. Compatible with the Svelte store contract
+ * (`subscribe`), so in a component it is used with `$history`.
  */
 
 export interface HistoryView<T> {
@@ -12,8 +12,8 @@ export interface HistoryView<T> {
 
 export interface CommitOptions {
   /**
-   * Commit consecutivi con la stessa chiave si fondono in un'unica voce di cronologia
-   * (es. il trascinamento di una cella: un solo undo per tutto il gesto).
+   * Consecutive commits with the same key merge into a single history entry
+   * (e.g. dragging a cell: a single undo for the whole gesture).
    */
   coalesceKey?: string;
 }
@@ -24,7 +24,7 @@ export interface History<T> {
   commit(change: (state: T) => T, options?: CommitOptions): void;
   undo(): void;
   redo(): void;
-  /** Sostituisce lo stato e azzera la cronologia (es. dopo aver caricato un file). */
+  /** Replaces the state and clears the history (e.g. after loading a file). */
   reset(state: T): void;
 }
 
@@ -57,7 +57,7 @@ export function createHistory<T>(initial: T, limit = 200): History<T> {
     get: view,
     commit(change, options) {
       const next = change(present);
-      if (Object.is(next, present)) return; // nessun cambiamento, nessuna voce di cronologia
+      if (Object.is(next, present)) return; // no change, no history entry
       const key = options?.coalesceKey;
       if (key !== undefined && key === lastKey && past.length > 0) {
         present = next; // fonde col commit precedente

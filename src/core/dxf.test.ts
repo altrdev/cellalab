@@ -13,14 +13,14 @@ const project = replaceCells(
 const strips = buildStrips(project);
 const base: DxfOptions = { face: 'all', kerfMm: 0, includeContacts: false, includeLabels: false };
 
-/** Legge il DXF come coppie codice/valore. */
+/** Reads the DXF as code/value pairs. */
 function pairs(dxf: string): [string, string][] {
   const l = dxf.trim().split('\n');
   const out: [string, string][] = [];
   for (let i = 0; i + 1 < l.length; i += 2) out.push([l[i]!, l[i + 1]!]);
   return out;
 }
-/** Le polilinee del DXF come vertici con bulge. */
+/** The DXF polylines as vertices with bulge. */
 function rings(dxf: string): ArcVertex[][] {
   const out: ArcVertex[][] = [];
   let cur: ArcVertex[] | null = null;
@@ -37,7 +37,7 @@ function rings(dxf: string): ArcVertex[][] {
   }
   return out;
 }
-/** Tutti i punti dei contorni, con gli archi riportati a punti. */
+/** All the outline points, with the arcs turned back into points. */
 const outlinePoints = (dxf: string) => rings(dxf).flatMap((r) => expandArcs(r, 0.02));
 const count = (dxf: string, entity: string) => pairs(dxf).filter(([c, v]) => c === '0' && v === entity).length;
 const vertices = (dxf: string) =>
@@ -49,7 +49,7 @@ const vertices = (dxf: string) =>
   }, []);
 
 describe('buildDxf', () => {
-  it('struttura valida: sezioni nell\'ordine giusto e fine file', () => {
+  it('valid structure: sections in the right order and end of file', () => {
     const dxf = buildDxf(strips, base);
     const names = pairs(dxf).filter(([c]) => c === '2').map(([, v]) => v);
     expect(names.slice(0, 3)).toEqual(['HEADER', 'TABLES', 'LAYER']);
@@ -58,25 +58,25 @@ describe('buildDxf', () => {
     expect(count(dxf, 'SECTION')).toBe(count(dxf, 'ENDSEC'));
   });
 
-  it('una polilinea chiusa per ogni lamella, con le coordinate dei suoi vertici', () => {
+  it('one closed polyline per strip, with the coordinates of its vertices', () => {
     const dxf = buildDxf(strips, base);
-    // una polilinea per il contorno e una per ogni finestra
+    // one polyline for the outline and one for each window
     const rings = strips.reduce((a, s) => a + 1 + s.holes.length, 0);
     expect(count(dxf, 'POLYLINE')).toBe(rings);
     expect(count(dxf, 'SEQEND')).toBe(rings);
-    // i tratti rotondi sono archi: molti meno vertici dei segmenti del poligono
+    // the round parts are arcs: far fewer vertices than the polygon's segments
     expect(count(dxf, 'VERTEX')).toBeLessThan(strips.reduce((a, s) => a + s.outline.length + s.holes.reduce((b, h) => b + h.length, 0), 0) / 2);
     expect(pairs(dxf).some(([c]) => c === '42')).toBe(true);
   });
 
-  it('filtra per faccia', () => {
+  it('filters by face', () => {
     const rings = (list: typeof strips) => list.reduce((a, s) => a + 1 + s.holes.length, 0);
     const top = strips.filter((s) => s.face === 'top');
     expect(count(buildDxf(strips, { ...base, face: 'top' }), 'POLYLINE')).toBe(rings(top));
     expect(count(buildDxf(strips, { ...base, face: 'bottom' }), 'POLYLINE')).toBe(rings(strips.filter((s) => s.face === 'bottom')));
   });
 
-  it('inverte la y (il DXF va verso l\'alto)', () => {
+  it('flips the y (the DXF goes upwards)', () => {
     const s = strips[0]!;
     const dxf = buildDxf([s], base);
     const v = outlinePoints(dxf);
@@ -85,7 +85,7 @@ describe('buildDxf', () => {
     expect(Math.max(...v.map((p) => p.x))).toBeCloseTo(Math.max(...s.outline.map((p) => p.x)), 1);
   });
 
-  it('kerf: il contorno cresce di metà kerf per lato', () => {
+  it('kerf: the outline grows by half a kerf per side', () => {
     const s = strips[0]!;
     const plain = outlinePoints(buildDxf([s], base));
     const kerf = outlinePoints(buildDxf([s], { ...base, kerfMm: 0.4 }));
@@ -93,7 +93,7 @@ describe('buildDxf', () => {
     expect(width(kerf) - width(plain)).toBeCloseTo(0.4, 1);
   });
 
-  it('contatti, etichette e punti sono opzionali', () => {
+  it('contacts, labels and spots are optional', () => {
     const none = buildDxf(strips, base);
     expect(count(none, 'CIRCLE')).toBe(0);
     expect(count(none, 'TEXT')).toBe(0);
@@ -111,11 +111,11 @@ describe('buildDxf', () => {
       spotDiameterMm: 2,
       spotSpacingMm: 3,
     });
-    // 2 punti per ogni nodo (tutti i contatti sono abbastanza grandi)
+    // 2 spots for each node (all the contacts are large enough)
     expect(count(spots, 'CIRCLE')).toBe(strips.reduce((a, s) => a + s.nodes.length * 2, 0));
   });
 
-  it('i layer dichiarati coprono quelli usati', () => {
+  it('the declared layers cover the used ones', () => {
     const dxf = buildDxf(strips, {
       ...base,
       includeContacts: true,
@@ -130,20 +130,20 @@ describe('buildDxf', () => {
     for (const u of used) expect(declared).toContain(u);
   });
 
-  it('nessuna lamella: file valido ma senza entità', () => {
+  it('no strips: valid file but with no entities', () => {
     const dxf = buildDxf([], base);
     expect(count(dxf, 'POLYLINE')).toBe(0);
     expect(dxf.trim().endsWith('EOF')).toBe(true);
   });
 });
 
-describe('archi nel contorno', () => {
-  it('i vertici con bulge cadono tutti sul poligono originale (scostamento sotto 0,02 mm)', () => {
+describe('arcs in the outline', () => {
+  it('the vertices with bulge all fall on the original polygon (deviation under 0.02 mm)', () => {
     const s = strips[0]!;
     const poly = [s.outline, ...s.holes];
     const dxf = buildDxf([s], base);
     const pts = outlinePoints(dxf);
-    // ogni punto dell'arco sta vicino a un lato del poligono originale (in y del DXF = -y)
+    // every point of the arc is close to a side of the original polygon (DXF y = -y)
     const distToPoly = (p: { x: number; y: number }) =>
       Math.min(
         ...poly.flatMap((ring) =>
@@ -161,13 +161,13 @@ describe('archi nel contorno', () => {
     expect(Math.max(...pts.map(distToPoly))).toBeLessThan(0.02);
   });
 
-  it('con il taglio compensato gli archi restano archi', () => {
+  it('with the compensated cut the arcs stay arcs', () => {
     const dxf = buildDxf([strips[0]!], { ...base, kerfMm: 0.4 });
     expect(pairs(dxf).filter(([c]) => c === '42').length).toBeGreaterThan(5);
   });
 });
 
-describe('posizione delle etichette', () => {
+describe('label position', () => {
   const top = strips.filter((s) => s.face === 'top');
   const bbox = (s: (typeof strips)[number]) => ({
     minX: Math.min(...s.outline.map((p) => p.x)),
@@ -178,21 +178,21 @@ describe('posizione delle etichette', () => {
   const box = (l: { x: number; y: number; text: string }) => ({ minX: l.x, maxX: l.x + l.text.length * 1.5, minY: l.y - 2.5, maxY: l.y });
   const overlap = (a: ReturnType<typeof box>, b: ReturnType<typeof box>) => a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
 
-  it('ogni etichetta sta fuori da tutte le lamelle e sotto la propria', () => {
+  it('each label is outside all the strips and below its own', () => {
     const labels = labelPlacements(top, 0);
     expect(labels).toHaveLength(top.length);
     labels.forEach((l, i) => {
-      expect(box(l).minY).toBeGreaterThanOrEqual(bbox(top[i]!).maxY); // sotto la propria
-      for (const s of top) expect(overlap(box(l), bbox(s))).toBe(false); // fuori da tutte
+      expect(box(l).minY).toBeGreaterThanOrEqual(bbox(top[i]!).maxY); // below its own
+      for (const s of top) expect(overlap(box(l), bbox(s))).toBe(false); // outside all of them
     });
   });
 
-  it('le etichette non si sovrappongono tra loro', () => {
+  it('the labels do not overlap each other', () => {
     const labels = labelPlacements(top, 0).map(box);
     for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++) expect(overlap(labels[i]!, labels[j]!)).toBe(false);
   });
 
-  it('nel DXF il testo è sotto il contorno (y del DXF verso l\'alto)', () => {
+  it('in the DXF the text is below the outline (DXF y upwards)', () => {
     const s = top[0]!;
     const dxf = buildDxf([s], { ...base, includeLabels: true });
     const p = pairs(dxf);
@@ -201,13 +201,13 @@ describe('posizione delle etichette', () => {
     expect(textY).toBeLessThan(-bbox(s).maxY);
   });
 
-  it('senza etichette non c\'è nessun TEXT', () => {
+  it('without labels there is no TEXT', () => {
     expect(count(buildDxf(strips, base), 'TEXT')).toBe(0);
   });
 });
 
-describe('etichette', () => {
-  it('il DXF è solo ASCII: frecce e meno tipografici diventano caratteri semplici', () => {
+describe('labels', () => {
+  it('the DXF is ASCII only: arrows and typographic minus signs become plain characters', () => {
     expect(asciiLabel('S2→S3 sopra')).toBe('S2->S3 sopra');
     expect(asciiLabel('P− sotto')).toBe('P- sotto');
     expect(asciiLabel('città')).toBe('citta');
@@ -219,20 +219,20 @@ describe('etichette', () => {
   });
 });
 
-describe('unità del DXF', () => {
+describe('DXF units', () => {
   const header = (dxf: string, name: string) => {
     const p = pairs(dxf);
     const i = p.findIndex(([c, v]) => c === '9' && v === name);
     return Number(p[i + 1]![1]);
   };
 
-  it('in mm: unità 4 e sistema metrico', () => {
+  it('in mm: unit 4 and metric system', () => {
     const dxf = buildDxf(strips, base);
     expect(header(dxf, '$INSUNITS')).toBe(4);
     expect(header(dxf, '$MEASUREMENT')).toBe(1);
   });
 
-  it('in pollici: coordinate divise per 25,4, unità 1 e sistema imperiale', () => {
+  it('in inches: coordinates divided by 25.4, unit 1 and imperial system', () => {
     const s = strips[0]!;
     const mm = outlinePoints(buildDxf([s], base));
     const inch = outlinePoints(buildDxf([s], { ...base, unit: 'in' }));
@@ -243,7 +243,7 @@ describe('unità del DXF', () => {
     expect(header(dxf, '$MEASUREMENT')).toBe(0);
   });
 
-  it('cerchi e testi si scalano insieme al disegno', () => {
+  it('circles and texts scale together with the drawing', () => {
     const mm = buildDxf(strips, { ...base, includeContacts: true, includeLabels: true });
     const inch = buildDxf(strips, { ...base, includeContacts: true, includeLabels: true, unit: 'in' });
     const radii = (dxf: string) => {

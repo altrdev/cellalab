@@ -4,38 +4,38 @@ import { circumcenter, SIDE_VECTOR, type Pt } from './polygon';
 import type { Project } from './types';
 
 /**
- * Posto per il sensore di temperatura (NTC): il vuoto tra tre celle vicine, dove il sensore tocca i fianchi di tutte e
- * tre. Si sceglie una cella centrale (la più calda) e, tra i vuoti che la toccano, quello più verso il lato di uscita
- * dei fili. La tasca è un foro tondo nelle pareti del portacelle, che si apre sulle tasche delle tre celle.
+ * Place for the temperature sensor (NTC): the gap between three neighbouring cells, where the sensor touches the flanks of all
+ * three. A central cell (the hottest) is chosen and, among the gaps that touch it, the one closest to the wire exit
+ * side. The pocket is a round hole in the holder walls, opening onto the pockets of the three cells.
  */
 
 export type NtcSide = 'top' | 'bottom' | 'left' | 'right';
 
 export interface NtcSite {
-  /** Centro del vuoto tra le tre celle, mm. */
+  /** Centre of the gap between the three cells, mm. */
   x: number;
   y: number;
-  /** Raggio del foro, mm. */
+  /** Radius of the hole, mm. */
   radiusMm: number;
   polygon: Pt[];
-  /** Foro passante nel fondo, largo come la tasca: il sensore si infila da fuori, dopo aver montato il pacco, e il filo esce da lì. */
+  /** Through hole in the floor, as wide as the pocket: the sensor is pushed in from outside, after assembling the pack, and the wire exits there. */
   wirePolygon: Pt[];
-  /** Il foro cade sotto una lamella: il sensore non si infila da fuori (nessun altro vuoto era libero). */
+  /** The hole falls under a strip: the sensor cannot be pushed in from outside (no other gap was free). */
   covered: boolean;
-  /** Le tre celle che il sensore tocca. */
+  /** The three cells the sensor touches. */
   cellIds: [string, string, string];
-  /** Vuoto tra quattro celle (griglia quadrata): con la sagoma «a profilo» è già aperto e il foro non toglie niente; con quella arrotondata il contorno lo riempie e il foro serve. */
+  /** Gap between four cells (square grid): with the "profile" outline it is already open and the hole removes nothing; with the rounded one the outline fills it and the hole is needed. */
   open: boolean;
 }
 
-/** Due celle sono vicine se i centri distano al massimo 1,25 volte la distanza minima nel pacco. */
+/** Two cells are neighbours if their centres are at most 1.25 times the minimum distance in the pack apart. */
 const NEIGHBOUR_FACTOR = 1.25;
-/** Nella griglia quadrata le due celle accanto a una terza stanno in diagonale: fino a 1,5 volte il passo. */
+/** In the square grid the two cells next to a third are diagonal: up to 1.5 times the pitch. */
 const DIAGONAL_FACTOR = 1.5;
 
 /**
- * I vuoti adatti all'NTC, dal migliore: prima quelli di una cella centrale, e a parità i liberi da lamelle e più verso il
- * lato di uscita. Vuota se non ce ne sono (meno di tre celle vicine, tutte in fila…).
+ * The gaps suitable for the NTC, best first: those of a central cell first, and among equals those free of strips and closer to the
+ * exit side. Empty if there are none (fewer than three neighbouring cells, all in a row…).
  */
 export function ntcSites(project: Project, side: NtcSide, diameterMm: number, clearanceMm: number, avoid: readonly Region[] = []): NtcSite[] {
   const cells = project.cells.flatMap((c) => {
@@ -67,12 +67,12 @@ export function ntcSites(project: Project, side: NtcSide, diameterMm: number, cl
           if (dist(a, b) > pairNear) continue;
           const p = circumcenter(c, a, b);
           if (!p) continue;
-          // deve essere un vuoto vero: fuori dalle tasche di tutte le celle
+          // must be a real gap: outside the pockets of all the cells
           if (cells.some((o) => dist(o, p) < o.pocket - 1e-6)) continue;
           const k = `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
           if (seen.has(k)) continue;
           seen.add(k);
-          // I vuoti liberi (senza lamelle sopra dove passa il filo) vincono su quelli coperti; poi conta il lato di uscita.
+          // Free gaps (no strips over where the wire passes) win over covered ones; then the exit side counts.
           const covered = avoid.length > 0 && intersectRegions(avoid, [circlePolygon(p.x, p.y, radiusMm)]).some((r) => regionArea(r) > 0.01);
           mine.push({ p, ids: [c.id, a.id, b.id], score: p.x * d.x + p.y * d.y, covered });
         }
@@ -85,13 +85,13 @@ export function ntcSites(project: Project, side: NtcSide, diameterMm: number, cl
     return out;
   };
   const triples = collect(near, false);
-  // Griglia quadrata: nessun vuoto tra tre celle, ma quello tra quattro (già aperto) va bene.
+  // Square grid: no gap between three cells, but the one between four (already open) will do.
   return triples.length > 0 ? triples : collect(pitch * DIAGONAL_FACTOR + 1e-6, true);
 }
 
-/** Il vuoto più adatto per l'NTC, o null se non c'è. */
+/** The most suitable gap for the NTC, or null if there is none. */
 export function ntcSite(project: Project, side: NtcSide, diameterMm: number, clearanceMm: number, avoid: readonly Region[] = []): NtcSite | null {
   const all = ntcSites(project, side, diameterMm, clearanceMm, avoid);
-  // una cella centrale con vuoti liberi vince su una più periferica con vuoti coperti
+  // a central cell with free gaps wins over a more peripheral one with covered gaps
   return all.find((s) => !s.covered) ?? all[0] ?? null;
 }

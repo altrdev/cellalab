@@ -3,7 +3,7 @@ import { history } from '../state';
 
 const KEY = 'cellalab:project';
 
-/** Ripristina l'ultimo progetto salvato nel browser. Se manca o è rovinato, parte da vuoto. */
+/** Restores the last project saved in the browser. If it is missing or damaged, starts empty. */
 export function restoreSaved(): boolean {
   try {
     const raw = localStorage.getItem(KEY);
@@ -15,7 +15,7 @@ export function restoreSaved(): boolean {
   }
 }
 
-/** Salva automaticamente a ogni modifica (con una breve attesa per non scrivere a ogni pixel). */
+/** Saves automatically at every change (with a short delay so it does not write at every pixel). */
 export function startAutosave(): void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let first = true;
@@ -28,7 +28,7 @@ export function startAutosave(): void {
     try {
       localStorage.setItem(KEY, serializeProject(history.get().present));
     } catch {
-      /* spazio esaurito o storage bloccato: l'app funziona lo stesso */
+      /* storage full or blocked: the app works anyway */
     }
   };
 
@@ -42,7 +42,7 @@ export function startAutosave(): void {
     timer = setTimeout(flush, 400);
   });
 
-  // Chiudendo o nascondendo la scheda non si aspetta l'attesa: l'ultima modifica non va persa.
+  // When the tab is closed or hidden the delay is not waited: the last change must not be lost.
   window.addEventListener('pagehide', flush);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flush();

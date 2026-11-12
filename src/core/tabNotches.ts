@@ -3,37 +3,37 @@ import { SIDE_VECTOR, type Pt } from './polygon';
 import { tabsOf, type Face, type Strip } from './strips';
 import { findAwg } from './wire';
 
-/** Gioco di lato tra linguetta e scanalatura, mm. */
+/** Side clearance between tab and groove, mm. */
 const SIDE_CLEARANCE_MM = 0.3;
-/** Spazio in più oltre al filo: la linguetta piegata e la saldatura, mm. */
+/** Extra space beyond the wire: the folded tab and the solder, mm. */
 const DEPTH_EXTRA_MM = 0.2;
-/** Una scanalatura più sottile di così non serve a niente. */
+/** A groove thinner than this is useless. */
 const MIN_DEPTH_MM = 0.3;
 
 
 export interface Notch {
   stripId: string;
-  /** Faccia della lamella: la scanalatura serve solo alla piastra di quella faccia. */
+  /** Strip face: the groove is only for the plate of that face. */
   face: Face;
   polygon: Pt[];
-  /** Profondità reale nella parete, mm. */
+  /** Actual depth into the wall, mm. */
   depthMm: number;
-  /** Il filo sporge dalla scanalatura: la parete è troppo sottile per alloggiarlo tutto. */
+  /** The wire sticks out of the groove: the wall is too thin to house all of it. */
   shallow: boolean;
 }
 
 /**
- * Scanalature sul bordo del portacelle dove si appoggiano la linguetta piegata e il suo filo. Profondità: quanto
- * serve al filo (AWG scelto), ma la parete deve restare almeno `MIN_PRINT_WALL_MM`. Partono dal bordo teorico della
- * parete della cella da cui esce la linguetta e vanno verso l'esterno. Se la linguetta è intralciata (passa sopra altre
- * celle) la scanalatura non c'è: taglierebbe le pareti delle celle vicine.
+ * Grooves on the holder edge where the folded tab and its wire rest. Depth: as much as
+ * the wire needs (chosen AWG), but the wall must stay at least `MIN_PRINT_WALL_MM`. They start from the theoretical edge of the
+ * wall of the cell the tab leaves from and go outwards. If the tab is obstructed (passes over other
+ * cells) there is no groove: it would cut the walls of the neighbouring cells.
  */
 export function tabNotches(strips: readonly Strip[], holder: HolderSettings, wires: { balanceAwg: number; powerAwg: number }): Notch[] {
   const out: Notch[] = [];
   const maxDepth = holder.wallMm - MIN_PRINT_WALL_MM;
   for (const s of strips) {
     for (const tab of tabsOf(s)) {
-      // Una linguetta che passa sopra altre celle o lamelle non ha un bordo libero dove stare: niente scanalatura.
+      // A tab passing over other cells or strips has no free edge to sit on: no groove.
       if (tab.blockedBy) continue;
       const node = s.nodes.find((n) => Math.hypot(n.x - tab.anchor.x, n.y - tab.anchor.y) < 1e-6);
       if (!node) continue;

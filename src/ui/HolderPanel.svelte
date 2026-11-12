@@ -6,7 +6,7 @@
   import UnitInput from './UnitInput.svelte';
   import { bmsOf } from '../core/bms';
   import { DEFAULT_HOLDER_SETTINGS } from '../core/holder';
-  import { ntcPlanOf, wireExitsOf } from './lamelle';
+  import { ntcPlanOf, wireExitsOf } from './busbar';
   import { history } from '../state';
   import { clampHolder, holderOf } from './holder';
   import { ui } from './ui.svelte';
@@ -22,7 +22,7 @@
   const status = $derived(
     !report ? 'empty' : report.issues.some((i) => i.level === 'error') ? 'error' : report.issues.some((i) => i.level === 'warning') ? 'warning' : 'ok',
   );
-  // Plastica PETG, 1,27 g/cm³, a riempimento pieno: è il massimo.
+  // PETG plastic, 1.27 g/cm³, fully solid: it is the maximum.
   const grams = $derived(report ? (report.volumeMm3 / 1000) * 1.27 : 0);
 
   type NumKey = Parameters<typeof clampHolder>[0];
@@ -38,7 +38,7 @@
     model && model.openingDiameterMm !== null ? t('hold.noteLock', { d: len(model.openingDiameterMm, 1), f: len(model.floorMm, 1) }) : t('hold.noteOpen'),
   );
 
-  /** Colori tipici dei filamenti per stampa 3D. */
+  /** Typical 3D printing filament colours. */
   const COLORS = [
     { name: t('hold.color.graphite'), hex: '#353b41' },
     { name: t('hold.color.black'), hex: '#111214' },

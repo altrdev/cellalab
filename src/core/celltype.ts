@@ -2,7 +2,7 @@ import { t } from '../i18n';
 import { BUILTIN_CELL_TYPES } from './catalog';
 import type { CellType, Project } from './types';
 
-/** Controlli sui tipi di cella inseriti dall'utente. Restituisce l'elenco dei problemi (vuoto = valido). */
+/** Checks on user-entered cell types. Returns the list of problems (empty = valid). */
 export function validateCellType(type: CellType): string[] {
   const problems: string[] = [];
   if (type.name.trim() === '') problems.push(t('celltype.name'));
@@ -34,7 +34,7 @@ export function validateCellType(type: CellType): string[] {
   return problems;
 }
 
-/** Id leggibile ricavato dal nome, unico tra catalogo e tipi del progetto. */
+/** Readable id derived from the name, unique among the catalogue and the project's types. */
 export function uniqueTypeId(project: Pick<Project, 'customCellTypes'>, name: string): string {
   const base =
     'mia-' +

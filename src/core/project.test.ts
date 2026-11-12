@@ -4,19 +4,19 @@ import { createProject, parseProject, ProjectParseError, serializeProject } from
 
 const T = '21700-5000-10a';
 
-describe('salvataggio JSON', () => {
-  it('serializza e rilegge senza perdere nulla', () => {
+describe('JSON saving', () => {
+  it('serialises and reads back without losing anything', () => {
     let p = createProject('Prova');
     p = addCell(p, { typeId: T, x: 1.5, y: 2.5, plusUp: false, group: 2, id: 'a' });
     expect(parseProject(serializeProject(p))).toEqual(p);
   });
 
   it.each([
-    ['json rotto', '{non json'],
-    ['radice non oggetto', '[]'],
-    ['versione sconosciuta', JSON.stringify({ version: 9, name: 'x', customCellTypes: [], cells: [] })],
+    ['broken json', '{non json'],
+    ['root is not an object', '[]'],
+    ['unknown version', JSON.stringify({ version: 9, name: 'x', customCellTypes: [], cells: [] })],
     [
-      'cella con coordinate non numeriche',
+      'cell with non-numeric coordinates',
       JSON.stringify({
         version: 1,
         name: 'x',
@@ -25,7 +25,7 @@ describe('salvataggio JSON', () => {
       }),
     ],
     [
-      'gruppo negativo',
+      'negative group',
       JSON.stringify({
         version: 1,
         name: 'x',
@@ -34,7 +34,7 @@ describe('salvataggio JSON', () => {
       }),
     ],
     [
-      'tipo di cella sconosciuto',
+      'unknown cell type',
       JSON.stringify({
         version: 1,
         name: 'x',
@@ -43,7 +43,7 @@ describe('salvataggio JSON', () => {
       }),
     ],
     [
-      'id duplicati',
+      'duplicate ids',
       JSON.stringify({
         version: 1,
         name: 'x',
@@ -54,11 +54,11 @@ describe('salvataggio JSON', () => {
         ],
       }),
     ],
-  ])('rifiuta: %s', (_nome, json) => {
+  ])('rejects: %s', (_name, json) => {
     expect(() => parseProject(json)).toThrow(ProjectParseError);
   });
 
-  it('ignora chiavi sconosciute, anche pericolose', () => {
+  it('ignores unknown keys, even dangerous ones', () => {
     const json =
       '{"version":1,"name":"x","customCellTypes":[],"cells":[],"__proto__":{"hack":true},"extra":1}';
     const p = parseProject(json);
@@ -68,32 +68,32 @@ describe('salvataggio JSON', () => {
 });
 
 
-describe('ricetta di generazione', () => {
+describe('generation recipe', () => {
   const recipe = { series: 3, parallel: 2, kind: 'hex', gapMm: 1, pitchMm: 22.4, typeId: '21700-5000-10a' } as const;
   const base = () => {
     const p = createProject();
     return { ...p, cells: [{ id: 'a', typeId: '21700-5000-10a', x: 0, y: 0, plusUp: true, group: 0 }] };
   };
 
-  it('si salva e si rilegge', () => {
+  it('is saved and read back', () => {
     const p = { ...base(), generator: recipe };
     expect(parseProject(serializeProject(p)).generator).toEqual(recipe);
   });
 
-  it('se è malformata si ignora senza rifiutare il progetto', () => {
+  it('if malformed it is ignored without rejecting the project', () => {
     const raw = JSON.parse(serializeProject({ ...base(), generator: recipe })) as Record<string, unknown>;
     raw.generator = { ...recipe, kind: 'triangolare' };
     expect(parseProject(JSON.stringify(raw)).generator).toBeUndefined();
   });
 
-  it('senza celle non si tiene', () => {
+  it('with no cells it is not kept', () => {
     const raw = JSON.parse(serializeProject({ ...createProject(), generator: recipe })) as Record<string, unknown>;
     expect(parseProject(JSON.stringify(raw)).generator).toBeUndefined();
   });
 });
 
-describe('limite di corrente', () => {
-  it('si salva e si rilegge; valori non validi si ignorano', () => {
+describe('current limit', () => {
+  it('is saved and read back; invalid values are ignored', () => {
     const p = { ...createProject(), currentLimitA: 25 };
     expect(parseProject(serializeProject(p)).currentLimitA).toBe(25);
     const raw = JSON.parse(serializeProject(p)) as Record<string, unknown>;

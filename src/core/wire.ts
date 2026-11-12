@@ -1,12 +1,12 @@
 /**
- * Fili AWG per i collegamenti del BMS: diametro del rame e ingombro con la guaina (valori tipici, arrotondati).
- * Servono per i fori delle linguette e per la profondità delle scanalature nel portacelle.
+ * AWG wires for the BMS connections: copper diameter and size with insulation (typical values, rounded).
+ * Used for the tab holes and for the depth of the grooves in the holder.
  */
 export interface Awg {
   awg: number;
-  /** Diametro del conduttore, mm. */
+  /** Conductor diameter, mm. */
   copperMm: number;
-  /** Diametro esterno con la guaina, mm. */
+  /** Outer diameter with insulation, mm. */
   outerMm: number;
 }
 
@@ -25,17 +25,17 @@ export const AWG_TABLE: readonly Awg[] = [
 ];
 
 /**
- * Portata continua prudente del cavo di potenza (A), per un cavo corto dentro un pacco chiuso: la colonna per isolante da 60 gradi delle
- * tabelle di portata (senza declassamento per la temperatura), arrotondata per difetto. Sono valori guida, non un calcolo.
+ * Cautious continuous ampacity of the power cable (A), for a short cable inside a closed pack: the 60-degree insulation column of the
+ * ampacity tables (no temperature derating), rounded down. They are guide values, not a calculation.
  */
 export const POWER_AMPACITY_A: Readonly<Record<number, number>> = { 16: 10, 14: 15, 12: 20, 10: 30, 8: 40 };
 
-/** Portata del cavo AWG scelto, A; 0 se non è una sezione per la potenza. */
+/** Ampacity of the chosen AWG cable, A; 0 if it is not a power gauge. */
 export const powerAmpacityA = (awg: number): number => POWER_AMPACITY_A[awg] ?? 0;
 
-/** La sezione più sottile (AWG più alto) che regge `currentA`, o null se nemmeno la più grossa basta. */
+/** The thinnest gauge (highest AWG) that carries `currentA`, or null if not even the thickest is enough. */
 export function powerAwgFor(currentA: number): number | null {
-  const sorted = [...POWER_AWGS].sort((a, b) => b - a); // dal più sottile al più grosso
+  const sorted = [...POWER_AWGS].sort((a, b) => b - a); // from the thinnest to the thickest
   return sorted.find((awg) => powerAmpacityA(awg) >= currentA) ?? null;
 }
 
@@ -44,5 +44,5 @@ export const POWER_AWGS: readonly number[] = [16, 14, 12, 10, 8];
 
 export const findAwg = (awg: number): Awg => AWG_TABLE.find((a) => a.awg === awg) ?? AWG_TABLE[1]!;
 
-/** Foro per far passare e saldare un filo: il conduttore più un po’ di gioco. */
+/** Hole to pass and solder a wire: the conductor plus a little clearance. */
 export const holeForWireMm = (awg: number): number => Math.round((findAwg(awg).copperMm + 0.8) * 100) / 100;

@@ -2,14 +2,14 @@ import ClipperLib from 'clipper-lib';
 import type { Pt } from './polygon';
 
 /**
- * Geometria 2D per lamelle non convesse (con finestre): unione di poligoni, offset (compensazione del
- * taglio) e distanza. Si appoggia a Clipper, che lavora con interi: qui si usano i micron.
+ * 2D geometry for non-convex strips (with windows): union of polygons, offset (cut
+ * compensation) and distance. Relies on Clipper, which works with integers: here microns are used.
  */
 
-const S = 1000; // 1 mm = 1000 unità
+const S = 1000; // 1 mm = 1000 units
 const { Clipper, ClipperOffset, ClipType, EndType, JoinType, PolyFillType, PolyType } = ClipperLib;
 
-/** Una forma con un contorno esterno e zero o più buchi. */
+/** A shape with an outer outline and zero or more holes. */
 export interface Region {
   outline: Pt[];
   holes: Pt[][];
@@ -19,7 +19,7 @@ type IPath = { X: number; Y: number }[];
 
 const toPath = (pts: readonly Pt[]): IPath => pts.map((p) => ({ X: Math.round(p.x * S), Y: Math.round(p.y * S) }));
 const fromPath = (path: IPath): Pt[] => path.map((q) => ({ x: q.X / S, y: q.Y / S }));
-/** Contorni esterni con area positiva, buchi con area negativa. */
+/** Outer outlines have positive area, holes negative area. */
 function oriented(path: IPath, positive: boolean): IPath {
   if (Clipper.Orientation(path) !== positive) path.reverse();
   return path;
@@ -43,7 +43,7 @@ function split(paths: IPath[]): Region {
   return { outline, holes };
 }
 
-/** Unione di poligoni (anche sovrapposti o non convessi). */
+/** Union of polygons (even overlapping or non-convex ones). */
 export function unionPolygons(polys: readonly (readonly Pt[])[]): Region {
   const c = new Clipper();
   let any = false;
@@ -58,7 +58,7 @@ export function unionPolygons(polys: readonly (readonly Pt[])[]): Region {
   return split(out);
 }
 
-/** Sposta i bordi di `d` mm verso l'esterno (negativo = verso l'interno); i buchi si restringono. */
+/** Moves the edges by `d` mm outwards (negative = inwards); holes shrink. */
 export function offsetRegion(region: Region, d: number): Region {
   if (d === 0) return { outline: region.outline.map((p) => ({ ...p })), holes: region.holes.map((h) => h.map((p) => ({ ...p }))) };
   const co = new ClipperOffset(2, 2);
@@ -74,7 +74,7 @@ export function regionArea(region: Region): number {
   return a(region.outline) - region.holes.reduce((s, h) => s + a(h), 0);
 }
 
-/** Tutti i contorni da disegnare o tagliare: prima l'esterno, poi i buchi. */
+/** All the outlines to draw or cut: the outside first, then the holes. */
 export const regionRings = (region: Region): Pt[][] => [region.outline, ...region.holes];
 
 function segDist(p: Pt, a: Pt, b: Pt): number {
@@ -85,7 +85,7 @@ function segDist(p: Pt, a: Pt, b: Pt): number {
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
-/** Distanza minima tra due forme, 0 se si sovrappongono o una contiene l'altra. */
+/** Minimum distance between two shapes, 0 if they overlap or one contains the other. */
 export function regionDistance(a: Region, b: Region): number {
   const c = new Clipper();
   c.AddPaths(toPaths(a), PolyType.ptSubject, true);
@@ -111,7 +111,7 @@ export function regionDistance(a: Region, b: Region): number {
   return best;
 }
 
-/** Cerchio come poligono (antiorario), con abbastanza lati da restare liscio anche in stampa. */
+/** Circle as a polygon (counter-clockwise), with enough sides to stay smooth even when printed. */
 export function circlePolygon(cx: number, cy: number, r: number, segments = Math.max(48, Math.min(120, Math.round(r * 4)))): Pt[] {
   return Array.from({ length: segments }, (_, i) => {
     const a = (2 * Math.PI * i) / segments;
@@ -119,7 +119,7 @@ export function circlePolygon(cx: number, cy: number, r: number, segments = Math
   });
 }
 
-/** Dispone contorni e buchi in forme separate: ogni buco va nel più piccolo contorno che lo contiene. */
+/** Arranges outlines and holes into separate shapes: each hole goes into the smallest outline that contains it. */
 function splitAll(paths: IPath[]): Region[] {
   const outers: { path: IPath; area: number; region: Region }[] = [];
   const holes: IPath[] = [];
@@ -139,8 +139,8 @@ function splitAll(paths: IPath[]): Region[] {
 }
 
 /**
- * Sottrae dei poligoni da una forma. Può dare più forme (isole rimaste dentro ai buchi),
- * ciascuna con i propri buchi.
+ * Subtracts polygons from a shape. May give several shapes (islands left inside holes),
+ * each with its own holes.
  */
 export function differenceRegions(subject: Region | readonly Region[], cuts: readonly (readonly Pt[])[]): Region[] {
   const c = new Clipper();
@@ -153,7 +153,7 @@ export function differenceRegions(subject: Region | readonly Region[], cuts: rea
   return splitAll(out);
 }
 
-/** Parte di `subject` che sta dentro ai poligoni `clips` (la loro unione). Può dare più forme. */
+/** Part of `subject` that lies inside the `clips` polygons (their union). May give several shapes. */
 export function intersectRegions(subject: Region | readonly Region[], clips: readonly (readonly Pt[])[]): Region[] {
   const c = new Clipper();
   for (const r of Array.isArray(subject) ? (subject as readonly Region[]) : [subject as Region]) c.AddPaths(toPaths(r), PolyType.ptSubject, true);
@@ -170,13 +170,13 @@ export function intersectRegions(subject: Region | readonly Region[], clips: rea
   return splitAll(out);
 }
 
-/** Vero se il punto sta nel materiale di una delle forme (dentro al contorno e fuori dai buchi). */
+/** True if the point is in the material of one of the shapes (inside the outline and outside the holes). */
 export function pointInRegions(p: Pt, regions: readonly Region[]): boolean {
   const q = { X: Math.round(p.x * S), Y: Math.round(p.y * S) };
   return regions.some((r) => Clipper.PointInPolygon(q, toPath(r.outline)) !== 0 && !r.holes.some((h) => Clipper.PointInPolygon(q, toPath(h)) !== 0));
 }
 
-/** Unione di poligoni che può dare più forme separate (gruppi di celle lontani tra loro). */
+/** Union of polygons that may give several separate shapes (cell groups far from each other). */
 export function unionAll(polys: readonly (readonly Pt[])[]): Region[] {
   const c = new Clipper();
   let any = false;
@@ -191,7 +191,7 @@ export function unionAll(polys: readonly (readonly Pt[])[]): Region[] {
   return splitAll(out);
 }
 
-/** Come `offsetRegion`, per più forme insieme. */
+/** Like `offsetRegion`, for several shapes together. */
 export function offsetRegions(regions: readonly Region[], d: number): Region[] {
   if (d === 0) return regions.map((r) => ({ outline: r.outline.map((p) => ({ ...p })), holes: r.holes.map((h) => h.map((p) => ({ ...p }))) }));
   const co = new ClipperOffset(2, 2);
@@ -202,8 +202,8 @@ export function offsetRegions(regions: readonly Region[], d: number): Region[] {
 }
 
 /**
- * Raccorda gli angoli concavi con raggio `radius` (chiusura: si ingrossa e poi si assottiglia di quanto).
- * Chiude anche le fessure più strette di 2·radius e lascia invariati gli angoli convessi.
+ * Rounds the concave corners with radius `radius` (closing: grow then shrink by that amount).
+ * Also closes slits narrower than 2·radius and leaves convex corners unchanged.
  */
 export function closeRegions(regions: readonly Region[], radius: number): Region[] {
   if (!(radius > 0)) return [...regions];

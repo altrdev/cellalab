@@ -32,16 +32,16 @@
   import ExportPanel from './ExportPanel.svelte';
   import HolderPanel from './HolderPanel.svelte';
   import { holderOf, sanitizeHolderSettings } from './holder';
-  import LamellePanel from './LamellePanel.svelte';
+  import BusbarPanel from './BusbarPanel.svelte';
   import SettingsMenu from './SettingsMenu.svelte';
-  import { bmsFitIssues, reportOf } from './lamelle';
-  import { sanitizeLamellaSettings } from './lamelleSettings';
+  import { bmsFitIssues, reportOf } from './busbar';
+  import { sanitizeLamellaSettings } from './busbarSettings';
   import { ui } from './ui.svelte';
 
   const project = $derived($history.present);
   const stats = $derived(computeStats(project));
   let showGenericInfo = $state(false);
-  /** Controlli del pacco, più l'ingombro della scheda del BMS (che dipende dalla posizione e dal lato di uscita dei fili). */
+  /** Pack checks, plus the BMS board footprint (which depends on the position and the wire exit side). */
   type Row = { severity: 'error' | 'warning' | 'info'; message: string; cellIds: string[] };
   const checkRows = $derived<Row[]>([...$drc, ...bmsFitIssues(project, ui.lamella)]);
   const sumErrors = $derived(checkRows.filter((i) => i.severity === 'error').length);
@@ -70,7 +70,7 @@
     { id: 'holder', label: t('side.tab.holder') },
     { id: 'file', label: t('side.tab.file') },
   ];
-  // Pallino sulla scheda quando c'è qualcosa da guardare: 'error' rosso, 'warning' giallo.
+  // Dot on the tab when there is something to look at: 'error' red, 'warning' yellow.
   const tabFlag = $derived.by((): Record<Tab, 'error' | 'warning' | null> => {
     const strips = project.cells.length > 0 ? reportOf(project, ui.lamella).status : 'empty';
     const issues = holderOf(project, ui.holder).report?.issues ?? [];
@@ -83,12 +83,12 @@
   });
   function pickTab(id: Tab) {
     ui.sideTab = id;
-    if (id === 'strips') ui.showStrips = true; // nella scheda delle lamelle le si vuole vedere
+    if (id === 'strips') ui.showStrips = true; // in the strips tab you want to see them
   }
 
   const selectedType = $derived(findCellType(project, ui.addTypeId));
   const diameter = $derived(selectedType?.diameterMm ?? 18);
-  /** Quante celle ci sono in ogni serie (e quante non ne hanno una). */
+  /** How many cells are in each series (and how many have none). */
   const groupCounts = $derived.by(() => {
     const m = new Map<number, number>();
     let none = 0;
@@ -104,7 +104,7 @@
     ui.selected = new Set(project.cells.filter((c) => c.group === g).map((c) => c.id));
   }
 
-  /** Come si sta lavorando: pacco generato (c'è la ricetta), a mano (celle senza ricetta) o ancora vuoto. */
+  /** How you are working: generated pack (there is a recipe), by hand (cells with no recipe) or still empty. */
   const packMode = $derived<'generated' | 'manual' | 'empty'>(
     project.cells.length === 0 ? 'empty' : project.generator ? 'generated' : 'manual',
   );
@@ -114,12 +114,12 @@
   const layoutDirty = $derived(
     !!generator && (generator.kind !== ui.layoutKind || Math.abs(generator.gapMm - ui.gapMm) > 1e-6 || typeDirty),
   );
-  /** Nel pacco a mano: celle già inserite di un tipo diverso da quello scelto. */
+  /** In the by-hand pack: cells already placed of a different type from the chosen one. */
   const otherTypeCount = $derived(
     project.cells.filter((c) => c.typeId !== ui.addTypeId && (ui.selected.size === 0 || ui.selected.has(c.id))).length,
   );
 
-  // Quando cambia la ricetta (generazione, annulla, apertura di un file) i campi seguono la ricetta.
+  // When the recipe changes (generation, undo, opening a file) the fields follow the recipe.
   $effect(() => {
     const g = project.generator;
     if (g) {
@@ -218,7 +218,7 @@
     history.commit((p) => alternateGroupPolarity(p, ids));
   }
 
-  // ---- Catalogo celle
+  // ---- Cell catalogue
   let draft = $state<CellType | null>(null);
   let editingId = $state<string | null>(null);
   let draftErrors = $state<string[]>([]);
@@ -313,7 +313,7 @@
       const opened = parseProject(text);
       const saved = parseProjectSettings(text);
       history.reset(opened);
-      // lamelle e portacelle: si usano le impostazioni del file; se non ci sono restano quelle correnti
+      // strips and holder: the file's settings are used; if there are none the current ones stay
       if (saved.lamella !== undefined) Object.assign(ui.lamella, sanitizeLamellaSettings(saved.lamella));
       if (saved.holder !== undefined) Object.assign(ui.holder, sanitizeHolderSettings(saved.holder));
       ui.selected = new Set();
@@ -665,7 +665,7 @@
   </details>
 
   {:else if ui.sideTab === 'strips'}
-    <LamellePanel />
+    <BusbarPanel />
   {:else if ui.sideTab === 'holder'}
     <HolderPanel />
   {:else}
@@ -800,7 +800,7 @@
     border: 1px solid var(--line);
     border-radius: 12px;
   }
-  /* distanza uniforme tra gli elementi della scheda (il gap non vale dentro <details>) */
+  /* uniform distance between the elements of the tab (gap does not apply inside <details>) */
   .sec > :global(:not(summary)) {
     margin-top: 10px;
   }

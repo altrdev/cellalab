@@ -7,16 +7,16 @@
   import PackBar from './ui/PackBar.svelte';
   import Toolbar from './ui/Toolbar.svelte';
   import { saveHolderSettings, saveHolderView } from './ui/holder';
-  import { saveLamellaSettings } from './ui/lamelleSettings';
+  import { saveLamellaSettings } from './ui/busbarSettings';
   import { ui } from './ui/ui.svelte';
 
-  // Titolo e lingua della pagina seguono la lingua scelta.
+  // The page title and language follow the chosen language.
   $effect(() => {
     document.documentElement.lang = ui.locale;
     document.title = t('app.title');
   });
 
-  // Le impostazioni delle lamelle si ricordano nel browser.
+  // The busbar settings are remembered in the browser.
   $effect(() => {
     saveLamellaSettings($state.snapshot(ui.lamella));
   });
@@ -26,12 +26,12 @@
     saveHolderView($state.snapshot(ui.holderView));
   });
 
-  // Dopo un annulla/ripristina alcune celle selezionate possono non esistere più.
+  // After an undo/redo some selected cells may no longer exist.
   $effect(() => {
     ui.prune($history.present);
   });
 
-  /** Campi in cui si scrive: lì le scorciatoie di tastiera restano spente. Caselle e cursori no. */
+  /** Fields you type in: keyboard shortcuts stay off there. Checkboxes and sliders do not. */
   function typing(target: EventTarget | null) {
     if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true;
     if (target instanceof HTMLInputElement) {
@@ -60,7 +60,7 @@
       return;
     }
     if (key === ' ') {
-      // Su un pulsante o una casella lo spazio serve ad attivarli: non si usa per spostare la vista.
+      // On a button or checkbox the space bar activates it: it is not used to pan the view.
       if (e.target instanceof HTMLButtonElement || e.target instanceof HTMLInputElement) return;
       e.preventDefault();
       ui.spaceDown = true;
@@ -85,7 +85,7 @@
   }
   let mainEl: HTMLElement | undefined = $state();
 
-  // Cambiando vista il disegno cambia dimensioni: lo reinquadra a layout concluso.
+  // Changing view changes the drawing size: re-fit it once the layout has settled.
   $effect(() => {
     const mode = ui.viewMode;
     if (mode === '3d') return;
@@ -93,7 +93,7 @@
     return () => cancelAnimationFrame(id);
   });
 
-  /** Trascina il divisore tra disegno e 3D (a destra su schermi larghi, in basso su quelli stretti). */
+  /** Drag the divider between the drawing and 3D (on the right on wide screens, at the bottom on narrow ones). */
   function startDrag(e: PointerEvent) {
     const el = mainEl;
     if (!el) return;
@@ -130,7 +130,7 @@
         onpointerdown={startDrag}
       ></div>
       <div class="pane three" style="--pct: {ui.splitPct}%">
-        <!-- three.js pesa: si scarica solo quando apri l'anteprima -->
+        <!-- three.js is heavy: it is only downloaded when the preview is opened -->
         {#await import('./ui/Preview3D.svelte') then { default: Preview3D }}
           <Preview3D />
         {/await}

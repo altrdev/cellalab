@@ -3,11 +3,11 @@ import { findBmsType } from './bms';
 import { DEFAULT_BMS_MOUNT, type BmsMount, type BmsType, type CellType, type PackGenerator, type PlacedCell, type Project } from './types';
 import { t } from '../i18n';
 
-/** Operazioni pure sul progetto: ricevono un Project e ne restituiscono uno nuovo. */
+/** Pure operations on the project: they receive a Project and return a new one. */
 
 let counter = 0;
 export function newId(prefix = 'c'): string {
-  // randomUUID è disponibile nei browser moderni e in Node; il contatore evita collisioni nei test.
+  // randomUUID is available in modern browsers and in Node; the counter avoids collisions in tests.
   const rand =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID().slice(0, 8)
@@ -63,17 +63,17 @@ export function removeCells(project: Project, ids: Iterable<string>): Project {
   if (selected.size === 0) return project;
   const cells = project.cells.filter((c) => !selected.has(c.id));
   if (cells.length === project.cells.length) return project;
-  // senza celle non c'è più un pacco generato da ricordare
+  // with no cells there is no generated pack to remember any more
   return cells.length === 0 ? clearPack(project) : { ...project, cells };
 }
 
-/** Toglie tutte le celle e la ricetta di generazione. */
+/** Removes all the cells and the generation recipe. */
 export function clearPack(project: Project): Project {
   const { generator: _generator, ...rest } = project;
   return { ...rest, cells: [] };
 }
 
-/** Ricorda come è stato generato il pacco (o lo dimentica con `undefined`). */
+/** Remembers how the pack was generated (or forgets it with `undefined`). */
 export function setGenerator(project: Project, generator: PackGenerator | undefined): Project {
   if (generator) return { ...project, generator };
   const { generator: _generator, ...rest } = project;
@@ -81,9 +81,9 @@ export function setGenerator(project: Project, generator: PackGenerator | undefi
 }
 
 /**
- * Adegua un pacco generato a un nuovo passo/disposizione: ogni cella resta nel suo slot (colonna, riga)
- * ma sul nuovo reticolo. Gruppi, polarità e modifiche restano. Null se il pacco non ha una ricetta
- * oppure se qualche cella non sta più sul reticolo con cui era stato generato.
+ * Adapts a generated pack to a new pitch/layout: each cell stays in its slot (column, row)
+ * but on the new lattice. Groups, polarities and edits stay. Null if the pack has no recipe
+ * or if some cell is no longer on the lattice it was generated with.
  */
 export function applyLayout(
   project: Project,
@@ -122,7 +122,7 @@ export function addCustomCellType(project: Project, type: CellType): Project {
   return { ...project, customCellTypes: [...project.customCellTypes, type] };
 }
 
-/** Sostituisce tutte le celle del progetto (es. dopo aver generato un nuovo pacco). */
+/** Replaces all the project's cells (e.g. after generating a new pack). */
 export function replaceCells(project: Project, cells: readonly Omit<NewCell, 'id'>[]): Project {
   return {
     ...project,
@@ -141,7 +141,7 @@ export function renameProject(project: Project, name: string): Project {
   return name === project.name ? project : { ...project, name };
 }
 
-/** Assegna i gruppi in blocco: `groups` associa l'id di una cella al suo nuovo indice di gruppo. */
+/** Assigns groups in bulk: `groups` maps a cell id to its new group index. */
 export function assignGroups(project: Project, groups: ReadonlyMap<string, number>): Project {
   let touched = false;
   const cells = project.cells.map((c) => {
@@ -154,8 +154,8 @@ export function assignGroups(project: Project, groups: ReadonlyMap<string, numbe
 }
 
 /**
- * Alterna la polarità tra gruppi consecutivi (gruppo pari: + sopra, dispari: − sopra),
- * così le lamelle di serie collegano celle vicine sulla stessa faccia. Salta le celle senza gruppo.
+ * Alternates the polarity between consecutive groups (even group: + up, odd: − up),
+ * so the series strips connect nearby cells on the same face. Skips cells with no group.
  */
 export function alternateGroupPolarity(project: Project, ids?: Iterable<string>): Project {
   const only = ids ? new Set(ids) : null;
@@ -170,7 +170,7 @@ export function alternateGroupPolarity(project: Project, ids?: Iterable<string>)
   return touched ? { ...project, cells } : project;
 }
 
-/** Sostituisce un tipo di cella personalizzato (stesso id). */
+/** Replaces a custom cell type (same id). */
 export function updateCustomCellType(project: Project, type: CellType): Project {
   if (!project.customCellTypes.some((t) => t.id === type.id)) {
     throw new Error(t('ops.err.noCustom', { id: type.id }));
@@ -178,7 +178,7 @@ export function updateCustomCellType(project: Project, type: CellType): Project 
   return { ...project, customCellTypes: project.customCellTypes.map((t) => (t.id === type.id ? type : t)) };
 }
 
-/** Elimina un tipo personalizzato, se nessuna cella del progetto lo usa. */
+/** Deletes a custom type, if no cell of the project uses it. */
 export function removeCustomCellType(project: Project, id: string): Project {
   if (!project.customCellTypes.some((t) => t.id === id)) return project;
   const used = project.cells.filter((c) => c.typeId === id).length;
@@ -187,8 +187,8 @@ export function removeCustomCellType(project: Project, id: string): Project {
 }
 
 /**
- * Assegna le celle a un gruppo (la "serie a pennello"). Con `alternatePolarity` imposta anche la
- * polarità secondo la parità del gruppo (pari: + sopra), come «Alterna polarità tra gruppi».
+ * Assigns cells to a group (the "series brush"). With `alternatePolarity` it also sets the
+ * polarity by the group's parity (even: + up), like "Alternate polarity between groups".
  */
 export function paintGroup(
   project: Project,
@@ -202,14 +202,14 @@ export function paintGroup(
   });
 }
 
-/** Imposta la corrente continua di progetto del pacco (il tuo uso, tetto del BMS); `undefined` o valore non valido lo toglie. */
+/** Sets the pack's continuous design current (your use, the BMS cap); `undefined` or an invalid value removes it. */
 export function setCurrentLimit(project: Project, limitA: number | undefined): Project {
   if (limitA !== undefined && Number.isFinite(limitA) && limitA > 0) return { ...project, currentLimitA: limitA };
   const { currentLimitA: _limit, ...rest } = project;
   return rest;
 }
 
-/** Sceglie il BMS del pacco; `undefined` lo toglie. */
+/** Chooses the pack's BMS; `undefined` removes it. */
 export function setBms(project: Project, id: string | undefined): Project {
   if (id === undefined || id === '') {
     const { bmsId: _id, ...rest } = project;
@@ -218,7 +218,7 @@ export function setBms(project: Project, id: string | undefined): Project {
   return project.bmsId === id ? project : { ...project, bmsId: id };
 }
 
-/** Cambia la posizione di montaggio del BMS (valori fuori misura si riportano nei limiti). */
+/** Changes the BMS mounting position (out-of-range values are brought back into the limits). */
 export function setBmsMount(project: Project, mount: Partial<BmsMount>): Project {
   const cur = { ...DEFAULT_BMS_MOUNT, ...project.bmsMount, ...mount };
   const clamp = (v: number, lo: number, hi: number) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo);
@@ -233,7 +233,7 @@ export function addCustomBms(project: Project, type: BmsType): Project {
   return { ...project, customBmsTypes: [...(project.customBmsTypes ?? []), type] };
 }
 
-/** Toglie un BMS personalizzato; se era quello scelto, il pacco resta senza BMS. */
+/** Removes a custom BMS; if it was the chosen one, the pack is left without a BMS. */
 export function removeCustomBms(project: Project, id: string): Project {
   if (!project.customBmsTypes?.some((b) => b.id === id)) return project;
   const { bmsId, customBmsTypes, ...rest } = project;
@@ -241,7 +241,7 @@ export function removeCustomBms(project: Project, id: string): Project {
   return { ...rest, ...(left.length > 0 && { customBmsTypes: left }), ...(bmsId !== undefined && bmsId !== id && { bmsId }) };
 }
 
-/** Cambia il tipo di cella delle celle indicate (tutte se `ids` è omesso). Posizioni, gruppi e polarità restano. */
+/** Changes the cell type of the given cells (all if `ids` is omitted). Positions, groups and polarities stay. */
 export function setCellType(project: Project, typeId: string, ids?: Iterable<string>): Project {
   const only = ids ? new Set(ids) : null;
   let changed = false;

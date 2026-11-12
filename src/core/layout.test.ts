@@ -7,7 +7,7 @@ import { computeStats } from './stats';
 const base = { typeId: '21700-5000-10a', diameterMm: 21.4 };
 
 describe('generateGrid', () => {
-  it('quadrato 3S2P: passo = diametro + gap, un gruppo per colonna', () => {
+  it('square 3S2P: pitch = diameter + gap, one group per column', () => {
     const cells = generateGrid({ ...base, series: 3, parallel: 2, kind: 'square', gapMm: 1 });
     expect(cells).toHaveLength(6);
     // passo 22,4 mm, origine in (0, 0)
@@ -16,21 +16,21 @@ describe('generateGrid', () => {
     expect(cells[2]).toMatchObject({ x: 22.4, y: 0, group: 1 });
   });
 
-  it('la polarità alterna da un gruppo all altro', () => {
+  it('the polarity alternates from one group to the next', () => {
     const cells = generateGrid({ ...base, series: 4, parallel: 1, kind: 'square', gapMm: 0 });
     expect(cells.map((c) => c.plusUp)).toEqual([true, false, true, false]);
   });
 
-  it('esagonale: ogni cella ha vicini alla stessa distanza (= passo)', () => {
+  it('hexagonal: every cell has neighbours at the same distance (= pitch)', () => {
     const gap = 1;
     const pitch = base.diameterMm + gap;
     const cells = generateGrid({ ...base, series: 4, parallel: 4, kind: 'hex', gapMm: gap });
     const dist = (a: number, b: number) =>
       Math.hypot(cells[a]!.x - cells[b]!.x, cells[a]!.y - cells[b]!.y);
-    // cella (g=0,k=1) con (g=1,k=0) e (g=1,k=1): colonna successiva sfalsata di mezzo passo
+    // cell (g=0,k=1) with (g=1,k=0) and (g=1,k=1): next column offset by half a pitch
     expect(dist(1, 4)).toBeCloseTo(pitch, 2);
     expect(dist(1, 5)).toBeCloseTo(pitch, 2);
-    // nessuna coppia più vicina del passo (niente sovrapposizioni)
+    // no pair closer than the pitch (no overlaps)
     for (let i = 0; i < cells.length; i++) {
       for (let j = i + 1; j < cells.length; j++) {
         expect(dist(i, j)).toBeGreaterThanOrEqual(pitch - 0.01);
@@ -38,7 +38,7 @@ describe('generateGrid', () => {
     }
   });
 
-  it('il pacco generato ha la configurazione richiesta nei calcoli', () => {
+  it('the generated pack has the requested configuration in the calculations', () => {
     const cells = generateGrid({ ...base, series: 13, parallel: 4, kind: 'hex', gapMm: 0.5 });
     const st = computeStats(replaceCells(createProject(), cells));
     expect(st.configLabel).toBe('13S4P');
@@ -47,21 +47,21 @@ describe('generateGrid', () => {
   });
 
   it.each([
-    ['S zero', { series: 0, parallel: 1 }],
-    ['P non intero', { series: 2, parallel: 1.5 }],
-    ['troppe celle', { series: 100, parallel: 100 }],
-  ])('rifiuta: %s', (_n, extra) => {
+    ['zero S', { series: 0, parallel: 1 }],
+    ['non-integer P', { series: 2, parallel: 1.5 }],
+    ['too many cells', { series: 100, parallel: 100 }],
+  ])('rejects: %s', (_n, extra) => {
     expect(() => generateGrid({ ...base, kind: 'square', gapMm: 1, ...extra })).toThrow(RangeError);
   });
 
-  it('rifiuta gap negativo o diametro nullo', () => {
+  it('rejects a negative gap or a zero diameter', () => {
     expect(() => generateGrid({ ...base, series: 1, parallel: 1, kind: 'square', gapMm: -1 })).toThrow(RangeError);
     expect(() => generateGrid({ ...base, diameterMm: 0, series: 1, parallel: 1, kind: 'square', gapMm: 1 })).toThrow(RangeError);
   });
 });
 
 describe('replaceCells', () => {
-  it('sostituisce le celle esistenti con id nuovi e unici', () => {
+  it('replaces the existing cells with new unique ids', () => {
     let p = addCell(createProject(), { typeId: base.typeId, x: 0, y: 0, id: 'vecchia' });
     p = replaceCells(p, generateGrid({ ...base, series: 2, parallel: 2, kind: 'square', gapMm: 1 }));
     expect(p.cells).toHaveLength(4);
@@ -85,7 +85,7 @@ describe('applyLayout', () => {
       recipe(series, parallel, kind, gapMm),
     );
 
-  it('cambiando cella cambia il tipo di tutte le celle e il passo, come una nuova generazione', () => {
+  it('changing the cell changes the type of all the cells and the pitch, like a new generation', () => {
     const p = generated(3, 2, 'hex', 1.5);
     const big = { typeId: '32700-lfp-6000', diameterMm: 32.2 };
     const r = applyLayout(p, { kind: 'hex', gapMm: 1.5, pitchMm: big.diameterMm + 1.5, typeId: big.typeId })!;
@@ -98,7 +98,7 @@ describe('applyLayout', () => {
     });
   });
 
-  it('cambiare lo spazio dà le stesse posizioni di una nuova generazione', () => {
+  it('changing the space gives the same positions as a new generation', () => {
     const p = generated(4, 3, 'hex', 1);
     const r = applyLayout(p, { kind: 'hex', gapMm: 2.5, pitchMm: base.diameterMm + 2.5 })!;
     const fresh = generateGrid({ ...base, series: 4, parallel: 3, kind: 'hex', gapMm: 2.5 });
@@ -109,7 +109,7 @@ describe('applyLayout', () => {
     expect(r.generator).toMatchObject({ gapMm: 2.5, kind: 'hex' });
   });
 
-  it('esagonale → quadrata come rigenerare', () => {
+  it('hexagonal → square like regenerating', () => {
     const p = generated(3, 2, 'hex', 1);
     const r = applyLayout(p, { kind: 'square', gapMm: 1, pitchMm: base.diameterMm + 1 })!;
     const fresh = generateGrid({ ...base, series: 3, parallel: 2, kind: 'square', gapMm: 1 });
@@ -119,7 +119,7 @@ describe('applyLayout', () => {
     });
   });
 
-  it('mantiene id, gruppi, polarità e le celle tolte a mano', () => {
+  it('keeps ids, groups, polarities and the cells removed by hand', () => {
     let p = generated(3, 2, 'hex', 1);
     p = { ...p, cells: p.cells.map((c, i) => (i === 0 ? { ...c, plusUp: !c.plusUp } : c)) };
     const removed = p.cells[5]!.id;
@@ -130,14 +130,14 @@ describe('applyLayout', () => {
     expect(r.cells.map((c) => [c.group, c.plusUp])).toEqual(p.cells.map((c) => [c.group, c.plusUp]));
   });
 
-  it('null se una cella è fuori dal reticolo o non c\'è la ricetta', () => {
+  it('null if a cell is off the lattice or there is no recipe', () => {
     const p = generated(3, 2, 'hex', 1);
     const moved = { ...p, cells: p.cells.map((c, i) => (i === 0 ? { ...c, x: c.x + 3.3 } : c)) };
     expect(applyLayout(moved, { kind: 'hex', gapMm: 2, pitchMm: 23.4 })).toBeNull();
     expect(applyLayout(clearPack(p), { kind: 'hex', gapMm: 2, pitchMm: 23.4 })).toBeNull();
   });
 
-  it('togliere tutte le celle dimentica la ricetta', () => {
+  it('removing all the cells forgets the recipe', () => {
     const p = generated(2, 1, 'square', 1);
     expect(removeCells(p, p.cells.map((c) => c.id)).generator).toBeUndefined();
     expect(clearPack(p).generator).toBeUndefined();
@@ -147,7 +147,7 @@ describe('applyLayout', () => {
 describe('setCellType', () => {
   const p = replaceCells(createProject(), generateGrid({ ...base, series: 2, parallel: 2, kind: 'square', gapMm: 1 }));
 
-  it('cambia il tipo di tutte le celle o solo di quelle indicate', () => {
+  it('changes the type of all the cells or only of the given ones', () => {
     expect(setCellType(p, '18650-3000-10a').cells.every((c) => c.typeId === '18650-3000-10a')).toBe(true);
     const some = setCellType(p, '18650-3000-10a', [p.cells[0]!.id]);
     expect(some.cells[0]!.typeId).toBe('18650-3000-10a');
@@ -156,7 +156,7 @@ describe('setCellType', () => {
     expect(some.cells[0]!.group).toBe(p.cells[0]!.group);
   });
 
-  it('senza cambiamenti restituisce lo stesso progetto', () => {
+  it('with no changes returns the same project', () => {
     expect(setCellType(p, base.typeId)).toBe(p);
   });
 });

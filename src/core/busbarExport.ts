@@ -4,18 +4,18 @@ import { getPrefs } from '../prefs';
 import { area, len, lenDigits, lenLabel, massSmall, toLen } from '../units';
 import { labelPlacements } from './dxf';
 import type { Pt } from './polygon';
-import type { LamellaReport } from './lamelle';
+import type { LamellaReport } from './busbar';
 import { spotPositions } from './sizing';
 import { tabsOf, type Face, type Strip } from './strips';
 
 /**
- * Esportazioni delle lamelle per chi non ha un CAD: SVG in scala reale (si stampa al 100 % e diventa
- * una dima da ritagliare) e lista di taglio in testo/CSV.
+ * Strip exports for those without a CAD: real-scale SVG (print at 100 % and it becomes
+ * a template to cut out) and a cut list as text/CSV.
  */
 
 const MARGIN_MM = 8;
 const SCALE_BAR_MM = 50;
-/** Con i pollici la barra di scala è lunga 2 in (50,8 mm): un numero tondo nell'unità scelta. */
+/** With inches the scale bar is 2 in (50.8 mm) long: a round number in the chosen unit. */
 const scaleBarMm = () => (getPrefs().length === 'in' ? 50.8 : SCALE_BAR_MM);
 const LABEL_SIZE_MM = 3.5;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -23,7 +23,7 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 export interface SvgOptions {
   face: Face;
-  /** Compensazione del taglio, mm (0 per il taglio a mano). */
+  /** Cut compensation, mm (0 for hand cutting). */
   kerfMm: number;
   includeContacts: boolean;
   spotsPerStrip?: ReadonlyMap<string, number>;
@@ -37,19 +37,19 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
   const rings = list.map((s) => regionRings(offsetRegion(s, o.kerfMm / 2)));
   const pts = rings.flat(2);
   if (pts.length === 0) pts.push({ x: 0, y: 0 }, { x: 60, y: 30 });
-  // etichette fuori dai pezzi, sotto ognuno: contano anche nelle dimensioni del foglio
+  // labels outside the pieces, below each: they count in the sheet size too
   const labels = labelPlacements(list, o.kerfMm / 2, { heightMm: LABEL_SIZE_MM, textOf: (s) => s.label });
   for (const l of labels) pts.push({ x: l.x, y: l.y }, { x: l.x + l.width, y: l.y });
   const minX = Math.min(...pts.map((p) => p.x)) - MARGIN_MM;
   const minY = Math.min(...pts.map((p) => p.y)) - MARGIN_MM;
   const maxX = Math.max(...pts.map((p) => p.x)) + MARGIN_MM;
-  const maxY = Math.max(...pts.map((p) => p.y)) + MARGIN_MM + 10; // spazio per la barra di scala
+  const maxY = Math.max(...pts.map((p) => p.y)) + MARGIN_MM + 10; // room for the scale bar
   const w = maxX - minX;
   const h = maxY - minY;
   const d = (poly: readonly Pt[]) => poly.map((p, i) => `${i ? 'L' : 'M'}${r3(p.x)} ${r3(p.y)}`).join(' ') + ' Z';
 
   const out: string[] = [];
-  // il disegno resta in mm (unità del viewBox); la dimensione stampata è dichiarata nell'unità scelta: scala reale
+  // the drawing stays in mm (viewBox unit); the printed size is declared in the chosen unit: real scale
   const unit = lenLabel();
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${r3(toLen(w))}${unit}" height="${r3(toLen(h))}${unit}" viewBox="${r3(minX)} ${r3(minY)} ${r3(w)} ${r3(h)}">`);
   out.push(`<title>${esc(t('export.svg.title', { title: o.title ?? t('export.svg.defaultTitle'), face: t(o.face === 'top' ? 'face.top' : 'face.bottom') }))}</title>`);
@@ -84,11 +84,11 @@ export function buildSvg(strips: readonly Strip[], o: SvgOptions): string {
 }
 
 const fmt = (n: number | null, d = 2) => (n === null ? '' : n.toFixed(d));
-/** Lunghezza nell'unità scelta (decimali con il punto, come nel resto del CSV). */
+/** Length in the chosen unit (decimals with a dot, as in the rest of the CSV). */
 const lenCsv = (mm: number | null, d: number) => (mm === null ? '' : toLen(mm).toFixed(lenDigits(d)));
 const areaCsv = (mm2: number) => (getPrefs().length === 'in' ? (mm2 / 645.16).toFixed(3) : mm2.toFixed(0));
 
-/** Lista di taglio in CSV (separatore ';', decimali con il punto). */
+/** Cut list as CSV (separator ';', decimals with a dot). */
 export function buildCutListCsv(strips: readonly Strip[], report: LamellaReport): string {
   const rows = [t('export.csv.header', { a: getPrefs().length === 'in' ? 'in2' : 'mm2', l: lenLabel() })];
   for (const s of strips) {
@@ -109,7 +109,7 @@ export function buildCutListCsv(strips: readonly Strip[], report: LamellaReport)
   return rows.join('\n') + '\n';
 }
 
-/** Riepilogo leggibile da stampare con la dima. */
+/** Readable summary to print with the template. */
 export function buildCutSummary(report: LamellaReport, projectName: string): string {
   const th = report.thicknessMm;
   const thickness =

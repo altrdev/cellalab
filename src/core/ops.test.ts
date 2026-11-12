@@ -15,7 +15,7 @@ import { createProject } from './project';
 const T = '21700-5000-10a';
 
 describe('ops', () => {
-  it('addCell non modifica il progetto originale', () => {
+  it('addCell does not modify the original project', () => {
     const p = createProject();
     const q = addCell(p, { typeId: T, x: 1, y: 2 });
     expect(p.cells).toHaveLength(0);
@@ -23,7 +23,7 @@ describe('ops', () => {
     expect(q.cells[0]).toMatchObject({ x: 1, y: 2, plusUp: true, group: null });
   });
 
-  it('moveCells sposta solo le celle scelte', () => {
+  it('moveCells moves only the chosen cells', () => {
     let p = createProject();
     p = addCell(p, { typeId: T, x: 0, y: 0, id: 'a' });
     p = addCell(p, { typeId: T, x: 10, y: 10, id: 'b' });
@@ -32,7 +32,7 @@ describe('ops', () => {
     expect(q.cells.find((c) => c.id === 'b')).toMatchObject({ x: 10, y: 10 });
   });
 
-  it('restituisce lo stesso oggetto quando non cambia nulla', () => {
+  it('returns the same object when nothing changes', () => {
     let p = createProject();
     p = addCell(p, { typeId: T, x: 0, y: 0, id: 'a' });
     expect(moveCells(p, ['a'], 0, 0)).toBe(p);
@@ -41,7 +41,7 @@ describe('ops', () => {
     expect(setGroup(p, ['a'], null)).toBe(p);
   });
 
-  it('flipPolarity inverte e riporta indietro', () => {
+  it('flipPolarity inverts and reverts', () => {
     let p = createProject();
     p = addCell(p, { typeId: T, x: 0, y: 0, id: 'a' });
     const q = flipPolarity(p, ['a']);
@@ -49,14 +49,14 @@ describe('ops', () => {
     expect(flipPolarity(q, ['a']).cells[0]!.plusUp).toBe(true);
   });
 
-  it('removeCells elimina le celle scelte', () => {
+  it('removeCells deletes the chosen cells', () => {
     let p = createProject();
     p = addCell(p, { typeId: T, x: 0, y: 0, id: 'a' });
     p = addCell(p, { typeId: T, x: 9, y: 0, id: 'b' });
     expect(removeCells(p, ['a']).cells.map((c) => c.id)).toEqual(['b']);
   });
 
-  it('addCustomCellType rifiuta id duplicati', () => {
+  it('addCustomCellType rejects duplicate ids', () => {
     const type = {
       id: 'mia',
       name: 'Mia',
@@ -74,7 +74,7 @@ describe('ops', () => {
     expect(() => addCustomCellType(p, type)).toThrow();
   });
 
-  it('paintGroup assegna il gruppo e, se richiesto, alterna la polarità', () => {
+  it('paintGroup assigns the group and, if requested, alternates the polarity', () => {
     let p = createProject();
     p = addCell(p, { typeId: T, x: 0, y: 0, id: 'a' });
     p = addCell(p, { typeId: T, x: 9, y: 0, id: 'b' });
@@ -85,7 +85,7 @@ describe('ops', () => {
     expect(paintGroup(alt, ['a'], 1, { alternatePolarity: true })).toBe(alt); // niente da cambiare
   });
 
-  describe('tipi personalizzati', () => {
+  describe('custom types', () => {
     const type = {
       id: 'mia',
       name: 'Mia',
@@ -100,14 +100,14 @@ describe('ops', () => {
       weightG: 40,
     };
 
-    it('updateCustomCellType sostituisce quello con lo stesso id e rifiuta gli sconosciuti', () => {
+    it('updateCustomCellType replaces the one with the same id and rejects unknown ones', () => {
       const p = addCustomCellType(createProject(), type);
       const q = updateCustomCellType(p, { ...type, priceEur: 3.5 });
       expect(q.customCellTypes[0]!.priceEur).toBe(3.5);
       expect(() => updateCustomCellType(createProject(), type)).toThrow();
     });
 
-    it('removeCustomCellType elimina un tipo non usato e rifiuta quello in uso', () => {
+    it('removeCustomCellType deletes an unused type and rejects one in use', () => {
       let p = addCustomCellType(createProject(), type);
       expect(removeCustomCellType(p, 'mia').customCellTypes).toHaveLength(0);
       expect(removeCustomCellType(p, 'inesistente')).toBe(p);

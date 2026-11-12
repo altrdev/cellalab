@@ -1,6 +1,6 @@
 /**
- * Tema dell'interfaccia: automatico (segue il sistema), chiaro o scuro. Si ricorda nel browser e si applica
- * come attributo `data-theme` su <html>; in automatico l'attributo non c'è e decide `prefers-color-scheme`.
+ * Interface theme: automatic (follows the system), light or dark. Remembered in the browser and applied
+ * as a `data-theme` attribute on <html>; in automatic the attribute is absent and `prefers-color-scheme` decides.
  */
 
 export type Theme = 'auto' | 'light' | 'dark';
@@ -25,7 +25,7 @@ let current: Theme = load();
 export const getTheme = (): Theme => current;
 
 const listeners = new Set<() => void>();
-/** Chiama `cb` quando cambia il tema scelto (la vista 3D rilegge i colori). */
+/** Calls `cb` when the chosen theme changes (the 3D view re-reads the colours). */
 export function onThemeChange(cb: () => void): () => void {
   listeners.add(cb);
   return () => listeners.delete(cb);
@@ -44,13 +44,13 @@ export function setTheme(theme: Theme): void {
   try {
     localStorage.setItem(STORAGE_KEY, next);
   } catch {
-    /* storage non disponibile: la scelta vale per questa sessione */
+    /* storage not available: the choice holds for this session */
   }
   apply(next);
   for (const cb of listeners) cb();
 }
 
-/** All'avvio: applica il tema salvato prima del primo disegno. */
+/** At startup: applies the saved theme before the first paint. */
 export function initTheme(): void {
   apply(current);
 }

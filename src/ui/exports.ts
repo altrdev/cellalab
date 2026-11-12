@@ -1,17 +1,17 @@
 import { t } from '../i18n';
 import { getPrefs } from '../prefs';
 import { buildDxf } from '../core/dxf';
-import { buildCutListCsv, buildCutSummary, buildSvg } from '../core/lamelleExport';
+import { buildCutListCsv, buildCutSummary, buildSvg } from '../core/busbarExport';
 import type { Project } from '../core/types';
 import { buildToleranceTest } from '../core/holder';
 import { holderOf } from './holder';
 import { zipStore } from '../core/zip';
 import { holderStl, type HolderHalf } from './holderMesh';
 import { buildHarnessCsv, buildHarnessSummary } from '../core/harnessExport';
-import { harnessOf, reportOf, stripsOf } from './lamelle';
+import { harnessOf, reportOf, stripsOf } from './busbar';
 import { ui } from './ui.svelte';
 
-/** Esportazioni dei file (taglio lamelle, stampa 3D): usate dalla scheda «Esporta». */
+/** File exports (strip cutting, 3D printing): used by the "Export" tab. */
 
 const slug = (s: string) =>
   s
@@ -82,7 +82,7 @@ export function exportStl(project: Project, half: HolderHalf) {
   save(holderStl(model, half) as BlobPart, `${slug(project.name)}-${t('file.holder')}-${faceName(half)}.stl`, 'model/stl');
 }
 
-/** Piastra di prova con tasche a giochi diversi, per tarare la stampante; usa il tipo di cella del progetto. */
+/** Test plate with pockets of different clearances, to calibrate the printer; uses the project's cell type. */
 export function exportToleranceTest(project: Project, clearancesMm: readonly number[]) {
   const typeId = project.cells[0]?.typeId ?? '18650-3000-10a';
   const model = buildToleranceTest(project, typeId, clearancesMm, ui.holder);
@@ -92,14 +92,14 @@ export function exportToleranceTest(project: Project, clearancesMm: readonly num
 
 const stlName = (project: Project, id: string, half: HolderHalf) => `${slug(project.name)}-${t('file.holder')}-${id}-${faceName(half)}.stl`;
 
-/** STL di un pezzo del portacelle diviso (già girato se entra nel piano solo così). */
+/** STL of a piece of the split holder (already rotated if it fits the bed only that way). */
 export function exportHolderPiece(project: Project, pieceId: string, half: HolderHalf) {
   const piece = holderOf(project, ui.holder).split?.pieces.find((p) => p.id === pieceId);
   if (!piece) return;
   save(holderStl(piece.model, half, piece.rotated) as BlobPart, stlName(project, piece.id, half), 'model/stl');
 }
 
-/** Tutti i pezzi, sopra e sotto, in un solo ZIP. */
+/** All the pieces, top and bottom, in a single ZIP. */
 export function exportHolderZip(project: Project) {
   const split = holderOf(project, ui.holder).split;
   if (!split) return;

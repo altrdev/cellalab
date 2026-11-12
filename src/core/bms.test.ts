@@ -6,23 +6,23 @@ import { createProject, parseProject, serializeProject } from './project';
 import { computeStats } from './stats';
 import { pack, codes } from './bmsFixtures';
 
-describe('catalogo BMS', () => {
-  it('gli id sono unici e le serie coerenti', () => {
+describe('BMS catalogue', () => {
+  it('ids are unique and the series are consistent', () => {
     const ids = BUILTIN_BMS_TYPES.map((b) => b.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const b of BUILTIN_BMS_TYPES) expect(b.minSeries).toBeLessThanOrEqual(b.maxSeries);
   });
 });
 
-describe('scelta del BMS', () => {
-  it('setBms imposta e toglie', () => {
+describe('BMS choice', () => {
+  it('setBms sets and removes', () => {
     const id = BUILTIN_BMS_TYPES[3]!.id;
     const p = setBms(createProject(), id);
     expect(bmsOf(p)?.id).toBe(id);
     expect(bmsOf(setBms(p, undefined))).toBeUndefined();
   });
 
-  it('un BMS personalizzato si aggiunge e togliendolo il pacco resta senza', () => {
+  it('a custom BMS can be added and when it is removed the pack is left without one', () => {
     const type = bmsFromDraft(createProject(), { name: 'Mio 6S', minSeries: 6, maxSeries: 6, maxCurrentA: 25, chemistry: 'li-ion', ntc: false, lengthMm: 0, widthMm: 0, thicknessMm: 0 });
     let p = setBms(addCustomBms(createProject(), type), type.id);
     expect(allBmsTypes(p)[0]!.id).toBe(type.id);
@@ -37,37 +37,37 @@ describe('scelta del BMS', () => {
   });
 });
 
-describe('verifiche BMS', () => {
+describe('BMS checks', () => {
   const bms13 = BUILTIN_BMS_TYPES.find((b) => b.id === 'bms-13s-40a-li-ion')!.id;
 
-  it('senza BMS non c’è nessuna verifica BMS', () => {
+  it('without a BMS there is no BMS check', () => {
     expect(codes(pack(13, 3)).filter((c) => c.startsWith('bms'))).toEqual([]);
   });
 
-  it('S giusta: solo l’informazione sui fili n+1', () => {
+  it('right S: only the information about the n+1 wires', () => {
     const issues = runDrc(setBms(pack(13, 3), bms13));
     expect(issues.map((i) => i.code)).toEqual(['bms-wires']);
     expect(issues[0]!.message).toContain('14');
   });
 
-  it('S diversa = errore', () => {
+  it('different S = error', () => {
     expect(codes(setBms(pack(10, 3), bms13))).toContain('bms-series');
   });
 
-  it('chimica diversa = errore con le celle', () => {
+  it('different chemistry = error with the cells', () => {
     const p = setBms(pack(8, 2), 'bms-8s-100a-lifepo4');
     const issue = runDrc(p).find((i) => i.code === 'bms-chemistry');
     expect(issue?.severity).toBe('error');
     expect(issue?.cellIds).toHaveLength(16);
   });
 
-  it('corrente di progetto sopra il BMS = avviso', () => {
+  it('design current above the BMS = warning', () => {
     const p = setCurrentLimit(setBms(pack(13, 8), bms13), 60);
     expect(codes(p)).toContain('bms-current');
   });
 
-  it('il limite del BMS fa da tetto alla corrente del pacco', () => {
-    const p = pack(13, 8); // celle: 80 A
+  it('the BMS limit caps the pack current', () => {
+    const p = pack(13, 8); // cells: 80 A
     expect(computeStats(p).maxCurrentA).toBe(80);
     const s = computeStats(setBms(p, bms13));
     expect(s.maxCurrentA).toBe(40);
@@ -75,8 +75,8 @@ describe('verifiche BMS', () => {
   });
 });
 
-describe('salvataggio', () => {
-  it('BMS scelto e personalizzato sopravvivono al giro JSON', () => {
+describe('saving', () => {
+  it('chosen and custom BMS survive the JSON round trip', () => {
     const type = bmsFromDraft(createProject(), { name: 'Mio', minSeries: 4, maxSeries: 8, maxCurrentA: 20, chemistry: 'lifepo4', ntc: true, lengthMm: 0, widthMm: 0, thicknessMm: 0 });
     const p = setBms(addCustomBms(createProject(), type), type.id);
     const back = parseProject(serializeProject(p));
@@ -84,7 +84,7 @@ describe('salvataggio', () => {
     expect(back.customBmsTypes).toEqual([type]);
   });
 
-  it('un bmsId sconosciuto o un BMS malformato si ignorano', () => {
+  it('an unknown bmsId or a malformed BMS is ignored', () => {
     const raw = JSON.parse(serializeProject(createProject()));
     raw.bmsId = 'non-esiste';
     raw.customBmsTypes = [{ id: 'x' }];

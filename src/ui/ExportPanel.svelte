@@ -8,7 +8,7 @@
   import { exportCutList, exportDxf, exportHarness, exportHolderPiece, exportHolderZip, exportStl, exportSvg, exportToleranceTest } from './exports';
   import { DEFAULT_TEST_CLEARANCES_MM } from '../core/holder';
   import { holderOf } from './holder';
-  import { harnessOf, reportOf, stripsOf } from './lamelle';
+  import { harnessOf, reportOf, stripsOf } from './busbar';
   import { ui } from './ui.svelte';
 
   let { onSave, onOpen }: { onSave: () => void; onOpen: (e: Event) => void } = $props();
@@ -20,7 +20,7 @@
   const labelOf = $derived(new Map(stripsOf(project, ui.lamella).map((s) => [s.id, s.label] as const)));
   const stripStatus = $derived(empty ? 'empty' : reportOf(project, ui.lamella).status);
   const holderReport = $derived(holderOf(project, ui.holder).report);
-  /** Piastra troppo grande per il piano: pezzi da stampare e incollare. */
+  /** Plate too big for the bed: pieces to print and glue. */
   const split = $derived(holderOf(project, ui.holder).split);
   const holderStatus = $derived(
     !holderReport ? 'empty' : holderReport.issues.some((i) => i.level === 'error') ? 'error' : holderReport.issues.some((i) => i.level === 'warning') ? 'warning' : 'ok',
@@ -202,7 +202,7 @@
     color: var(--fg);
   }
   .hint {
-    padding-left: 38px; /* sotto il testo, non sotto l'interruttore */
+    padding-left: 38px; /* under the text, not under the switch */
     font-size: 0.74rem;
     line-height: 1.35;
     color: var(--muted);

@@ -10,41 +10,41 @@ import { t } from '../i18n';
 import { len, lenLabel, lenNum, temp } from '../units';
 
 /**
- * Portacelle monolitico a due piastre (sopra e sotto). Ogni piastra è un "cappuccio":
- *  - un fondo sottile (`floorMm`) che appoggia sul bordo del polo, con un foro per il terminale;
- *  - le pareti (`lipMm`) che avvolgono le celle, con una tasca per cella (raggio + gioco).
- * Le due piastre hanno lo stesso disegno in pianta; il pacco finito è alto «altezza celle + 2 fondi».
- * La sagoma esterna segue le celle, con gli angoli concavi raccordati e il bordo esterno smussato.
+ * Monolithic two-plate holder (top and bottom). Each plate is a "cap":
+ *  - a thin floor (`floorMm`) resting on the pole rim, with a hole for the terminal;
+ *  - the walls (`lipMm`) wrapping the cells, with one pocket per cell (radius + clearance).
+ * The two plates have the same plan layout; the finished pack is "cell height + 2 floors" tall.
+ * The outer outline follows the cells, with the concave corners rounded and the outer edge chamfered.
  */
 
 export type HolderShape = 'profile' | 'rounded';
 
 export interface HolderSettings {
-  /** Spessore della parete attorno alle celle, mm. */
+  /** Wall thickness around the cells, mm. */
   wallMm: number;
-  /** Gioco per lato tra cella e tasca, mm. */
+  /** Clearance per side between cell and pocket, mm. */
   clearanceMm: number;
-  /** Spessore del fondo (il bordo che trattiene la cella), mm. */
+  /** Floor thickness (the rim that holds the cell), mm. */
   floorMm: number;
-  /** Quanto le pareti avvolgono la cella, mm. */
+  /** How far the walls wrap the cell, mm. */
   lipMm: number;
-  /** Larghezza del bordo di ritenzione sopra il polo, mm: il foro ha raggio R − bordo. */
+  /** Width of the retaining rim over the pole, mm: the hole has radius R − rim. */
   ledgeMm: number;
-  /** `profile`: la sagoma segue le celle; `rounded`: contorno convesso con gli angoli arrotondati. */
+  /** `profile`: the outline follows the cells; `rounded`: convex outline with rounded corners. */
   shape: HolderShape;
-  /** Raggio di raccordo degli angoli concavi della sagoma, mm (0 = angoli vivi). Solo con `profile`. */
+  /** Fillet radius of the concave corners of the outline, mm (0 = sharp corners). Only with `profile`. */
   filletMm: number;
-  /** Smusso del bordo esterno, mm (0 = nessuno). */
+  /** Chamfer of the outer edge, mm (0 = none). */
   chamferMm: number;
-  /** Con il fondo che blocca le celle sul lato dei poli; spento, le pareti sono aperte da parte a parte. */
+  /** With the floor that locks the cells on the pole side; off, the walls are open from side to side. */
   lockCells: boolean;
-  /** Piano di stampa (area utile), mm. */
+  /** Print bed (usable area), mm. */
   bedXMm: number;
   bedYMm: number;
-  /** Tasca per il sensore NTC (solo se il BMS ha l'ingresso NTC) e diametro del sensore, mm. */
+  /** Pocket for the NTC sensor (only if the BMS has an NTC input) and sensor diameter, mm. */
   ntc: boolean;
   ntcMm: number;
-  /** Senza linguette di bilanciamento: un piccolo foro nel portacelle accanto a ogni lamella, da cui esce il filo. */
+  /** Without balance tabs: a small hole in the holder next to each strip, from which the wire exits. */
   wireHoles: boolean;
 }
 
@@ -65,16 +65,16 @@ export const DEFAULT_HOLDER_SETTINGS: HolderSettings = {
   wireHoles: false,
 };
 
-/** Spessore minimo di parete tra due tasche per stamparla bene (due passate con ugello da 0,4). */
+/** Minimum wall thickness between two pockets to print it well (two passes with a 0.4 nozzle). */
 export const MIN_PRINT_WALL_MM = 0.8;
 
-/** Vuoti tra le celle più piccoli di così (mm²) vengono riempiti di plastica. */
+/** Gaps between cells smaller than this (mm²) are filled with plastic. */
 export const MIN_OPEN_GAP_MM2 = 25;
 
-/** Passo dello smusso: come lo strato di una stampa tipica, 0,2 mm. */
+/** Chamfer step: like the layer of a typical print, 0.2 mm. */
 const CHAMFER_STEP_MM = 0.2;
 
-/** Una fetta della piastra: forme da `z0` a `z1`, con z misurato dalla faccia esterna del fondo verso il bordo delle pareti. */
+/** A slice of the plate: shapes from `z0` to `z1`, with z measured from the outer face of the floor towards the wall rim. */
 export interface HolderLayer {
   z0: number;
   z1: number;
@@ -83,30 +83,30 @@ export interface HolderLayer {
 
 export interface HolderModel {
   settings: HolderSettings;
-  /** Altezza delle celle usata per le due piastre (la più alta). */
+  /** Cell height used for the two plates (the tallest). */
   cellHeightMm: number;
-  /** Profondità reale delle pareti (limitata a metà cella). */
+  /** Actual wall depth (limited to half a cell). */
   lipMm: number;
-  /** Spessore reale del fondo (0 se le celle non sono bloccate). */
+  /** Actual floor thickness (0 if the cells are not locked). */
   floorMm: number;
-  /** Spessore totale di una piastra: fondo + pareti. */
+  /** Total thickness of a plate: floor + walls. */
   totalMm: number;
   /** Smusso effettivo, mm. */
   chamferMm: number;
-  /** Fondo: sagoma esterna con i fori dei terminali (vuoto se le celle non sono bloccate). */
+  /** Floor: outer outline with the terminal holes (empty if the cells are not locked). */
   slab: Region[];
-  /** Pareti: sagoma esterna con le tasche delle celle. */
+  /** Walls: outer outline with the cell pockets. */
   wall: Region[];
-  /** Fette della piastra, dalla faccia esterna al bordo delle pareti. */
+  /** Slices of the plate, from the outer face to the wall rim. */
   layers: HolderLayer[];
-  /** Le due piastre quando non sono uguali (scanalature solo dove passano le linguette): ciascuna è un modello completo; il resto di questo modello è quello della piastra sopra. */
+  /** The two plates when they are not equal (grooves only where the tabs pass): each is a complete model; the rest of this model is that of the top plate. */
   halves?: { top: HolderModel; bottom: HolderModel };
   /**
-   * Smusso a rampa continua (solo con `smooth`): le fette arretrano di `chamferMm` sulle due facce e lo smusso
-   * è il raccordo inclinato tra il contorno pieno (`a`) e quello arretrato (`b`). Coppie di contorni corrispondenti.
+   * Continuous ramp chamfer (only with `smooth`): the slices step back by `chamferMm` on the two faces and the chamfer
+   * is the sloped blend between the full outline (`a`) and the set-back one (`b`). Pairs of matching outlines.
    */
   ramp: { contours: { a: Pt[]; b: Pt[] }[] } | null;
-  /** Diametro del foro del terminale sulla cella più piccola, mm (null se non c'è il fondo). */
+  /** Diameter of the terminal hole on the smallest cell, mm (null if there is no floor). */
   openingDiameterMm: number | null;
   /** Ingombro in pianta. */
   bounds: Rect;
@@ -121,13 +121,13 @@ export interface HolderIssue {
 export interface HolderReport {
   widthMm: number;
   depthMm: number;
-  /** Altezza totale del pacco col portacelle: celle + due fondi. */
+  /** Total pack height with the holder: cells + two floors. */
   totalHeightMm: number;
-  /** Parete più sottile tra due tasche vicine, mm (null con una sola cella). */
+  /** Thinnest wall between two neighbouring pockets, mm (null with a single cell). */
   minWallBetweenMm: number | null;
-  /** Volume di plastica di una piastra, mm³. */
+  /** Plastic volume of one plate, mm³. */
   volumeMm3: number;
-  /** Pezzi in cui si divide ogni piastra (1 se entra nel piano). */
+  /** Pieces each plate is split into (1 if it fits the bed). */
   pieces: number;
   issues: HolderIssue[];
 }
@@ -150,13 +150,13 @@ function boundsOf(regions: readonly Region[]): Rect {
   return { minX, minY, maxX, maxY };
 }
 
-/** Costruisce le sagome delle due piastre. Null se non ci sono celle. */
+/** Builds the outlines of the two plates. Null if there are no cells. */
 const centroidOf = (pts: readonly Pt[]): Pt => ({
   x: pts.reduce((a, p) => a + p.x, 0) / pts.length,
   y: pts.reduce((a, p) => a + p.y, 0) / pts.length,
 });
 
-/** Accoppia i contorni di `A` con quelli di `B` per vicinanza dei baricentri; null se non sono quanti i primi. */
+/** Pairs the outlines of `A` with those of `B` by nearness of centroids; null if the counts differ. */
 function matchContours(A: readonly Pt[][], B: readonly Pt[][]): { a: Pt[]; b: Pt[] }[] | null {
   if (A.length !== B.length) return null;
   const free = new Set(B.map((_, i) => i));
@@ -179,7 +179,7 @@ function matchContours(A: readonly Pt[][], B: readonly Pt[][]): { a: Pt[]; b: Pt
   return out;
 }
 
-/** Contorni pieni e arretrati accoppiati (contorno esterno e buchi di ogni regione); null se l'arretramento cambia la topologia. */
+/** Paired full and set-back outlines (outer outline and holes of each region); null if the set-back changes the topology. */
 function rampContours(outer: readonly Region[], inner: readonly Region[]): { a: Pt[]; b: Pt[] }[] | null {
   const regions = matchContours(outer.map((r) => r.outline), inner.map((r) => r.outline));
   if (!regions) return null;
@@ -195,26 +195,26 @@ function rampContours(outer: readonly Region[], inner: readonly Region[]): { a: 
 }
 
 
-/** Opzioni per i pezzi speciali (pezzo test); il portacelle normale non ne usa. */
+/** Options for special pieces (test piece); the normal holder does not use them. */
 export interface BuildOptions {
-  /** Gioco per cella (stesso ordine di `project.cells`) al posto di `settings.clearanceMm`. */
+  /** Clearance per cell (same order as `project.cells`) in place of `settings.clearanceMm`. */
   clearances?: readonly number[];
-  /** Forme piene da unire alla sagoma esterna (per esempio una striscia per le scritte). */
+  /** Solid shapes to join to the outer outline (for example a strip for the labels). */
   addOuter?: readonly (readonly Pt[])[];
-  /** Forme da incidere sul bordo delle pareti, per `engraveMm` di profondità. */
+  /** Shapes to engrave on the wall rim, `engraveMm` deep. */
   engrave?: readonly (readonly Pt[])[];
   engraveMm?: number;
-  /** Tacche da togliere alla sagoma esterna (scanalature per i fili): su tutto lo spessore della piastra. */
+  /** Notches to remove from the outer outline (grooves for the wires): through the whole plate thickness. */
   notches?: readonly (readonly Pt[])[];
-  /** Tasche in più nelle pareti (non nel fondo), per esempio quella dell'NTC: fori tra le tasche delle celle. */
+  /** Extra pockets in the walls (not in the floor), for example the NTC one: holes between the cell pockets. */
   extraPockets?: readonly (readonly Pt[])[];
-  /** Fori in più che passano anche nel fondo (per esempio il filo dell'NTC). */
+  /** Extra holes that also go through the floor (for example the NTC wire). */
   throughHoles?: readonly (readonly Pt[])[];
 }
 
 /**
- * Con `smooth` lo smusso non è una scala di gradini (che serve solo se vuoi vederli come strati di stampa) ma una
- * rampa inclinata continua: le fette restano poche e in `ramp` ci sono i contorni da raccordare.
+ * With `smooth` the chamfer is not a staircase of steps (needed only if you want to see them as print layers) but a
+ * continuous sloped ramp: the slices stay few and `ramp` holds the outlines to blend.
  */
 export function buildHolder(
   project: Project,
@@ -233,16 +233,16 @@ export function buildHolder(
   const floorMm = s.lockCells ? s.floorMm : 0;
   const lipMm = Math.max(1, Math.min(s.lipMm, cellHeightMm / 2 - 1 - floorMm));
   const totalMm = floorMm + lipMm;
-  // lo smusso non può mangiare tutta la parete né più di metà piastra
+  // the chamfer cannot eat the whole wall nor more than half the plate
   const chamferMm = Math.max(0, Math.min(s.chamferMm, s.wallMm * 0.75, totalMm / 2 - 0.05));
 
   const merged = unionAll([...cells.map(({ c, r, cl }) => circlePolygon(c.x, c.y, r + cl + s.wallMm)), ...(opts.addOuter ?? [])]);
   let outer: Region[];
   if (s.shape === 'rounded') {
-    // Contorno convesso di ogni gruppo di celle: i bordi tondi sono gli archi delle celle d'angolo.
+    // Convex outline of each cell group: the round edges are the arcs of the corner cells.
     outer = unionAll(merged.map((reg) => convexHull(reg.outline)));
   } else {
-    // Raccordo degli angoli concavi; le fessure minuscole che restano non si stampano: si riempiono.
+    // Fillet of the concave corners; the tiny slits that remain cannot be printed: they are filled.
     outer = closeRegions(merged, s.filletMm).map((reg) => ({
       outline: reg.outline,
       holes: reg.holes.filter((hole) => regionArea({ outline: hole, holes: [] }) >= MIN_OPEN_GAP_MM2),
@@ -255,18 +255,18 @@ export function buildHolder(
   const extra = opts.extraPockets ?? [];
   const wallPocketsCut = [...pockets, ...extra, ...through];
   const slabOpeningsCut = [...openings, ...through];
-  // Sagome di riferimento (disegno, divisione in pezzi): senza la tasca dell'NTC, che sta su una sola piastra e solo nelle fette.
+  // Reference outlines (drawing, split into pieces): without the NTC pocket, which is on one plate only and only in the slices.
   const wall = differenceRegions(outer, pockets);
   const slab = s.lockCells ? differenceRegions(outer, openings) : [];
 
-  // Smusso a rampa: contorno arretrato e coppie di contorni da raccordare (se la topologia regge).
+  // Ramp chamfer: set-back outline and pairs of outlines to blend (if the topology holds).
   let ramp: HolderModel['ramp'] = null;
   if (smooth && chamferMm > 0) {
     const contours = rampContours(outer, offsetRegions(outer, -chamferMm));
     if (contours) ramp = { contours };
   }
 
-  // Fette: ai bordi dello smusso la sagoma esterna si ritira a gradini; sotto `floorMm` si taglia con i fori, sopra con le tasche.
+  // Slices: at the chamfer edges the outer outline steps back; below `floorMm` it is cut with the holes, above with the pockets.
   const engrave = opts.engrave && opts.engrave.length > 0 ? opts.engrave : null;
   const engraveFromZ = totalMm - Math.max(0, Math.min(opts.engraveMm ?? 0, totalMm - floorMm - 0.4));
   const makeLayers = (wallPockets: readonly (readonly Pt[])[], slabOpenings: readonly (readonly Pt[])[]): HolderLayer[] => {
@@ -332,14 +332,14 @@ export function buildHolder(
   };
 }
 
-/** Volume dei due cunei dello smusso a rampa: corona tra contorno pieno e arretrato, per metà dello smusso, su ciascuna faccia. */
+/** Volume of the two wedges of the ramp chamfer: ring between full and set-back outline, for half of the chamfer, on each face. */
 function rampVolume(model: HolderModel): number {
   if (!model.ramp) return 0;
   const area = (pts: Pt[]) => regionArea({ outline: pts, holes: [] });
   return model.ramp.contours.reduce((v, c) => v + Math.abs(area(c.a) - area(c.b)), 0) * model.chamferMm;
 }
 
-/** Entra nel piano di stampa, anche ruotando di 90°. */
+/** Fits the print bed, even rotated by 90°. */
 export const fitsBed = (w: number, d: number, s: Pick<HolderSettings, 'bedXMm' | 'bedYMm'>) =>
   (w <= s.bedXMm && d <= s.bedYMm) || (w <= s.bedYMm && d <= s.bedXMm);
 
@@ -380,7 +380,7 @@ export function analyzeHolder(project: Project, model: HolderModel, split: Holde
 
   const bedArgs = { w: lenNum(widthMm, 0), d: lenNum(depthMm, 0), bx: lenNum(s.bedXMm, 0), by: lenNum(s.bedYMm, 0), u: lenLabel() };
   if (split) {
-    // troppo grande per il piano: divisa in pezzi (e, se qualcuno non entra nemmeno così, avviso)
+    // too big for the bed: split into pieces (and, if some still do not fit that way, a warning)
     issues.push({ level: 'info', text: t('holder.issue.split', { ...bedArgs, n: split.pieces.length, ids: split.pieces.map((p) => p.id).join(', ') }) });
     if (!split.allFit) {
       issues.push({ level: 'warning', text: t('holder.issue.pieceBed', { ids: split.pieces.filter((p) => !p.fits).map((p) => p.id).join(', ') }) });
@@ -413,23 +413,23 @@ export function analyzeHolder(project: Project, model: HolderModel, split: Holde
   };
 }
 
-/** Profondità delle pareti del pezzo test, mm: basta a sentire il gioco senza sprecare plastica. */
+/** Wall depth of the test piece, mm: enough to feel the clearance without wasting plastic. */
 const TOLERANCE_TEST_LIP_MM = 4;
-/** Cifre incise: altezza, tratto (due passate con ugello da 0,4) e profondità, mm. */
+/** Engraved digits: height, stroke (two passes with a 0.4 nozzle) and depth, mm. */
 const TEST_DIGIT_MM = 5;
 const TEST_STROKE_MM = 0.8;
 const TEST_ENGRAVE_MM = 1;
 
 export const DEFAULT_TEST_CLEARANCES_MM = [0.1, 0.2, 0.3];
 
-/** Il gioco scritto sul pezzo: centesimi di mm, quindi 0,15 mm → «15». */
+/** The clearance written on the piece: hundredths of a mm, so 0.15 mm → "15". */
 export const clearanceLabel = (clearanceMm: number) => String(Math.round(clearanceMm * 100));
 
 /**
- * Pezzo test per tarare il gioco: una piastra bassa con una fila di tasche, ognuna con un gioco diverso
- * (dalla più stretta a sinistra alla più larga a destra). Sotto ogni tasca una striscia con il gioco inciso
- * in centesimi di mm («10» = 0,10 mm). Ha le stesse impostazioni del portacelle vero, così la prova vale
- * per quello che poi si stampa. Null se il tipo di cella non esiste o non ci sono giochi.
+ * Test piece to calibrate the clearance: a low plate with a row of pockets, each with a different clearance
+ * (from the tightest on the left to the loosest on the right). Under each pocket a strip with the clearance engraved
+ * in hundredths of a mm ("10" = 0.10 mm). It has the same settings as the real holder, so the test holds
+ * for what is printed afterwards. Null if the cell type does not exist or there are no clearances.
  */
 export function buildToleranceTest(
   project: Pick<Project, 'customCellTypes'>,
@@ -453,7 +453,7 @@ export function buildToleranceTest(
   }));
   const test: Project = { version: 1, name: 'test', customCellTypes: project.customCellTypes, cells };
 
-  // striscia sotto la fila: parte dentro le tasche (che la bucano) e arriva sotto il raggio esterno
+  // strip under the row: partly inside the pockets (which cut into it) and reaching under the outer radius
   const edge = r + clMax + settings.wallMm;
   const textY = edge + 1.2 + TEST_DIGIT_MM / 2;
   const strip: Pt[] = [

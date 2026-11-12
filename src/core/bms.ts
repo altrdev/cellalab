@@ -2,8 +2,8 @@ import { t } from '../i18n';
 import type { BmsSize, BmsType, Chemistry, Project } from './types';
 
 /**
- * Catalogo BMS predefinito: solo profili GENERICI (nessun modello commerciale). I valori sono tipici per la
- * classe: verificare sempre la scheda tecnica del BMS che si compra davvero.
+ * Default BMS catalogue: GENERIC profiles only (no commercial model). Values are typical for the
+ * class: always check the datasheet of the BMS you actually buy.
  */
 function generic(series: number, maxCurrentA: number, chemistry: Chemistry, sizeMm: BmsSize): BmsType {
   const chem = chemistry === 'li-ion' ? 'Li-ion' : 'LiFePO4';
@@ -24,7 +24,7 @@ function generic(series: number, maxCurrentA: number, chemistry: Chemistry, size
 
 const size = (lengthMm: number, widthMm: number, thicknessMm: number): BmsSize => ({ lengthMm, widthMm, thicknessMm });
 
-/** Gli ingombri sono stime per classe, non misure: sul BMS vero vanno sovrascritti. */
+/** Dimensions are estimates per class, not measurements: overwrite them on the real BMS. */
 export const BUILTIN_BMS_TYPES: readonly BmsType[] = [
   generic(4, 30, 'li-ion', size(60, 20, 4)),
   generic(7, 40, 'li-ion', size(70, 30, 5)),
@@ -45,12 +45,12 @@ export function findBmsType(project: Pick<Project, 'customBmsTypes'>, id: string
   return project.customBmsTypes?.find((b) => b.id === id) ?? BUILTIN_BMS_TYPES.find((b) => b.id === id);
 }
 
-/** Il BMS scelto per il pacco, se c'è ed esiste ancora. */
+/** The BMS chosen for the pack, if there is one and it still exists. */
 export function bmsOf(project: Pick<Project, 'customBmsTypes' | 'bmsId'>): BmsType | undefined {
   return project.bmsId === undefined ? undefined : findBmsType(project, project.bmsId);
 }
 
-/** Intervallo di S come testo: «13S» oppure «10S–14S». */
+/** Range of S as text: "13S" or "10S–14S". */
 export function seriesLabel(b: Pick<BmsType, 'minSeries' | 'maxSeries'>): string {
   return b.minSeries === b.maxSeries ? `${b.minSeries}S` : `${b.minSeries}S–${b.maxSeries}S`;
 }
@@ -62,13 +62,13 @@ export interface BmsDraft {
   maxCurrentA: number;
   chemistry: Chemistry;
   ntc: boolean;
-  /** Ingombro: tutti e tre a zero (o vuoti) = non indicato. */
+  /** Dimensions: all three zero (or empty) = not specified. */
   lengthMm: number;
   widthMm: number;
   thicknessMm: number;
 }
 
-/** Messaggi di errore (vuoto se i dati vanno bene) per un BMS personalizzato. */
+/** Error messages (empty if the data is fine) for a custom BMS. */
 export function validateBms(d: BmsDraft): string[] {
   const errors: string[] = [];
   if (d.name.trim() === '') errors.push(t('bms.err.name'));

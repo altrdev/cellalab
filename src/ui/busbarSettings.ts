@@ -1,12 +1,12 @@
-import { DEFAULT_LAMELLA_SETTINGS, type LamellaSettings } from '../core/lamelle';
+import { DEFAULT_LAMELLA_SETTINGS, type LamellaSettings } from '../core/busbar';
 import { COOLING } from '../core/sizing';
 import { AWG_TABLE, POWER_AWGS } from '../core/wire';
 
-// ---- Impostazioni: ricordate nel browser e scritte anche nel file del progetto
+// ---- Settings: remembered in the browser and also written in the project file
 
 const KEY = 'cellalab:lamelle';
 
-/** Impostazioni valide da dati qualunque (file o browser): i campi sbagliati o mancanti tornano al valore di default. */
+/** Valid settings from any data (file or browser): wrong or missing fields go back to the default value. */
 export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
   const base: LamellaSettings = { ...DEFAULT_LAMELLA_SETTINGS };
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return base;
@@ -47,6 +47,6 @@ export function saveLamellaSettings(s: LamellaSettings): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
-    /* storage non disponibile: l'app funziona lo stesso */
+    /* storage not available: the app works anyway */
   }
 }

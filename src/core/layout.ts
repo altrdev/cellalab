@@ -9,21 +9,21 @@ export const MAX_GENERATED_CELLS = 2000;
 export interface GridSpec {
   typeId: string;
   diameterMm: number;
-  /** Numero di gruppi in serie (S). */
+  /** Number of groups in series (S). */
   series: number;
-  /** Celle per gruppo in parallelo (P). */
+  /** Cells per group in parallel (P). */
   parallel: number;
   kind: LayoutKind;
-  /** Spazio libero tra una cella e l'altra, in mm. */
+  /** Free space between one cell and the next, in mm. */
   gapMm: number;
 }
 
 /**
- * Genera un pacco S×P: P file di S celle. Ogni gruppo in parallelo è una colonna di P celle
- * (nell'esagonale una diagonale, con le celle a contatto); i gruppi si susseguono lungo x, sugli
- * slot del reticolo condiviso (vedi lattice.ts; origine in 0,0).
- * La polarità alterna da un gruppo all'altro (+ sopra, poi − sopra, ...): è la
- * disposizione tipica per collegare i gruppi in serie con lamelle corte.
+ * Generates an S×P pack: P rows of S cells. Each parallel group is a column of P cells
+ * (in the hexagonal one a diagonal, with the cells touching); the groups follow one another along x, on the
+ * slots of the shared lattice (see lattice.ts; origin at 0,0).
+ * The polarity alternates from one group to the next (+ up, then − up, ...): it is the
+ * typical arrangement to connect the series groups with short strips.
  */
 export function generateGrid(spec: GridSpec): Omit<NewCell, 'id'>[] {
   const { typeId, diameterMm, series, parallel, kind, gapMm } = spec;

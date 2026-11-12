@@ -1,33 +1,33 @@
 import { t } from '../i18n';
 
 /**
- * Catalogo dei materiali per le lamelle (strisce che collegano i poli delle celle).
+ * Catalogue of strip materials (strips that connect the cell poles).
  *
- * I valori sono TIPICI da letteratura, non garantiti: la lega reale del fornitore può differire
- * di parecchio (soprattutto resistività dell'acciaio nichelato e dell'ottone). Verifica sempre
- * la scheda tecnica di ciò che compri.
+ * The values are TYPICAL from the literature, not guaranteed: the supplier's real alloy may differ
+ * quite a lot (especially the resistivity of nickel-plated steel and brass). Always check
+ * the datasheet of what you buy.
  */
 
-/** Quanto è facile saldare a punti il materiale con una saldatrice hobby. */
+/** How easy it is to spot-weld the material with a hobby welder. */
 export type Weldability = 'good' | 'fair' | 'poor';
 
 export interface LamellaMaterial {
   id: string;
   name: string;
-  /** Resistività a 20 °C, Ω·m. */
+  /** Resistivity at 20 °C, Ω·m. */
   resistivityOhmM: number;
   densityKgM3: number;
   /** Calore specifico, J/(kg·K). */
   specificHeatJKgK: number;
-  /** Coefficiente di temperatura della resistività, 1/K. */
+  /** Temperature coefficient of resistivity, 1/K. */
   tempCoeffPerK: number;
-  /** Conducibilità termica, W/(m·K): il calore che la lamella porta verso le celle. */
+  /** Thermal conductivity, W/(m·K): the heat the strip carries towards the cells. */
   conductivityWmK: number;
   weldability: Weldability;
   /** Spessori commerciali tipici in mm, in ordine crescente. */
   thicknessesMm: number[];
   note: string;
-  /** Colore con cui si disegna la lamella (2D e 3D). */
+  /** Colour used to draw the strip (2D and 3D). */
   colorHex: string;
 }
 
@@ -140,12 +140,12 @@ export function findMaterial(id: string): LamellaMaterial | undefined {
   return LAMELLA_MATERIALS.find((m) => m.id === id);
 }
 
-/** Resistività alla temperatura `tempC` (modello lineare). */
+/** Resistivity at temperature `tempC` (linear model). */
 export function resistivityAt(m: LamellaMaterial, tempC: number): number {
   return m.resistivityOhmM * (1 + m.tempCoeffPerK * (tempC - 20));
 }
 
-/** Capacità termica volumetrica, J/(m³·K). */
+/** Volumetric heat capacity, J/(m³·K). */
 export function volumetricHeat(m: LamellaMaterial): number {
   return m.densityKgM3 * m.specificHeatJKgK;
 }

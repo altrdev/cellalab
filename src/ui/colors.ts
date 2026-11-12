@@ -1,6 +1,6 @@
 /**
- * Tonalità (0–360) di un gruppo: angolo aureo sul cerchio dei colori, così i gruppi vicini si
- * distinguono. Parte dal blu (200°) per non confondere S1 col rosso usato per gli errori.
+ * Hue (0–360) of a group: golden angle on the colour wheel, so neighbouring groups can be
+ * told apart. Starts from blue (200°) so S1 is not confused with the red used for errors.
  */
 export function groupHue(group: number): number {
   return (200 + group * 137.508) % 360;

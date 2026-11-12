@@ -2,11 +2,11 @@ import { t } from '../i18n';
 import type { CellType, Project } from './types';
 
 /**
- * Catalogo predefinito: profili GENERICI per famiglia (generic: true) e modelli commerciali comuni.
- * Per i modelli commerciali i dati sono quelli di scheda/negozi (capacità e corrente come indicate da nkon.nl),
- * le dimensioni sono ingombri tipici con guaina.
- * priceEur dei modelli commerciali: prezzo indicativo per cella (IVA inclusa, 1 pezzo o primo scaglione) rilevato su nkon.nl a novembre 2026.
- * Verificare sempre sulla scheda tecnica della cella che si compra davvero.
+ * Default catalogue: GENERIC profiles per family (generic: true) and common commercial models.
+ * For commercial models the data come from datasheets/shops (capacity and current as given by nkon.nl),
+ * dimensions are typical sizes with sleeve.
+ * priceEur of commercial models: indicative price per cell (VAT included, 1 piece or first tier) taken from nkon.nl in November 2026.
+ * Always check the datasheet of the cell you actually buy.
  */
 export const BUILTIN_CELL_TYPES: readonly CellType[] = [
   {
@@ -305,7 +305,7 @@ export const BUILTIN_CELL_TYPES: readonly CellType[] = [
   },
 ];
 
-/** Cerca un tipo di cella: prima tra quelli personalizzati del progetto, poi nel catalogo. */
+/** Looks up a cell type: first among the project's custom ones, then in the catalogue. */
 export function findCellType(
   project: Pick<Project, 'customCellTypes'>,
   id: string,

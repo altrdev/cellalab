@@ -1,18 +1,18 @@
 /**
- * Dimensionamento delle lamelle. Funzioni pure, in unità SI dove non indicato (mm nei nomi).
+ * Strip sizing. Pure functions, in SI units unless stated (mm in the names).
  *
- * Tre criteri (vedi la specifica):
- *  - termico continuo: t·(w+t) = I²·ρ / (2·w·h·ΔT), con scambio di calore da entrambe le facce
- *    e dai bordi verso l'aria (h = coefficiente di scambio);
- *  - picco adiabatico: A_min = I_picco·√(ρ·t_imp / (c_v·ΔT)), senza smaltimento di calore;
- *  - punti di saldatura: n = ceil((I/P) / I_per_punto), per ogni terminale.
+ * Three criteria (see the specification):
+ *  - continuous thermal: t·(w+t) = I²·ρ / (2·w·h·ΔT), with heat exchange from both faces
+ *    and from the edges to the air (h = exchange coefficient);
+ *  - adiabatic peak: A_min = I_peak·√(ρ·t_pulse / (c_v·ΔT)), with no heat dissipation;
+ *  - weld spots: n = ceil((I/P) / I_per_spot), for each terminal.
  */
 
 import { t } from '../i18n';
 
 const MM = 1e-3;
 
-/** Coefficienti di scambio termico verso l'aria, W/(m²·K). */
+/** Heat exchange coefficients towards the air, W/(m²·K). */
 export const COOLING = {
   free: {
     get label() {
@@ -38,12 +38,12 @@ export type CoolingId = keyof typeof COOLING;
 export interface ThermalInput {
   currentA: number;
   resistivityOhmM: number;
-  /** Aumento di temperatura ammesso rispetto all'ambiente, K. */
+  /** Allowed temperature rise above ambient, K. */
   deltaTK: number;
   hWm2K: number;
 }
 
-/** Spessore minimo (mm) che tiene l'aumento di temperatura entro ΔT, per una lamella larga `widthMm`. */
+/** Minimum thickness (mm) that keeps the temperature rise within ΔT, for a strip `widthMm` wide. */
 export function minThicknessThermalMm(widthMm: number, i: ThermalInput): number {
   if (!(widthMm > 0) || !(i.currentA > 0)) return 0;
   const w = widthMm * MM;
@@ -53,19 +53,19 @@ export function minThicknessThermalMm(widthMm: number, i: ThermalInput): number 
 }
 
 export interface ConductionInput extends ThermalInput {
-  /** Lunghezza libera della banda tra i due appoggi saldati sulle celle, mm. */
+  /** Free length of the band between the two welded supports on the cells, mm. */
   lengthMm: number;
-  /** Conducibilità termica del materiale, W/(m·K). */
+  /** Thermal conductivity of the material, W/(m·K). */
   conductivityWmK: number;
-  /** Aumento di temperatura delle estremità (le celle) rispetto all'ambiente, K. */
+  /** Temperature rise of the ends (the cells) above ambient, K. */
   endDeltaK: number;
 }
 
 /**
- * Aumento di temperatura (K, rispetto all'ambiente) al centro di una banda lunga `lengthMm` con le estremità
- * saldate alle celle, che stanno a `endDeltaK`. È il modello della «aletta» con generazione di calore:
- * θ(x) = θp + (θe − θp)·cosh(m·(x − L/2)) / cosh(m·L/2), con θp il valore della banda infinita (aria libera)
- * e m = √(h·P/(k·A)). Per L → ∞ torna a `steadyDeltaTK`.
+ * Temperature rise (K, above ambient) at the middle of a band `lengthMm` long with the ends
+ * welded to the cells, which are at `endDeltaK`. It is the "fin" model with heat generation:
+ * θ(x) = θp + (θe − θp)·cosh(m·(x − L/2)) / cosh(m·L/2), with θp the value of the infinite band (free air)
+ * and m = √(h·P/(k·A)). For L → ∞ it goes back to `steadyDeltaTK`.
  */
 export function conductionDeltaTK(widthMm: number, thicknessMm: number, i: ConductionInput): number {
   if (!(widthMm > 0) || !(thicknessMm > 0)) return Infinity;
@@ -79,19 +79,19 @@ export function conductionDeltaTK(widthMm: number, thicknessMm: number, i: Condu
   return thetaP + (i.endDeltaK - thetaP) / c;
 }
 
-/** Spessore massimo che si prova nel calcolo con conduzione, mm. */
+/** Maximum thickness tried in the calculation with conduction, mm. */
 const MAX_SEARCH_MM = 20;
 
 /**
- * Spessore minimo (mm) per cui la banda, con le estremità sulle celle, resta entro ΔT. Le estremità non vengono
- * considerate più calde dell'80% di ΔT, altrimenti non ci sarebbe soluzione. Se anche `MAX_SEARCH_MM` non basta
+ * Minimum thickness (mm) for which the band, with its ends on the cells, stays within ΔT. The ends are not
+ * considered hotter than 80% of ΔT, otherwise there would be no solution. If even `MAX_SEARCH_MM` is not enough
  * restituisce `MAX_SEARCH_MM`.
  */
 export function minThicknessConductionMm(widthMm: number, i: ConductionInput): number {
   if (!(widthMm > 0) || !(i.currentA > 0)) return 0;
   const inp = { ...i, endDeltaK: Math.max(0, Math.min(i.endDeltaK, 0.8 * i.deltaTK)) };
   const ok = (t: number) => conductionDeltaTK(widthMm, t, inp) <= i.deltaTK;
-  // cerca a passi geometrici il primo spessore che va bene, poi affina con la bisezione
+  // search in geometric steps for the first thickness that works, then refine with bisection
   let lo = 0.005;
   if (ok(lo)) return lo;
   let hi = lo;
@@ -110,7 +110,7 @@ export function minThicknessConductionMm(widthMm: number, i: ConductionInput): n
   return MAX_SEARCH_MM;
 }
 
-/** Aumento di temperatura a regime (K) di una lamella larga `widthMm` e spessa `thicknessMm`. */
+/** Steady-state temperature rise (K) of a strip `widthMm` wide and `thicknessMm` thick. */
 export function steadyDeltaTK(
   widthMm: number,
   thicknessMm: number,
@@ -127,27 +127,27 @@ export function steadyDeltaTK(
 export interface PeakInput {
   peakCurrentA: number;
   resistivityOhmM: number;
-  /** Capacità termica volumetrica, J/(m³·K). */
+  /** Volumetric heat capacity, J/(m³·K). */
   volumetricHeatJm3K: number;
   durationS: number;
   deltaTK: number;
 }
 
-/** Sezione minima (mm²) per assorbire un picco di corrente senza scambio di calore. */
+/** Minimum section (mm²) to absorb a current peak with no heat exchange. */
 export function minAreaPeakMm2(i: PeakInput): number {
   if (!(i.peakCurrentA > 0)) return 0;
   const a = i.peakCurrentA * Math.sqrt((i.resistivityOhmM * i.durationS) / (i.volumetricHeatJm3K * i.deltaTK));
   return a / (MM * MM);
 }
 
-/** Punti di saldatura necessari su un terminale che porta `cellCurrentA`. */
+/** Weld spots needed on a terminal carrying `cellCurrentA`. */
 export function spotsNeeded(cellCurrentA: number, spotCurrentA: number, minSpots: number): number {
   if (!(spotCurrentA > 0)) return Infinity;
   return Math.max(minSpots, Math.ceil(cellCurrentA / spotCurrentA - 1e-9));
 }
 
 type Phase = readonly [number, number];
-/** Disposizioni del reticolo: punto al centro, due punti affiancati, quattro punti a quadrato. */
+/** Lattice layouts: one spot in the centre, two side by side, four in a square. */
 const PHASES: Phase[] = [[0, 0], [0.5, 0], [0.5, 0.5]];
 
 function latticePoints(usable: number, spacingMm: number, phase: Phase): { x: number; y: number }[] {
@@ -164,8 +164,8 @@ function latticePoints(usable: number, spacingMm: number, phase: Phase): { x: nu
 }
 
 /**
- * Quanti punti entrano in un'area di contatto circolare di raggio `radiusMm`: reticolo con passo
- * `spacingMm`, punti interamente dentro il cerchio. Prova due fasi del reticolo e prende la migliore.
+ * How many spots fit in a circular contact area of radius `radiusMm`: lattice with pitch
+ * `spacingMm`, spots entirely inside the circle. Tries two lattice phases and takes the better.
  */
 export function spotCapacity(radiusMm: number, spotDiameterMm: number, spacingMm: number): number {
   const usable = radiusMm - spotDiameterMm / 2;
@@ -173,7 +173,7 @@ export function spotCapacity(radiusMm: number, spotDiameterMm: number, spacingMm
   return Math.max(...PHASES.map((ph) => latticePoints(usable, spacingMm, ph).length));
 }
 
-/** Raggio minimo del contatto (mm) in cui entrano `count` punti; Infinity se non bastano 40 mm. */
+/** Minimum contact radius (mm) in which `count` spots fit; Infinity if 40 mm is not enough. */
 export function minRadiusForSpots(count: number, spotDiameterMm: number, spacingMm: number): number {
   for (let r = spotDiameterMm / 2; r <= 40; r += 0.02) {
     if (spotCapacity(r, spotDiameterMm, spacingMm) >= count) return Math.round(r * 100) / 100;
@@ -182,8 +182,8 @@ export function minRadiusForSpots(count: number, spotDiameterMm: number, spacing
 }
 
 /**
- * Dove mettere `count` punti dentro il contatto: i più vicini al centro, a coppie opposte così da
- * restare bilanciati. Posizioni relative al centro della cella, mm. Vuoto se non ci stanno.
+ * Where to put `count` spots inside the contact: the closest to the centre, in opposite pairs so as to
+ * stay balanced. Positions relative to the cell centre, mm. Empty if they do not fit.
  */
 export function spotPositions(
   radiusMm: number,
@@ -193,8 +193,8 @@ export function spotPositions(
 ): { x: number; y: number }[] {
   const usable = radiusMm - spotDiameterMm / 2;
   if (count <= 0 || usable < 0 || !(spacingMm > 0)) return [];
-  // Si prova ogni fase del reticolo (punto al centro, due affiancati, quadrato) e si tiene la disposizione più
-  // compatta: così 4 punti sono un quadrato 2×2 e 6 un rettangolo 2×3, non un parallelogramma sfalsato.
+  // Every lattice phase is tried (spot in the centre, two side by side, square) and the most compact layout
+  // is kept: so 4 spots are a 2×2 square and 6 a 2×3 rectangle, not an offset parallelogram.
   const phases: Phase[] = count % 2 === 0 ? [[0.5, 0.5], [0.5, 0], [0, 0]] : [[0, 0], [0.5, 0], [0.5, 0.5]];
   const key = (p: { x: number; y: number }) => `${Math.round(p.x * 1e6)},${Math.round(p.y * 1e6)}`;
   let best: { x: number; y: number }[] | null = null;
@@ -204,7 +204,7 @@ export function spotPositions(
       (a, b) => a.x * a.x + a.y * a.y - (b.x * b.x + b.y * b.y) || a.y - b.y || a.x - b.x,
     );
     if (pts.length < count) continue;
-    // si prendono i più vicini al centro, a coppie opposte così da restare bilanciati
+    // take the closest to the centre, in opposite pairs so as to stay balanced
     const used = new Set<string>();
     const out: { x: number; y: number }[] = [];
     for (const p of pts) {
@@ -220,7 +220,7 @@ export function spotPositions(
     }
     if (out.length !== count) continue;
     let reach = Math.max(...out.map((p) => Math.hypot(p.x, p.y)));
-    // con un numero pari il punto al centro rende la disposizione asimmetrica: solo se non c'è altro modo
+    // with an even number the centre spot makes the layout asymmetric: only if there is no other way
     if (count % 2 === 0 && phase[0] === 0 && phase[1] === 0) reach += 1000;
     if (reach < bestReach - 1e-9) {
       best = out;

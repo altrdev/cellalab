@@ -15,50 +15,50 @@ import type { Project } from '../core/types';
 import { groupHue } from './colors';
 import { holderHalfGeometries } from './holderMesh';
 
-/** Direzione della linguetta nel disegno (y verso il basso). */
+/** Direction of the tab in the drawing (y down). */
 
 /**
- * Scena 3D del pacco. Coordinate: x e y del disegno 2D diventano X e Z (y verso chi guarda),
- * l'altezza della cella sale lungo Y. Le celle stanno appoggiate sul piano (Y = 0).
+ * 3D scene of the pack. Coordinates: x and y of the 2D drawing become X and Z (y towards the viewer),
+ * the cell height goes up along Y. The cells rest on the plane (Y = 0).
  */
 
 export type ViewPreset = 'iso' | 'top' | 'front' | 'side';
 
 export interface SceneOptions {
-  /** Spostamento (mm) della cella più lontana dal centro nella vista esplosa. */
+  /** Offset (mm) of the cell farthest from the centre in the exploded view. */
   explosionMm: number;
   showCells: boolean;
   showPlane: boolean;
   selected: ReadonlySet<string>;
-  /** Lamelle da disegnare (null = nascoste) e loro spessore, mm. */
+  /** Strips to draw (null = hidden) and their thickness, mm. */
   strips?: readonly Strip[] | null;
   stripThicknessMm?: number;
-  /** Colore del materiale delle lamelle (#rrggbb). */
+  /** Colour of the strip material (#rrggbb). */
   stripColor?: string;
-  /** Portacelle da disegnare (null = nascosto). Sparisce nella vista esplosa. */
+  /** Holder to draw (null = hidden). It disappears in the exploded view. */
   holder?: HolderModel | null;
-  /** Quali piastre mostrare e di che colore (#rrggbb). */
+  /** Which plates to show and in what colour (#rrggbb). */
   holderTop?: boolean;
   holderBottom?: boolean;
   holderColor?: string;
-  /** BMS e fili da disegnare (null = nascosti). Spariscono nella vista esplosa. */
+  /** BMS and wires to draw (null = hidden). They disappear in the exploded view. */
   harness?: Harness | null;
 }
 
-const RING_COLOR = 0xc9382f; // anello isolante sul lato positivo
+const RING_COLOR = 0xc9382f; // insulating ring on the positive side
 const UNGROUPED_COLOR = 0x8a8f8a;
 const SELECT_COLOR = 0x2fbf71;
 const FOV = 40;
 
 interface CellNode {
   root: THREE.Group;
-  /** Guaina colorata: porta il colore del gruppo e l'evidenziazione della selezione. */
+  /** Coloured sleeve: carries the group colour and the selection highlight. */
   sleeve: THREE.Mesh;
   geometryKey: string;
   materialKey: string;
 }
 
-/** Geometrie condivise da tutte le celle con lo stesso diametro e la stessa altezza. */
+/** Geometries shared by all the cells with the same diameter and height. */
 interface CellGeometries {
   sleeve: THREE.BufferGeometry;
   steelTop: THREE.BufferGeometry;
@@ -71,13 +71,13 @@ const v2 = (r: number, y: number) => new THREE.Vector2(r, y);
 const lathe = (pts: THREE.Vector2[], segments = 48) => new THREE.LatheGeometry(pts, segments);
 
 /**
- * Cella cilindrica (tipo 18650/21700) con il polo + in alto, centrata sull'origine.
- * Profili di rotazione con piccoli smussi, in millimetri.
+ * Cylindrical cell (18650/21700 type) with the + pole up, centred on the origin.
+ * Revolution profiles with small chamfers, in millimetres.
  */
 function buildCellGeometries(R: number, H: number): CellGeometries {
   const T = H / 2;
-  const e = Math.min(0.5, R * 0.05); // spessore degli smussi
-  // Guaina: avvolge il corpo e arriva a ridosso delle due estremità.
+  const e = Math.min(0.5, R * 0.05); // chamfer thickness
+  // Sleeve: wraps the body and reaches right up to the two ends.
   const sleeve = lathe([
     v2(R - 0.55, -T + 0.15),
     v2(R - e * 0.3, -T + 0.2),
@@ -86,13 +86,13 @@ function buildCellGeometries(R: number, H: number): CellGeometries {
     v2(R - e * 0.3, T - 0.55),
     v2(R - 0.55, T - 0.5),
   ]);
-  // Spalla in acciaio sotto l'anello isolante (lato +).
+  // Steel shoulder under the insulating ring (+ side).
   const steelTop = lathe([v2(0, T - 0.05), v2(R - 0.5, T - 0.05), v2(R - 0.5, T - 0.55), v2(0, T - 0.55)]);
   // Anello isolante rosso attorno al bottone.
   const ri = R * 0.56;
   const ro = R * 0.82;
   const ring = lathe([v2(ri, T - 0.05), v2(ri, T + 0.3), v2(ro, T + 0.3), v2(ro, T - 0.05)]);
-  // Bottone positivo in rilievo, con il bordo smussato.
+  // Raised positive button, with a chamfered edge.
   const rb = R * 0.42;
   const bh = Math.min(1.1, R * 0.12);
   const button = lathe([
@@ -102,7 +102,7 @@ function buildCellGeometries(R: number, H: number): CellGeometries {
     v2(rb, T + 0.05),
     v2(0, T + 0.05),
   ]);
-  // Fondo piatto in acciaio (polo −), con un piccolo bordo smussato.
+  // Flat steel bottom (− pole), with a small chamfered edge.
   const steelBottom = lathe([
     v2(0, -T - 0.02),
     v2(R - 0.9, -T - 0.02),
@@ -158,7 +158,7 @@ export class PackScene {
     this.renderer.domElement.style.display = 'block';
     container.appendChild(this.renderer.domElement);
 
-    // Mappa d'ambiente: senza, l'acciaio riflette il nulla e appare nero.
+    // Environment map: without it the steel reflects nothing and looks black.
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const room = new RoomEnvironment();
     this.envTexture = pmrem.fromScene(room, 0.04).texture;
@@ -200,7 +200,7 @@ export class PackScene {
     this.requestRender();
   };
 
-  /** Prende i colori dal tema dell'app (variabili CSS), così il 3D segue chiaro/scuro. */
+  /** Takes the colours from the app theme (CSS variables), so the 3D follows light/dark. */
   private applyTheme() {
     const css = getComputedStyle(document.documentElement);
     const read = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
@@ -216,8 +216,8 @@ export class PackScene {
   }
 
   /**
-   * Piano e griglia grandi quanto serve al pacco: una griglia enorme, vista di taglio, produce
-   * un effetto moiré. Si ricostruiscono solo se la dimensione cambia.
+   * Plane and grid as large as the pack needs: a huge grid, seen edge-on, produces
+   * a moiré effect. They are rebuilt only if the size changes.
    */
   private buildGround(size: number, step: number) {
     const key = `${size}/${step}`;
@@ -295,7 +295,7 @@ export class PackScene {
   private removeNode(id: string) {
     const node = this.nodes.get(id);
     if (!node) return;
-    this.cellsRoot.remove(node.root); // le geometrie e i materiali sono condivisi: si liberano in dispose()
+    this.cellsRoot.remove(node.root); // the geometries and materials are shared: they are freed in dispose()
     this.nodes.delete(id);
   }
 
@@ -338,7 +338,7 @@ export class PackScene {
       }
       const off = offsets.get(c.id);
       node.root.position.set(c.x + (off?.dx ?? 0), type.heightMm / 2, c.y + (off?.dy ?? 0));
-      node.root.rotation.x = c.plusUp ? 0 : Math.PI; // polo + verso il basso: cella capovolta
+      node.root.rotation.x = c.plusUp ? 0 : Math.PI; // + pole down: upside-down cell
     }
     for (const id of [...this.nodes.keys()]) if (!seen.has(id)) this.removeNode(id);
 
@@ -349,7 +349,7 @@ export class PackScene {
     this.plane.visible = options.showPlane;
     this.grid.visible = options.showPlane;
 
-    // Il piano segue il pacco (agganciato a 10 mm per tenere allineate le linee della griglia).
+    // The plane follows the pack (snapped to 10 mm to keep the grid lines aligned).
     const b = boundsOfCells(project);
     if (b) {
       const extent = Math.max(b.maxX - b.minX, b.maxY - b.minY) + 2 * options.explosionMm;
@@ -364,7 +364,7 @@ export class PackScene {
       this.plane.position.x = this.grid.position.x = sx;
       this.plane.position.z = this.grid.position.z = sz;
       this.aimSun((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, extent);
-      // Se il pacco è cambiato molto di dimensione, reinquadra con la vista corrente.
+      // If the pack changed a lot in size, re-fit with the current view.
       const radius = this.packRadius(project);
       if (this.lastFitRadius === 0 || radius > this.lastFitRadius * 1.3 || radius < this.lastFitRadius * 0.6) {
         this.setView(this.preset, project);
@@ -373,7 +373,7 @@ export class PackScene {
     this.requestRender();
   }
 
-  /** Lamelle: ogni contorno diventa un foglio sottile sopra (a quota cella) o sotto (a quota 0). */
+  /** Strips: each outline becomes a thin sheet above (at cell height) or below (at height 0). */
   private updateHolder(options: SceneOptions) {
     const model = options.holder ?? null;
     this.holderRoot.visible = !!model && options.explosionMm === 0;
@@ -388,7 +388,7 @@ export class PackScene {
     if (!model) return;
     for (const half of ['top', 'bottom'] as const) {
       for (const raw of holderHalfGeometries(model, half)) {
-        // i cerchi sono poligoni: normali "a spigolo" solo oltre 35°, così pareti e rampe sembrano lisce e i bordi veri restano netti
+        // circles are polygons: "hard edge" normals only beyond 35°, so walls and ramps look smooth and real edges stay sharp
         const g = toCreasedNormals(raw, (35 * Math.PI) / 180);
         raw.dispose();
         const mesh = new THREE.Mesh(g, this.holderMat);
@@ -403,13 +403,13 @@ export class PackScene {
 
   private updateBus(project: Project, options: SceneOptions) {
     const strips = options.strips ?? null;
-    // Nella vista esplosa le celle si spostano ma le lamelle no: meglio nasconderle.
+    // In the exploded view the cells move but the strips do not: better to hide them.
     this.busRoot.visible = !!strips && options.explosionMm === 0;
     if (!strips) return;
     this.busMat.color.set(options.stripColor ?? '#b4bac0');
     const thickness = Math.max(0.3, options.stripThicknessMm ?? 0.3);
     let height = 0;
-    let lift = 0; // il bottone sporge dal bordo della cella: la lamella si appoggia sopra
+    let lift = 0; // the button sticks out from the cell edge: the strip rests on top
     for (const c of project.cells) {
       const type = findCellType(project, c.typeId);
       if (!type) continue;
@@ -441,11 +441,11 @@ export class PackScene {
       const folds = tabsOf(s);
       if (folds.length === 0) {
         const geo = extrude(region);
-        geo.rotateX(Math.PI / 2); // y del disegno -> Z, l'estrusione scende lungo -Y
+        geo.rotateX(Math.PI / 2); // drawing y -> Z, the extrusion goes down along -Y
         add(geo, (m) => (m.position.y = sheetY));
         continue;
       }
-      // Ogni linguetta si piega a 90° sulla sua linea di piega: verso il basso (faccia sopra) o verso l'alto (faccia sotto).
+      // Each tab bends 90° on its fold line: down (top face) or up (bottom face).
       const BIG = 1000;
       const frame = (tab: (typeof folds)[number]) => {
         const d = SIDE_VECTOR[tab.side];
@@ -455,7 +455,7 @@ export class PackScene {
           [[u0, -BIG], [u1, -BIG], [u1, BIG], [u0, BIG]].map(([u, v]) => ({ x: mid.x + d.x * u! + perp.x * v!, y: mid.y + d.y * u! + perp.y * v! }));
         return { d, perp, mid, quad };
       };
-      // Parte piana: quella che sta prima di tutte le linee di piega.
+      // Flat part: the one before all the fold lines.
       let flat: Region[] = [region];
       for (const tab of folds) {
         const { quad } = frame(tab);
@@ -466,7 +466,7 @@ export class PackScene {
         geo.rotateX(Math.PI / 2);
         add(geo, (m) => (m.position.y = sheetY));
       }
-      // Pezzi piegati: disegnati in (u lungo la linguetta, v di lato) e poi messi in piedi sul bordo della lamella.
+      // Folded pieces: drawn in (u along the tab, v sideways) and then stood up on the strip edge.
       const sy = top ? -1 : 1;
       const xAxis = new THREE.Vector3(0, sy, 0);
       for (const tab of folds) {
@@ -483,7 +483,7 @@ export class PackScene {
           const shape = new THREE.Shape(r.outline.map(local));
           for (const h of r.holes) shape.holes.push(new THREE.Path(h.map(local)));
           const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
-          if (zAxis.dot(outward) < 0) geo.translate(0, 0, -thickness); // lo spessore resta verso l'esterno
+          if (zAxis.dot(outward) < 0) geo.translate(0, 0, -thickness); // the thickness stays outwards
           add(geo, (m) => {
             m.matrixAutoUpdate = false;
             m.matrix.makeBasis(xAxis, yAxis, zAxis).setPosition(mid.x, top ? sheetY : sheetY - thickness, mid.y);
@@ -495,7 +495,7 @@ export class PackScene {
     this.busKey = { strips, thickness, height, lift };
   }
 
-  /** BMS come scatola contro il fianco e fili come tubi sottili dalle linguette al connettore. */
+  /** BMS as a box against the flank and wires as thin tubes from the tabs to the connector. */
   private updateHarness(options: SceneOptions) {
     const h = options.harness ?? null;
     this.harnessRoot.visible = !!h && options.explosionMm === 0;
@@ -515,7 +515,7 @@ export class PackScene {
     };
     if (h.box) {
       const geo = new THREE.BoxGeometry(h.box.size.x, h.box.size.y, h.box.size.z);
-      // Un po' trasparente, così si vedono i fili dietro la scheda (le linguette) e quelli che arrivano al connettore.
+      // Slightly transparent, so the wires behind the board (the tabs) and those going to the connector can be seen.
       const boxMat = mat(0x1f7a4a, 0.6) as THREE.MeshStandardMaterial;
       boxMat.transparent = true;
       boxMat.opacity = 0.55;
@@ -530,7 +530,7 @@ export class PackScene {
       const pts = w.points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
       for (let i = 0; i + 1 < pts.length; i++) path.add(new THREE.LineCurve3(pts[i]!, pts[i + 1]!));
       const geo = new THREE.TubeGeometry(path, 24 * path.curves.length, 0.45, 6, false);
-      // Colori come in un pacco vero: B0 (meno) nero, BS (più) rosso, gli intermedi bianchi.
+      // Colours as in a real pack: B0 (negative) black, BS (positive) red, the intermediate ones white.
       const last = Math.max(...h.wires.map((x) => x.node));
       const color = w.node === 0 ? 0x1b1b1b : w.node === last ? 0xd32f2f : 0xf2f2f2;
       const mesh = new THREE.Mesh(geo, mat(color, 0.55));
@@ -539,7 +539,7 @@ export class PackScene {
     }
   }
 
-  /** Il sole segue il pacco e la sua ombra copre esattamente l'area utile (più nitida). */
+  /** The sun follows the pack and its shadow exactly covers the useful area (sharper). */
   private aimSun(cx: number, cz: number, extent: number) {
     const reach = Math.max(extent, 60) * 0.85;
     this.sun.target.position.set(cx, 0, cz);
@@ -561,7 +561,7 @@ export class PackScene {
     return 0.5 * Math.hypot(b.maxX - b.minX, b.maxY - b.minY, h);
   }
 
-  /** Porta la camera su una delle viste predefinite, inquadrando tutto il pacco. */
+  /** Moves the camera to one of the preset views, framing the whole pack. */
   setView(preset: ViewPreset, project: Project): void {
     if (this.disposed) return;
     this.preset = preset;
@@ -575,7 +575,7 @@ export class PackScene {
     const dist = (radius / Math.sin((FOV * Math.PI) / 360)) * 1.1;
     const dirs: Record<ViewPreset, [number, number, number]> = {
       iso: [1, 0.85, 1],
-      top: [0, 1, 0.02], // dall'alto: x verso destra e y verso il basso, come nel disegno 2D
+      top: [0, 1, 0.02], // from above: x to the right and y downwards, as in the 2D drawing
       front: [0, 0.12, 1],
       side: [1, 0.12, 0],
     };

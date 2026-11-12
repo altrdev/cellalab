@@ -9,7 +9,7 @@ import { holderHalfGeometries, holderStl } from './holderMesh';
 const project = (series = 2, parallel = 2) =>
   replaceCells(createProject(), generateGrid({ typeId: '21700-5000-10a', diameterMm: 21.4, series, parallel, kind: 'hex', gapMm: 1.5 }));
 
-/** Ogni lato deve essere condiviso da due triangoli, percorso in versi opposti: solido chiuso e orientato. */
+/** Every side must be shared by two triangles, traversed in opposite directions: closed and oriented solid. */
 function openEdges(pos: ArrayLike<number>): number {
   const key = (i: number) => [0, 1, 2].map((k) => pos[i * 3 + k]!.toFixed(4)).join(',');
   const count = new Map<string, number>();
@@ -29,8 +29,8 @@ function openEdges(pos: ArrayLike<number>): number {
   return bad;
 }
 
-describe('mesh dello smusso a rampa', () => {
-  it('ogni cuneo è un solido chiuso, su entrambe le piastre', () => {
+describe('ramp chamfer mesh', () => {
+  it('each wedge is a closed solid, on both plates', () => {
     const model = buildHolder(project(), DEFAULT_HOLDER_SETTINGS, true)!;
     expect(model.ramp).not.toBeNull();
     for (const half of ['top', 'bottom'] as const) {
@@ -42,8 +42,8 @@ describe('mesh dello smusso a rampa', () => {
   });
 });
 
-describe('pezzo test tolleranze', () => {
-  /** Per un solido chiuso ogni spigolo orientato è compensato dal suo opposto. */
+describe('clearance test piece', () => {
+  /** For a closed solid every oriented edge is balanced by its opposite. */
   function unbalancedEdges(model: NonNullable<ReturnType<typeof buildToleranceTest>>, half: 'top' | 'bottom') {
     const key = (x: number, y: number, z: number) => [x, y, z].map((v) => Math.round(v * 1000)).join(',');
     const net = new Map<string, number>();
@@ -66,19 +66,19 @@ describe('pezzo test tolleranze', () => {
   it.each([
     [[0.1, 0.2, 0.3]],
     [[0.05, 0.15, 0.25, 0.35]],
-  ])('la mesh con le cifre incise è chiusa (giochi %j)', (clearances) => {
+  ])('the mesh with the engraved digits is closed (clearances %j)', (clearances) => {
     const model = buildToleranceTest({ customCellTypes: [] }, '18650-3000-10a', clearances)!;
     expect(unbalancedEdges(model, 'bottom')).toBe(0);
     expect(unbalancedEdges(model, 'top')).toBe(0);
   });
 });
 
-describe('pezzi di un portacelle diviso', () => {
+describe('pieces of a split holder', () => {
   const p = replaceCells(createProject(), generateGrid({ typeId: '21700-5000-10a', diameterMm: 21.4, series: 4, parallel: 3, kind: 'hex', gapMm: 1.5 }));
   const settings = { ...DEFAULT_HOLDER_SETTINGS, bedXMm: 70, bedYMm: 70 };
   const split = splitHolder(p, settings)!;
 
-  /** Dimensioni (x, y, z) di un STL binario. */
+  /** Dimensions (x, y, z) of a binary STL. */
   function dims(stl: Uint8Array) {
     const v = new DataView(stl.buffer, stl.byteOffset, stl.byteLength);
     const n = v.getUint32(80, true);
@@ -96,7 +96,7 @@ describe('pezzi di un portacelle diviso', () => {
     return { size: max.map((m, a) => m - min[a]!), min, triangles: n };
   }
 
-  it('l\'STL di un pezzo ha le misure del pezzo, a partire da (0, 0, 0)', () => {
+  it('the STL of a piece has the piece\'s size, starting from (0, 0, 0)', () => {
     for (const piece of split.pieces) {
       for (const half of ['top', 'bottom'] as const) {
         const d = dims(holderStl(piece.model, half));
@@ -110,7 +110,7 @@ describe('pezzi di un portacelle diviso', () => {
     }
   });
 
-  it('con rotate le dimensioni in x e y si scambiano', () => {
+  it('with rotate the x and y dimensions swap', () => {
     const piece = split.pieces[0]!;
     const a = dims(holderStl(piece.model, 'bottom'));
     const b = dims(holderStl(piece.model, 'bottom', true));

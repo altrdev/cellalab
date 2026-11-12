@@ -7,9 +7,9 @@ export interface Offset {
 }
 
 /**
- * Spostamenti per la vista esplosa: ogni cella si allontana dal centro del pacco lungo la
- * retta che le unisce, in proporzione alla distanza. La cella più lontana si sposta esattamente
- * di `distanceMm`; la proporzione conserva la forma del pacco e le celle non si sovrappongono.
+ * Offsets for the exploded view: each cell moves away from the pack centre along the
+ * line joining them, in proportion to the distance. The farthest cell moves exactly
+ * `distanceMm`; the proportion preserves the pack shape and the cells do not overlap.
  */
 export function explodeOffsets(project: Project, distanceMm: number): Map<string, Offset> {
   const out = new Map<string, Offset>();

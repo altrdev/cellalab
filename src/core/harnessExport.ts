@@ -3,7 +3,7 @@ import { len, lenDigits, lenLabel, toLen } from '../units';
 import type { Harness } from './harness';
 import type { Strip } from './strips';
 
-/** Lista dei fili del cablaggio del BMS: riepilogo leggibile e CSV (separatore ';', decimali con il punto). */
+/** List of the BMS harness wires: readable summary and CSV (separator ';', decimals with a dot). */
 
 const lenCsv = (mm: number, d: number) => toLen(mm).toFixed(lenDigits(d));
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHistory } from './history';
 
 describe('createHistory', () => {
-  it('undo e redo ripristinano gli stati', () => {
+  it('undo and redo restore the states', () => {
     const h = createHistory(0);
     h.commit((n) => n + 1);
     h.commit((n) => n + 1);
@@ -15,7 +15,7 @@ describe('createHistory', () => {
     expect(h.get().canRedo).toBe(false);
   });
 
-  it('un commit dopo un undo cancella il redo', () => {
+  it('a commit after an undo clears the redo', () => {
     const h = createHistory(0);
     h.commit((n) => n + 1);
     h.undo();
@@ -24,13 +24,13 @@ describe('createHistory', () => {
     expect(h.get().present).toBe(10);
   });
 
-  it('ignora i commit che non cambiano lo stato', () => {
+  it('ignores commits that do not change the state', () => {
     const h = createHistory({ a: 1 });
     h.commit((s) => s);
     expect(h.get().canUndo).toBe(false);
   });
 
-  it('fonde i commit con la stessa coalesceKey in un solo undo', () => {
+  it('merges commits with the same coalesceKey into a single undo', () => {
     const h = createHistory(0);
     h.commit((n) => n + 1, { coalesceKey: 'drag' });
     h.commit((n) => n + 1, { coalesceKey: 'drag' });
@@ -41,7 +41,7 @@ describe('createHistory', () => {
     expect(h.get().canUndo).toBe(false);
   });
 
-  it('chiavi diverse non si fondono', () => {
+  it('different keys do not merge', () => {
     const h = createHistory(0);
     h.commit((n) => n + 1, { coalesceKey: 'a' });
     h.commit((n) => n + 1, { coalesceKey: 'b' });
@@ -49,14 +49,14 @@ describe('createHistory', () => {
     expect(h.get().present).toBe(1);
   });
 
-  it('rispetta il limite della cronologia', () => {
+  it('respects the history limit', () => {
     const h = createHistory(0, 3);
     for (let i = 0; i < 10; i++) h.commit((n) => n + 1);
     for (let i = 0; i < 10; i++) h.undo();
     expect(h.get().present).toBe(7);
   });
 
-  it('subscribe notifica subito e a ogni cambiamento, unsubscribe smette', () => {
+  it('subscribe notifies immediately and at every change, unsubscribe stops', () => {
     const h = createHistory(0);
     const seen: number[] = [];
     const off = h.subscribe((v) => seen.push(v.present));
@@ -66,7 +66,7 @@ describe('createHistory', () => {
     expect(seen).toEqual([0, 1]);
   });
 
-  it('reset azzera la cronologia', () => {
+  it('reset clears the history', () => {
     const h = createHistory(0);
     h.commit((n) => n + 1);
     h.reset(42);

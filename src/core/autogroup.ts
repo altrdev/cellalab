@@ -2,35 +2,35 @@ import type { PlacedCell } from './types';
 import { t } from '../i18n';
 
 /**
- * Suggerisce la divisione di un insieme di celle in gruppi da P celle (in parallelo)
- * e il loro ordine in serie. È un'euristica: propone, l'utente può sempre correggere a mano.
+ * Suggests how to divide a set of cells into groups of P cells (in parallel)
+ * and their series order. It is a heuristic: it proposes, the user can always fix it by hand.
  *
  * Strategie:
- *  - `x`: gruppi in colonna, ordinati da sinistra a destra. Colonne dritte (quadrato) oppure, se le
- *    celle formano esattamente P file, la k-esima cella di ogni fila (diagonali dell'esagonale);
+ *  - `x`: groups in columns, ordered left to right. Straight columns (square) or, if the
+ *    cells form exactly P rows, the k-th cell of each row (diagonals of the hexagonal);
  *  - `y`: righe regolari, ordinate dall'alto in basso;
- *  - `blob`: blocchi compatti (si parte dalla cella più a sinistra e si prendono le P-1 più vicine),
- *    messi in serie seguendo il gruppo più vicino.
- *  - `auto`: se le colonne risultano tutte allineate usa `x`; altrimenti, se le righe sono allineate,
- *    usa `y`; in tutti gli altri casi (layout irregolari, blocchi 2D) usa `blob`.
+ *  - `blob`: compact blocks (start from the leftmost cell and take the P-1 nearest),
+ *    put in series following the nearest group.
+ *  - `auto`: if the columns are all aligned use `x`; otherwise, if the rows are aligned,
+ *    use `y`; in every other case (irregular layouts, 2D blocks) use `blob`.
  */
 
 export type GroupStrategy = 'auto' | 'x' | 'y' | 'blob';
 
 export interface AutoGroupResult {
-  /** id cella → indice di gruppo (già con l'offset iniziale). */
+  /** cell id → group index (already with the initial offset). */
   groups: Map<string, number>;
   /** Strategia effettivamente usata. */
   strategy: Exclude<GroupStrategy, 'auto'>;
   groupCount: number;
 }
 
-/** Un gruppo conta come "allineato" se le sue celle stanno sulla stessa colonna/riga entro questa tolleranza. */
+/** A group counts as "aligned" if its cells are on the same column/row within this tolerance. */
 export const ALIGN_TOLERANCE_MM = 1;
 
 type Cell = Pick<PlacedCell, 'id' | 'x' | 'y'>;
 
-const q = (n: number) => Math.round(n * 1000); // quantizza al micron: il rumore numerico non altera l'ordine
+const q = (n: number) => Math.round(n * 1000); // quantise to the micron: numeric noise does not change the order
 const byXY = (a: Cell, b: Cell) => q(a.x) - q(b.x) || q(a.y) - q(b.y) || a.id.localeCompare(b.id);
 const byYX = (a: Cell, b: Cell) => q(a.y) - q(b.y) || q(a.x) - q(b.x) || a.id.localeCompare(b.id);
 
@@ -50,7 +50,7 @@ function centroid(group: readonly Cell[]) {
   return { x: x / group.length, y: y / group.length };
 }
 
-/** Vero se in ogni gruppo tutte le celle hanno la stessa coordinata `axis` (entro la tolleranza). */
+/** True if in every group all cells have the same `axis` coordinate (within the tolerance). */
 function isAligned(groups: readonly (readonly Cell[])[], axis: 'x' | 'y'): boolean {
   return groups.every((g) => {
     const values = g.map((c) => c[axis]);
@@ -59,8 +59,8 @@ function isAligned(groups: readonly (readonly Cell[])[], axis: 'x' | 'y'): boole
 }
 
 /**
- * Se le celle formano esattamente `parallel` file orizzontali con lo stesso numero di celle,
- * ogni gruppo è la k-esima cella di ciascuna fila (da sinistra): colonne dritte nel quadrato,
+ * If the cells form exactly `parallel` horizontal rows with the same number of cells,
+ * each group is the k-th cell of each row (from the left): straight columns in the square grid,
  * coppie/terne in diagonale nell'esagonale. Altrimenti null.
  */
 function rowRankGroups<T extends Cell>(cells: readonly T[], parallel: number): T[][] | null {
@@ -79,7 +79,7 @@ function rowRankGroups<T extends Cell>(cells: readonly T[], parallel: number): T
   return Array.from({ length: size }, (_, k) => rows.map((r) => r[k]!));
 }
 
-/** Distanza minima tra due celle (per giudicare se un gruppo è compatto). */
+/** Minimum distance between two cells (to judge whether a group is compact). */
 function minPairDistance(cells: readonly Cell[]): number {
   let best = Infinity;
   for (let i = 0; i < cells.length; i++) {
@@ -106,7 +106,7 @@ function blobGroups<T extends Cell>(cells: readonly T[], parallel: number): T[][
     group.forEach((c) => used.add(c.id));
     groups.push(group);
   }
-  // Ordine in serie: si parte dal primo blocco e si passa sempre al più vicino non ancora visitato.
+  // Series order: start from the first block and always move to the nearest one not yet visited.
   const centers = groups.map(centroid);
   const order = [0];
   const left = new Set(groups.map((_, i) => i).slice(1));
@@ -166,7 +166,7 @@ export function suggestGroups<T extends Cell>(
   return { groups, strategy: chosen, groupCount: cells.length / parallel };
 }
 
-/** Primo indice di gruppo libero dopo quelli usati dalle celle NON in `exclude`. */
+/** First free group index after those used by the cells NOT in `exclude`. */
 export function nextFreeGroup(cells: readonly PlacedCell[], exclude: ReadonlySet<string>): number {
   let max = -1;
   for (const c of cells) if (!exclude.has(c.id) && c.group !== null) max = Math.max(max, c.group);

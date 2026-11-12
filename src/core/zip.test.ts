@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { crc32, zipStore, type ZipEntry } from './zip';
 
-/** Lettore minimo di ZIP «store» per verificare quello che si scrive. */
+/** Minimal "store" ZIP reader to verify what is written. */
 function readZip(zip: Uint8Array): { name: string; data: Uint8Array; crc: number }[] {
   const v = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
   const eocd = zip.length - 22;
@@ -27,12 +27,12 @@ function readZip(zip: Uint8Array): { name: string; data: Uint8Array; crc: number
 }
 
 describe('zipStore', () => {
-  it('crc32 di una stringa nota', () => {
+  it('crc32 of a known string', () => {
     expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926);
     expect(crc32(new Uint8Array())).toBe(0);
   });
 
-  it('scrive e rilegge più file con nomi, contenuto e crc', () => {
+  it('writes and reads back several files with names, content and crc', () => {
     const entries: ZipEntry[] = [
       { name: 'a.stl', data: new TextEncoder().encode('ciao') },
       { name: 'cartella/b è.stl', data: Uint8Array.from({ length: 1000 }, (_, i) => i % 251) },
@@ -46,7 +46,7 @@ describe('zipStore', () => {
     });
   });
 
-  it('lo stesso contenuto dà lo stesso file', () => {
+  it('the same content gives the same file', () => {
     const e = [{ name: 'x', data: new Uint8Array([1, 2, 3]) }];
     expect([...zipStore(e)]).toEqual([...zipStore(e)]);
   });

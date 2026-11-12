@@ -1,5 +1,5 @@
 <script lang="ts">
-  /** Icone semplici a tratto (24×24), colorate come il testo. */
+  /** Simple stroke icons (24×24), coloured like the text. */
   let { name, size = 16 }: { name: string; size?: number } = $props();
 
   const paths: Record<string, string> = {

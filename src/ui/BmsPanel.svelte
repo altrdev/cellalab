@@ -5,7 +5,7 @@
   import { bmsMountOf } from '../core/harness';
   import UnitInput from './UnitInput.svelte';
   import { history } from '../state';
-  import { bmsFitIssues } from './lamelle';
+  import { bmsFitIssues } from './busbar';
   import { ui } from './ui.svelte';
   import Help from './Help.svelte';
   import { rangeFill } from './rangeFill';

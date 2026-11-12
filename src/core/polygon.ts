@@ -1,11 +1,11 @@
-/** Geometria 2D di poligoni convessi (coordinate del disegno, mm). */
+/** 2D geometry of convex polygons (drawing coordinates, mm). */
 
 export interface Pt {
   x: number;
   y: number;
 }
 
-/** Area con segno (formula del lacciolo): positiva se i vertici girano in senso antiorario nel piano x-y standard. */
+/** Signed area (shoelace formula): positive if the vertices turn counter-clockwise in the standard x-y plane. */
 export function signedArea(poly: readonly Pt[]): number {
   let a = 0;
   for (let i = 0; i < poly.length; i++) {
@@ -18,7 +18,7 @@ export function signedArea(poly: readonly Pt[]): number {
 
 export const polygonArea = (poly: readonly Pt[]) => Math.abs(signedArea(poly));
 
-/** Inviluppo convesso (Andrew), con orientamento a area positiva. */
+/** Convex hull (Andrew), oriented to positive area. */
 export function convexHull(points: readonly Pt[]): Pt[] {
   const pts = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
   if (pts.length < 3) return pts;
@@ -40,7 +40,7 @@ export function convexHull(points: readonly Pt[]): Pt[] {
   return signedArea(hull) < 0 ? hull.reverse() : hull;
 }
 
-/** Punti equispaziati su un cerchio. */
+/** Equally spaced points on a circle. */
 export function circlePoints(cx: number, cy: number, r: number, n: number): Pt[] {
   const out: Pt[] = [];
   for (let i = 0; i < n; i++) {
@@ -50,11 +50,11 @@ export function circlePoints(cx: number, cy: number, r: number, n: number): Pt[]
   return out;
 }
 
-/** Versori dei quattro lati nel disegno (y verso il basso). */
+/** Unit vectors of the four sides in the drawing (y down). */
 export type Side = 'top' | 'bottom' | 'left' | 'right';
 export const SIDE_VECTOR: Record<Side, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
-/** Centro del cerchio per tre punti, o null se sono quasi allineati. */
+/** Centre of the circle through three points, or null if they are nearly collinear. */
 export function circumcenter(a: Pt, b: Pt, c: Pt): Pt | null {
   const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
   if (Math.abs(d) < 1e-9) return null;
@@ -67,7 +67,7 @@ export function circumcenter(a: Pt, b: Pt, c: Pt): Pt | null {
   };
 }
 
-/** Distanza di un punto da un rettangolo (poligono convesso); 0 se dentro. */
+/** Distance of a point from a rectangle (convex polygon); 0 if inside. */
 export function distToRect(p: Pt, rect: readonly Pt[]): number {
   let inside = true;
   let best = Infinity;

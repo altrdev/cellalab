@@ -5,7 +5,7 @@ import { createProject } from './project';
 import type { Project } from './types';
 
 export type P3 = { x: number; y: number; z: number };
-/** Punti ogni 0,1 mm lungo una spezzata 3D. */
+/** Points every 0.1 mm along a 3D polyline. */
 export function samplePath(pts: readonly P3[]): P3[] {
   const out: P3[] = [];
   for (let k = 0; k + 1 < pts.length; k++) {
@@ -16,7 +16,7 @@ export function samplePath(pts: readonly P3[]): P3[] {
   }
   return out;
 }
-/** La distanza minima tra due percorsi diversi. */
+/** The minimum distance between two different paths. */
 export function closestApart(paths: readonly (readonly P3[])[]): number {
   let closest = Infinity;
   for (let i = 0; i < paths.length; i++) for (let j = i + 1; j < paths.length; j++) for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));

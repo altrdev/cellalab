@@ -8,7 +8,7 @@ import type { PlacedCell, Project } from './types';
 
 const T = '21700-5000-10a';
 
-/** Pacco senza gruppi, con le celle in ordine inverso (per non barare con l'ordine di partenza). */
+/** Pack with no groups, cells in reverse order (so the starting order does not give it away). */
 const truth = new WeakMap<Project, Map<string, number>>();
 function ungrouped(series: number, parallel: number, kind: 'hex' | 'square', gap = 1): Project {
   const p = replaceCells(
@@ -20,9 +20,9 @@ function ungrouped(series: number, parallel: number, kind: 'hex' | 'square', gap
   return out;
 }
 
-/** Per ogni gruppo originale (colonna g) controlla che finisca tutto nello stesso gruppo proposto. */
+/** For each original group (column g) check that it ends up entirely in the same proposed group. */
 function sameColumnsAs(original: Project, groups: Map<string, number>, series: number) {
-  // i gruppi generati hanno indice g: ogni gruppo proposto deve coincidere con uno originale
+  // generated groups have index g: each proposed group must match an original one
   const byOriginal = new Map<number, Set<number>>();
   for (const c of original.cells) {
     const key = truth.get(original)!.get(c.id)!;
@@ -33,19 +33,19 @@ function sameColumnsAs(original: Project, groups: Map<string, number>, series: n
 }
 
 describe('suggestGroups', () => {
-  it('ritrova i gruppi (diagonali) di un pacco esagonale 4S3P e le mette in serie da sinistra a destra', () => {
+  it('finds the groups (diagonals) of a 4S3P hexagonal pack and puts them in series from left to right', () => {
     const p = ungrouped(4, 3, 'hex');
     const r = suggestGroups(p.cells, 3);
     expect(r.strategy).toBe('x');
     expect(r.groupCount).toBe(4);
     sameColumnsAs(p, r.groups, 4);
-    // ordine in serie come il pacco generato: da sinistra a destra
+    // series order as in the generated pack: left to right
     for (const c of p.cells) expect(r.groups.get(c.id)).toBe(truth.get(p)!.get(c.id));
   });
 
-  it('ritrova le righe quando i gruppi sono orizzontali', () => {
+  it('finds the rows when the groups are horizontal', () => {
     const p = ungrouped(3, 4, 'square');
-    // trasposta: ogni gruppo diventa una riga
+    // transposed: each group becomes a row
     const rows = { ...p, cells: p.cells.map((c) => ({ ...c, x: c.y, y: c.x })) };
     const r = suggestGroups(rows.cells, 4);
     expect(r.strategy).toBe('y');
@@ -54,7 +54,7 @@ describe('suggestGroups', () => {
     expect([...byY.values()].every((s) => s.size === 1)).toBe(true);
   });
 
-  it('con una strategia forzata a blocchi forma quadrati 2×2', () => {
+  it('with a forced block strategy it forms 2×2 squares', () => {
     const p = ungrouped(4, 4, 'square'); // griglia 4×4
     const r = suggestGroups(p.cells, 4, { strategy: 'blob' });
     expect(r.strategy).toBe('blob');
@@ -68,7 +68,7 @@ describe('suggestGroups', () => {
     }
   });
 
-  it('in automatico usa i blocchi quando colonne e righe non sono allineate (3×3 in una griglia 6×6)', () => {
+  it('automatically uses blocks when columns and rows are not aligned (3×3 in a 6×6 grid)', () => {
     const p = ungrouped(6, 6, 'square');
     const r = suggestGroups(p.cells, 9);
     expect(r.strategy).toBe('blob');
@@ -79,18 +79,18 @@ describe('suggestGroups', () => {
     }
   });
 
-  it('in automatico preferisce le colonne quando sono allineate (anche se i blocchi 2×2 sarebbero possibili)', () => {
+  it('automatically prefers columns when they are aligned (even if 2×2 blocks would be possible)', () => {
     const p = ungrouped(4, 4, 'square');
     expect(suggestGroups(p.cells, 4).strategy).toBe('x');
   });
 
-  it('applica l offset iniziale dei gruppi', () => {
+  it('applies the initial group offset', () => {
     const p = ungrouped(2, 2, 'square');
     const r = suggestGroups(p.cells, 2, { startGroup: 5 });
     expect([...new Set(r.groups.values())].sort()).toEqual([5, 6]);
   });
 
-  it('è deterministico', () => {
+  it('is deterministic', () => {
     const p = ungrouped(5, 3, 'hex');
     const a = suggestGroups(p.cells, 3);
     const b = suggestGroups([...p.cells].reverse(), 3);
@@ -98,20 +98,20 @@ describe('suggestGroups', () => {
   });
 
   it.each([
-    ['numero di celle non multiplo di P', 7, 3],
-    ['P non valido', 6, 0],
-  ])('rifiuta: %s', (_n, count, parallel) => {
+    ['cell count not a multiple of P', 7, 3],
+    ['invalid P', 6, 0],
+  ])('rejects: %s', (_n, count, parallel) => {
     const cells: PlacedCell[] = Array.from({ length: count }, (_, i) => ({
       id: `c${i}`, typeId: T, x: i * 22, y: 0, plusUp: true, group: null,
     }));
     expect(() => suggestGroups(cells, parallel)).toThrow(RangeError);
   });
 
-  it('rifiuta un insieme vuoto', () => {
+  it('rejects an empty set', () => {
     expect(() => suggestGroups([], 2)).toThrow(RangeError);
   });
 
-  it('con le celle in una sola fila, i gruppi sono tratti consecutivi', () => {
+  it('with the cells in a single row, the groups are consecutive stretches', () => {
     const cells: PlacedCell[] = Array.from({ length: 6 }, (_, i) => ({
       id: `c${i}`, typeId: T, x: i * 22.4, y: 0, plusUp: true, group: null,
     }));
@@ -121,7 +121,7 @@ describe('suggestGroups', () => {
 });
 
 describe('nextFreeGroup, assignGroups, alternateGroupPolarity', () => {
-  it('nextFreeGroup ignora le celle escluse', () => {
+  it('nextFreeGroup ignores the excluded cells', () => {
     const cells: PlacedCell[] = [
       { id: 'a', typeId: T, x: 0, y: 0, plusUp: true, group: 0 },
       { id: 'b', typeId: T, x: 0, y: 0, plusUp: true, group: 3 },
@@ -132,7 +132,7 @@ describe('nextFreeGroup, assignGroups, alternateGroupPolarity', () => {
     expect(nextFreeGroup(cells, new Set(['a', 'b']))).toBe(0);
   });
 
-  it('assignGroups applica i gruppi e non crea un nuovo progetto se non cambia nulla', () => {
+  it('assignGroups applies the groups and does not create a new project if nothing changes', () => {
     const p = ungrouped(2, 2, 'square');
     const r = suggestGroups(p.cells, 2);
     const q = assignGroups(p, r.groups);
@@ -140,7 +140,7 @@ describe('nextFreeGroup, assignGroups, alternateGroupPolarity', () => {
     expect(assignGroups(q, r.groups)).toBe(q);
   });
 
-  it('dopo il raggruppamento automatico + alternanza il pacco è pulito per le verifiche', () => {
+  it('after automatic grouping + alternation the pack is clean for the checks', () => {
     const p = ungrouped(4, 3, 'hex');
     const grouped = assignGroups(p, suggestGroups(p.cells, 3).groups);
     const flat = { ...grouped, cells: grouped.cells.map((c) => ({ ...c, plusUp: true })) };
@@ -149,7 +149,7 @@ describe('nextFreeGroup, assignGroups, alternateGroupPolarity', () => {
     expect(runDrc(fixed)).toEqual([]);
   });
 
-  it('alternateGroupPolarity rispetta la selezione e salta le celle senza gruppo', () => {
+  it('alternateGroupPolarity respects the selection and skips cells with no group', () => {
     const cells: PlacedCell[] = [
       { id: 'a', typeId: T, x: 0, y: 0, plusUp: true, group: 1 },
       { id: 'b', typeId: T, x: 0, y: 0, plusUp: true, group: 1 },

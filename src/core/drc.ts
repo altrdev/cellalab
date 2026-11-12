@@ -6,8 +6,8 @@ import { computeStats } from './stats';
 import type { PlacedCell, Project } from './types';
 
 /**
- * Verifiche sul pacco (design rule check). Ogni problema porta con sé le celle coinvolte,
- * così l'interfaccia può evidenziarle.
+ * Pack checks (design rule check). Each problem carries the cells involved,
+ * so the UI can highlight them.
  */
 
 export type Severity = 'error' | 'warning' | 'info';
@@ -36,12 +36,12 @@ export interface Issue {
 }
 
 export interface DrcOptions {
-  /** Spazio minimo tra due celle, in mm: sotto questo valore il holder non ha spazio per la parete. */
+  /** Minimum space between two cells, in mm: below this value the holder has no room for the wall. */
   minGapMm?: number;
 }
 
 export const DEFAULT_MIN_GAP_MM = 0.6;
-/** Tolleranza numerica: due celle tangenti non sono "sovrapposte". */
+/** Numeric tolerance: two tangent cells are not "overlapping". */
 const EPS = 0.01;
 
 const label = (group: number) => `S${group + 1}`;
@@ -51,7 +51,7 @@ function labelList(groups: number[], max = 6): string {
   return groups.length > max ? `${shown} …` : shown;
 }
 
-/** Visita ogni coppia di celle con meno di `margin` mm di spazio tra i bordi (negativo = sovrapposte). */
+/** Visits every pair of cells with less than `margin` mm of space between their edges (negative = overlapping). */
 function forEachNearPair(
   cells: readonly PlacedCell[],
   radius: readonly number[],
@@ -63,7 +63,7 @@ function forEachNearPair(
   const size = 2 * maxR + margin;
   if (!(size > 0)) return;
 
-  // Griglia di secchi: ogni cella si confronta solo con quelle dei secchi vicini.
+  // Bucket grid: each cell is compared only with those in the neighbouring buckets.
   const key = (ix: number, iy: number) => `${ix},${iy}`;
   const buckets = new Map<string, number[]>();
   cells.forEach((c, i) => {
@@ -78,7 +78,7 @@ function forEachNearPair(
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         for (const j of buckets.get(key(ix + dx, iy + dy)) ?? []) {
-          if (j <= i) continue; // ogni coppia una volta sola
+          if (j <= i) continue; // each pair only once
           const o = cells[j]!;
           const gap = Math.hypot(c.x - o.x, c.y - o.y) - radius[i]! - radius[j]!;
           if (gap < margin) visit(i, j, gap);
@@ -163,7 +163,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     }
   }
 
-  // Polarità in parallelo: celle del gruppo con facce opposte vanno in cortocircuito.
+  // Parallel polarity: cells of the group with opposite faces get shorted.
   const uniformPolarity = new Map<number, boolean>();
   for (const g of indices) {
     const members = groups.get(g)!;
@@ -180,7 +180,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     }
   }
 
-  // Numero di celle per gruppo: confronto con la taglia più comune.
+  // Number of cells per group: compared with the most common size.
   if (indices.length > 1) {
     const freq = new Map<number, number>();
     for (const g of indices) {
@@ -216,7 +216,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     });
   }
 
-  // Un gruppo dovrebbe essere un blocco unico: celle separate da buchi si collegano male.
+  // A group should be a single block: cells separated by gaps connect poorly.
   const split: number[] = [];
   for (const g of indices) {
     const members = groups.get(g)!;
@@ -248,7 +248,7 @@ export function runDrc(project: Project, options: DrcOptions = {}): Issue[] {
     });
   }
 
-  // Gruppi consecutivi con la stessa faccia in alto: il collegamento in serie deve unire facce opposte.
+  // Consecutive groups with the same face up: the series connection must join opposite faces.
   const samePolarity: number[] = [];
   for (let g = 0; g + 1 <= (indices[indices.length - 1] ?? -1); g++) {
     const a = uniformPolarity.get(g);

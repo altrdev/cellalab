@@ -5,29 +5,29 @@ import { spotPositions } from './sizing';
 import { tabsOf, type Face, type Strip } from './strips';
 
 /**
- * Scrittore DXF ASCII minimale (formato R12, il più compatibile: LibreCAD, LightBurn, Inkscape,
- * software CAM). Unità: millimetri. L'asse y del DXF va verso l'alto, quindi si inverte la y del disegno.
+ * Minimal ASCII DXF writer (R12 format, the most compatible: LibreCAD, LightBurn, Inkscape,
+ * CAM software). Unit: millimetres. The DXF y axis points up, so the drawing's y is flipped.
  *
  * Layer:
- *  - CUT   contorno di taglio, compensato di metà kerf verso l'esterno;
- *  - MARK  aree di contatto delle celle e linee di piega delle linguette (riferimenti, non da tagliare);
- *  - SPOTS punti di saldatura consigliati;
+ *  - CUT   cut outline, compensated by half the kerf outwards;
+ *  - MARK  cell contact areas and tab fold lines (references, not to be cut);
+ *  - SPOTS recommended weld spots;
  *  - TEXT  etichette.
  */
 
 export interface DxfOptions {
   /** Quale faccia esportare. */
   face: Face | 'all';
-  /** Larghezza del taglio: il contorno si sposta di metà verso l'esterno. */
+  /** Cut width: the outline moves outwards by half of it. */
   kerfMm: number;
-  /** Mostra le aree di contatto. */
+  /** Shows the contact areas. */
   includeContacts: boolean;
   includeLabels: boolean;
-  /** Punti per terminale da segnare, per lamella (id → numero). Vuoto = non segnare i punti. */
+  /** Spots per terminal to mark, per strip (id → number). Empty = do not mark spots. */
   spotsPerTerminal?: ReadonlyMap<string, number>;
   spotDiameterMm?: number;
   spotSpacingMm?: number;
-  /** Unità in cui si scrivono le coordinate (il calcolo resta in mm): 'in' divide per 25,4 e lo dichiara nell'intestazione. */
+  /** Unit the coordinates are written in (the calculation stays in mm): 'in' divides by 25.4 and declares it in the header. */
   unit?: 'mm' | 'in';
 }
 
@@ -38,7 +38,7 @@ const LAYERS: readonly [name: string, color: number][] = [
   ['TEXT', 7],
 ];
 
-/** Il DXF R12 è solo ASCII: le frecce e i segni meno tipografici delle etichette diventano caratteri semplici. */
+/** DXF R12 is ASCII only: the arrows and typographic minus signs of the labels become plain characters. */
 export const asciiLabel = (s: string) =>
   s
     .replace(/→/g, '->')
@@ -60,7 +60,7 @@ class Writer {
 }
 
 const LABEL_HEIGHT_MM = 2.5;
-/** Distanza tra il contorno di una lamella e la sua etichetta, mm. */
+/** Distance between a strip's outline and its label, mm. */
 const LABEL_GAP_MM = 2;
 
 interface Box {
@@ -72,20 +72,20 @@ interface Box {
 const overlaps = (a: Box, b: Box) => a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
 
 export interface LabelPlacement {
-  /** Bordo sinistro del testo. */
+  /** Left edge of the text. */
   x: number;
-  /** Centro del testo in orizzontale (per chi lo allinea al centro). */
+  /** Horizontal centre of the text (for those who align it to the centre). */
   cx: number;
-  /** Linea di base. */
+  /** Baseline. */
   y: number;
   width: number;
   text: string;
 }
 
 /**
- * Posizione delle etichette: sotto ogni lamella, fuori dal contorno (in un file di taglio un testo dentro il pezzo
- * verrebbe inciso o tagliato, e su una dima copre i punti). Se lì c'è un'altra lamella o un'altra etichetta si scende
- * finché c'è posto. Coordinate del disegno (y verso il basso); `padMm` è il margine di taglio attorno alle lamelle.
+ * Label positions: below each strip, outside the outline (in a cut file text inside the piece
+ * would be engraved or cut, and on a template it covers the spots). If another strip or label is there it moves down
+ * until there is room. Drawing coordinates (y down); `padMm` is the cut margin around the strips.
  */
 export function labelPlacements(
   strips: readonly Strip[],
@@ -111,7 +111,7 @@ export function labelPlacements(
     let top = b.maxY + LABEL_GAP_MM;
     for (let guard = 0; guard < 200; guard++) {
       const box: Box = { minX: x, maxX: x + width, minY: top, maxY: top + height };
-      // la propria lamella sta sopra: conta solo il resto
+      // its own strip is above: only the rest counts
       if (!obstacles.some((o, k) => k !== i && overlaps(o, box)) && !out.some((l) => overlaps(labelBox(l), box))) break;
       top += height * 1.6;
     }
@@ -120,7 +120,7 @@ export function labelPlacements(
   return out;
 }
 
-/** Centro e raggio se tutti i punti stanno su un cerchio (un foro tondo disegnato a spezzata), altrimenti null. */
+/** Centre and radius if all points lie on a circle (a round hole drawn as a polyline), otherwise null. */
 function circleOf(ring: readonly { x: number; y: number }[]): { x: number; y: number; r: number } | null {
   if (ring.length < 12) return null;
   const x = ring.reduce((a, p) => a + p.x, 0) / ring.length;
@@ -135,7 +135,7 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
   const list = strips.filter((s) => options.face === 'all' || s.face === options.face);
   // y verso l'alto
   const Y = (y: number) => -y;
-  // il disegno si calcola in mm; in uscita si scala nell'unità scelta
+  // the drawing is computed in mm; on output it is scaled to the chosen unit
   const inches = options.unit === 'in';
   const f = inches ? 1 / 25.4 : 1;
 
@@ -143,7 +143,7 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
   w.pair(2, 'HEADER');
   w.pair(9, '$ACADVER');
   w.pair(1, 'AC1009');
-  // unità del disegno (1 = pollici, 4 = millimetri) e sistema di misura (0 = imperiale, 1 = metrico)
+  // drawing units (1 = inches, 4 = millimetres) and measurement system (0 = imperial, 1 = metric)
   w.pair(9, '$INSUNITS');
   w.pair(70, inches ? 1 : 4);
   w.pair(9, '$MEASUREMENT');
@@ -168,7 +168,7 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
   w.pair(0, 'SECTION');
   w.pair(2, 'ENTITIES');
 
-  /** Polilinea chiusa; i vertici con `bulge` ≠ 0 aprono un arco verso il vertice successivo (gruppo 42). */
+  /** Closed polyline; vertices with `bulge` ≠ 0 open an arc towards the next vertex (group 42). */
   const polyline = (layer: string, pts: readonly { x: number; y: number; bulge?: number }[]) => {
     w.pair(0, 'POLYLINE');
     w.pair(8, layer);
@@ -209,20 +209,20 @@ export function buildDxf(strips: readonly Strip[], options: DxfOptions): string 
   };
 
   for (const s of list) {
-    // I cerchi noti della lamella (appoggi e teste delle bande, ingranditi di metà taglio) diventano archi veri.
-    // Il bulge è calcolato con la y del DXF (verso l'alto), quindi anche i cerchi e i vertici si ribaltano.
+    // The strip's known circles (contact areas and band heads, enlarged by half the cut) become true arcs.
+    // The bulge is computed with the DXF y (upwards), so the circles and vertices are flipped too.
     const k = options.kerfMm / 2;
     const circles: Circle[] = s.nodes.flatMap((n) => [
       { cx: n.x, cy: Y(n.y), r: n.reachMm + k },
       { cx: n.x, cy: Y(n.y), r: s.bandMm / 2 + k },
     ]);
-    // Anche i fori tondi (quello della linguetta…) diventano archi veri: il taglio li stringe di metà kerf.
+    // Round holes too (the tab one…) become true arcs: the cut narrows them by half the kerf.
     for (const hole of s.holes) {
       const fit = circleOf(hole);
       if (fit) circles.push({ cx: fit.x, cy: Y(fit.y), r: fit.r - k });
     }
     for (const ring of regionRings(offsetRegion(s, k))) {
-      // prima i cerchi noti (celle, bande, fori), poi gli angoli arrotondati dal kerf e simili
+      // first the known circles (cells, bands, holes), then the corners rounded by the kerf and the like
       const arcs = fitFreeArcs(
         ringWithArcs(
           ring.map((p) => ({ x: p.x, y: Y(p.y) })),

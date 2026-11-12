@@ -6,8 +6,8 @@ import type { Pt } from '../core/polygon';
 import { stlBinary } from '../core/stl';
 
 /**
- * Mesh del portacelle. Coordinate come nella scena 3D: x,y del disegno → X,Z; l'altezza sale lungo Y,
- * con le celle appoggiate sul piano (da Y = 0 a Y = altezza).
+ * Holder mesh. Coordinates as in the 3D scene: drawing x,y → X,Z; the height goes up along Y,
+ * with the cells resting on the plane (from Y = 0 to Y = height).
  */
 
 export type HolderHalf = 'top' | 'bottom';
@@ -18,10 +18,10 @@ function shapeOf(r: Region): THREE.Shape {
   return shape;
 }
 
-/** Estrude le forme da `topY` verso il basso per `depth` mm. */
+/** Extrudes the shapes from `topY` downwards by `depth` mm. */
 function extrudeDown(regions: readonly Region[], depth: number, topY: number): THREE.BufferGeometry {
   const g = new THREE.ExtrudeGeometry(regions.map(shapeOf), { depth, bevelEnabled: false, curveSegments: 1 });
-  g.rotateX(Math.PI / 2); // (x, y, z) → (x, −z, y): il disegno va su X/Z e l'estrusione scende lungo −Y
+  g.rotateX(Math.PI / 2); // (x, y, z) → (x, −z, y): the drawing goes on X/Z and the extrusion goes down along −Y
   g.translate(0, topY, 0);
   return g;
 }
@@ -39,9 +39,9 @@ const signedArea = (pts: readonly Pt[]) => {
 };
 
 /**
- * Striscia di triangoli tra due contorni chiusi (P a quota zp, Q a quota zq), avanzando sempre dal lato che
- * dà la diagonale più corta: va bene per contorni paralleli come un contorno e il suo arretramento.
- * I lati su P sono percorsi in avanti, quelli su Q all'indietro: più strisce in sequenza chiudono un solido coerente.
+ * Strip of triangles between two closed outlines (P at height zp, Q at height zq), always advancing on the side that
+ * gives the shorter diagonal: fine for parallel outlines such as an outline and its set-back.
+ * The sides on P are traversed forwards, those on Q backwards: several strips in sequence close a coherent solid.
  */
 function strip(P: readonly Pt[], zp: number, Qin: readonly Pt[], zq: number, tris: V3[][]) {
   const Q = signedArea(P) * signedArea(Qin) < 0 ? [...Qin].reverse() : Qin;
@@ -73,7 +73,7 @@ function strip(P: readonly Pt[], zp: number, Qin: readonly Pt[], zq: number, tri
 }
 
 /**
- * Cuneo dello smusso su una faccia: sezione triangolare tra il contorno pieno `a` (a quota `zc`) e quello
+ * Chamfer wedge on one face: triangular section between the full outline `a` (at height `zc`) and the
  * arretrato `b` (a quota `zFace` e `zc`). Tre strisce: rampa, parete interna, bordo piano.
  */
 function wedge(a: readonly Pt[], b: readonly Pt[], zFace: number, zc: number): V3[][] {
@@ -84,11 +84,11 @@ function wedge(a: readonly Pt[], b: readonly Pt[], zFace: number, zc: number): V
   return tris;
 }
 
-/** Geometria da triangoli in coordinate locali (x, y, z dalla faccia esterna); `map` le porta nella scena. */
+/** Geometry from triangles in local coordinates (x, y, z from the outer face); `map` carries them into the scene. */
 function trisGeometry(tris: V3[][], map: (v: V3) => V3): THREE.BufferGeometry {
   const pos: number[] = [];
   for (const t of tris) for (const v of t) pos.push(...map(v));
-  // orientamento: volume con segno positivo = normali verso l'esterno (si corregge in blocco, la mappa può specchiare)
+  // orientation: positive signed volume = normals outwards (fixed in bulk, the map may mirror)
   let vol = 0;
   for (let i = 0; i < pos.length; i += 9) {
     const [ax, ay, az, bx, by, bz, cx, cy, cz] = pos.slice(i, i + 9) as [number, number, number, number, number, number, number, number, number];
@@ -110,8 +110,8 @@ function trisGeometry(tris: V3[][], map: (v: V3) => V3): THREE.BufferGeometry {
 }
 
 /**
- * Le fette di una piastra, nel sistema della scena. La faccia esterna del fondo sta dalla parte
- * opposta alle celle: in alto per la piastra sopra, in basso per quella sotto.
+ * The slices of a plate, in the scene system. The outer face of the floor is on the side
+ * opposite the cells: up for the top plate, down for the bottom one.
  */
 export function holderHalfGeometries(whole: HolderModel, half: HolderHalf): THREE.BufferGeometry[] {
   const model = whole.halves?.[half] ?? whole;
@@ -123,7 +123,7 @@ export function holderHalfGeometries(whole: HolderModel, half: HolderHalf): THRE
       : extrudeDown(l.regions, l.z1 - l.z0, l.z1 - f),
   );
   if (model.ramp) {
-    // z locale dalla faccia esterna: top → Y = H + f − z, bottom → Y = z − f; il disegno va su X/Z
+    // local z from the outer face: top → Y = H + f − z, bottom → Y = z − f; the drawing goes on X/Z
     const map = (v: V3): V3 => (half === 'top' ? [v[0], H + f - v[2], v[1]] : [v[0], v[2] - f, v[1]]);
     const c = model.chamferMm;
     for (const { a, b } of model.ramp.contours) {
@@ -135,8 +135,8 @@ export function holderHalfGeometries(whole: HolderModel, half: HolderHalf): THRE
 }
 
 /**
- * STL di una piastra, nella posizione di stampa: fondo piatto sul piano (Z = 0), pareti verso l'alto,
- * angolo minimo in (0, 0). Le due piastre sono una lo specchio dell'altra; con `rotate` il pezzo è girato di 90° (per un piano più stretto).
+ * STL of a plate, in the print position: flat floor on the plane (Z = 0), walls upwards,
+ * minimum corner at (0, 0). The two plates are mirror images of each other; with `rotate` the piece is turned by 90° (for a narrower bed).
  */
 export function holderStl(model: HolderModel, half: HolderHalf, rotate = false): Uint8Array {
   const f = model.floorMm;
@@ -155,7 +155,7 @@ export function holderStl(model: HolderModel, half: HolderHalf, rotate = false):
     }
     g.dispose();
   }
-  // rotazione di 90° (x, y) → (y, −x): non specchia, i triangoli restano rivolti verso l'esterno
+  // 90° rotation (x, y) → (y, −x): it does not mirror, the triangles stay facing outwards
   if (rotate) {
     for (let i = 0; i < out.length; i += 3) {
       const x = out[i]!;

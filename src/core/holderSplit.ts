@@ -5,35 +5,35 @@ import type { Pt } from './polygon';
 import type { Project } from './types';
 
 /**
- * Divisione di un portacelle più grande del piano di stampa in pezzi da incollare.
+ * Splitting a holder larger than the print bed into pieces to glue together.
  *
- * Le celle si dividono in gruppi con una griglia di tagli verticali e orizzontali (il minor numero di pezzi che
- * entra nel piano). Il pezzo di un gruppo è la sagoma del portacelle intersecata con la regione delle sue celle,
- * calcolata col «diagramma di potenza» dei cerchi delle tasche: il confine tra due celle è la retta (asse radicale)
- * che passa nella parete tra le due tasche, quindi **un taglio non attraversa mai una tasca**, nemmeno nel nido d'ape.
- * I pezzi sono fatti con lo smusso a gradini (la rampa liscia non si può tagliare lungo le giunzioni); le facce di
- * taglio sono piatte e senza smusso, da incollare.
+ * The cells are divided into groups with a grid of vertical and horizontal cuts (the fewest pieces that
+ * fit the bed). A group's piece is the holder outline intersected with the region of its cells,
+ * computed with the "power diagram" of the pocket circles: the boundary between two cells is the line (radical axis)
+ * that runs through the wall between the two pockets, so **a cut never crosses a pocket**, not even in the honeycomb.
+ * The pieces are made with the stepped chamfer (the smooth ramp cannot be cut along the joints); the cut
+ * faces are flat and unchamfered, to be glued.
  */
 
 export interface HolderPiece {
-  /** Sigla del pezzo: riga (A, B, …) e colonna (1, 2, …), per esempio «B2». */
+  /** Piece label: row (A, B, …) and column (1, 2, …), for example "B2". */
   id: string;
   cellIds: string[];
-  /** Le due piastre di questo pezzo (stessa forma sopra e sotto), pronte per la mesh e per l'STL. */
+  /** The two plates of this piece (same shape top and bottom), ready for the mesh and the STL. */
   model: HolderModel;
   widthMm: number;
   depthMm: number;
-  /** Il pezzo entra nel piano solo ruotato di 90°. */
+  /** The piece fits the bed only rotated by 90°. */
   rotated: boolean;
-  /** Entra nel piano di stampa (anche ruotato). */
+  /** Fits the print bed (even rotated). */
   fits: boolean;
 }
 
 export interface HolderSplit {
   pieces: HolderPiece[];
-  /** Segmenti delle linee di taglio dentro il materiale (per disegnarle). */
+  /** Segments of the cut lines inside the material (to draw them). */
   seams: [Pt, Pt][];
-  /** Tutti i pezzi entrano nel piano. */
+  /** All the pieces fit the bed. */
   allFit: boolean;
 }
 
@@ -43,11 +43,11 @@ interface Disc {
   id: string;
   x: number;
   y: number;
-  /** Raggio della tasca. */
+  /** Pocket radius. */
   r: number;
 }
 
-/** Ritaglia un poligono convesso col semipiano `nx·x + ny·y ≤ k` (Sutherland–Hodgman). */
+/** Clips a convex polygon with the half-plane `nx·x + ny·y ≤ k` (Sutherland–Hodgman). */
 function clipHalfPlane(poly: readonly Pt[], nx: number, ny: number, k: number): Pt[] {
   const out: Pt[] = [];
   for (let i = 0; i < poly.length; i++) {
@@ -64,7 +64,7 @@ function clipHalfPlane(poly: readonly Pt[], nx: number, ny: number, k: number): 
   return out;
 }
 
-/** Soglie che separano `parts` gruppi lungo un asse: vicine a quote uguali, a metà tra due valori diversi. */
+/** Thresholds separating `parts` groups along an axis: close to equal values, halfway between two different values. */
 function thresholds(values: readonly number[], parts: number): number[] {
   const u = [...new Set(values.map((v) => Math.round(v * 1e4) / 1e4))].sort((a, b) => a - b);
   if (parts <= 1 || u.length <= 1) return [];
@@ -100,8 +100,8 @@ function bounds(regions: readonly Region[]) {
 }
 
 /**
- * Divide il portacelle in pezzi che entrano nel piano di stampa. Null se non ci sono celle o se la piastra intera
- * entra già nel piano (non c'è niente da dividere).
+ * Splits the holder into pieces that fit the print bed. Null if there are no cells or if the whole plate
+ * already fits the bed (nothing to split).
  */
 export function splitHolder(project: Project, settings: HolderSettings, opts: BuildOptions = {}): HolderSplit | null {
   const full = buildHolder(project, settings, false, opts);
@@ -115,9 +115,9 @@ export function splitHolder(project: Project, settings: HolderSettings, opts: Bu
     return t ? [{ id: c.id, x: c.x, y: c.y, r: t.diameterMm / 2 + settings.clearanceMm }] : [];
   });
   if (discs.length < 2) return null;
-  const reach = Math.max(...discs.map((d) => d.r)) + settings.wallMm; // quanto la sagoma esce dal centro di una cella
+  const reach = Math.max(...discs.map((d) => d.r)) + settings.wallMm; // how far the outline extends from the centre of a cell
 
-  // candidati (colonne × righe) dal minor numero di pezzi in su, a parità i più «quadrati»
+  // candidates (columns × rows) from the fewest pieces up, ties going to the most "square"
   const candidates: [number, number][] = [];
   for (let nx = 1; nx <= MAX_SPLITS_PER_AXIS; nx++) for (let ny = 1; ny <= MAX_SPLITS_PER_AXIS; ny++) if (nx * ny > 1) candidates.push([nx, ny]);
   candidates.sort((a, b) => a[0] * a[1] - b[0] * b[1] || Math.abs(a[0] - a[1]) - Math.abs(b[0] - b[1]));
@@ -148,7 +148,7 @@ export function splitHolder(project: Project, settings: HolderSettings, opts: Bu
     for (const g of ordered) {
       const inGroup = new Set(g.cells);
       const others = discs.filter((d) => !inGroup.has(d));
-      // regione di ogni cella del gruppo: i punti più «vicini» (in potenza) a lei che a una cella di un altro gruppo
+      // region of each cell of the group: the points "closer" (in power) to it than to a cell of another group
       const masks: Pt[][] = g.cells.map((c) => {
         let poly = rect;
         for (const o of others) {
@@ -179,7 +179,7 @@ export function splitHolder(project: Project, settings: HolderSettings, opts: Bu
         rotated: fits && !(w <= settings.bedXMm && d <= settings.bedYMm),
         fits,
       });
-      // linee di taglio: i lati della regione del gruppo che stanno dentro il materiale
+      // cut lines: the sides of the group's region that lie inside the material
       for (const region of unionAll(masks)) {
         const ring = region.outline;
         for (let i = 0; i < ring.length; i++) {
@@ -194,7 +194,7 @@ export function splitHolder(project: Project, settings: HolderSettings, opts: Bu
 
   let best: HolderSplit | null = null;
   for (const [nx, ny] of candidates) {
-    // stima prudente prima di costruire: riquadro delle celle del gruppo + quanto esce la sagoma
+    // conservative estimate before building: box of the group's cells + how far the outline extends
     const cx = thresholds(discs.map((d) => d.x), nx);
     const cy = thresholds(discs.map((d) => d.y), ny);
     const boxes = new Map<string, { minX: number; minY: number; maxX: number; maxY: number }>();
@@ -213,6 +213,6 @@ export function splitHolder(project: Project, settings: HolderSettings, opts: Bu
     if (attempt.allFit) return attempt;
     best ??= attempt;
   }
-  // nessuna griglia basta: si restituisce la divisione più fine provata, con i pezzi che non entrano segnalati
+  // no grid is enough: the finest split tried is returned, with the pieces that do not fit flagged
   return best ?? build(MAX_SPLITS_PER_AXIS, MAX_SPLITS_PER_AXIS);
 }

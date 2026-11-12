@@ -5,7 +5,7 @@
   import { onMount } from 'svelte';
   import { history } from '../state';
   import { holderOf } from './holder';
-  import { harnessOf, reportOf, stripsOf } from './lamelle';
+  import { harnessOf, reportOf, stripsOf } from './busbar';
   import { PackScene, type ViewPreset } from './scene3d';
   import { ui } from './ui.svelte';
 
@@ -35,7 +35,7 @@
     };
   });
 
-  // Ridisegna a ogni modifica del pacco, della selezione o dei comandi del pannello.
+  // Redraws at every change of the pack, the selection or the panel controls.
   $effect(() => {
     const project = $history.present;
     const strips = showBus ? stripsOf(project, ui.lamella) : null;
@@ -56,7 +56,7 @@
     });
   });
 
-  // Cambio vista: reinquadra (la lettura del progetto non deve far rieseguire questo effetto).
+  // View change: re-fit (reading the project must not re-run this effect).
   $effect(() => {
     const p = preset;
     scene?.setView(p, history.get().present);

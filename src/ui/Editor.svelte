@@ -9,7 +9,7 @@
   import { drc, history } from '../state';
   import { groupColor } from './colors';
   import { holderOf, packExtent, regionsPath, seamsPath } from './holder';
-  import { pathOf, reportOf, spotMarks, stripsOf } from './lamelle';
+  import { pathOf, reportOf, spotMarks, stripsOf } from './busbar';
   import { ui } from './ui.svelte';
 
   let svg: SVGSVGElement | undefined = $state();
@@ -22,13 +22,13 @@
   const vh = $derived(ui.view.w * (ch / cw));
   const viewBox = $derived(`${ui.view.x} ${ui.view.y} ${ui.view.w} ${vh}`);
 
-  /** Lamelle della faccia visibile, con l'esito dell'analisi per evidenziare quelle con problemi. */
+  /** Strips of the visible face, with the analysis outcome to highlight those with problems. */
   const holderModel = $derived.by(() => {
     if (!ui.showHolder || !(ui.face === 'top' ? ui.holderView.showTop : ui.holderView.showBottom)) return null;
     const m = holderOf(project, ui.holder).model;
-    return m?.halves?.[ui.face] ?? m; // le due piastre possono avere scanalature diverse
+    return m?.halves?.[ui.face] ?? m; // the two plates may have different grooves
   });
-  /** Piastra troppo grande per il piano: le linee di taglio e le sigle dei pezzi. */
+  /** Plate too big for the bed: the cut lines and the piece labels. */
   const holderSplit = $derived(
     ui.showHolder && (ui.face === 'top' ? ui.holderView.showTop : ui.holderView.showBottom) ? holderOf(project, ui.holder).split : null,
   );
@@ -52,7 +52,7 @@
     return m;
   });
   const ghostRadius = $derived((findCellType(project, ui.addTypeId)?.diameterMm ?? 18) / 2);
-  /** Griglia a slot: passo centro-centro = diametro del tipo scelto + spazio. */
+  /** Slot grid: centre-to-centre pitch = diameter of the chosen type + gap. */
   const lattice = $derived<Lattice>({ kind: ui.layoutKind, pitchMm: ghostRadius * 2 + Math.max(ui.gapMm, 0) });
   const round3 = (n: number) => Math.round(n * 1000) / 1000 + 0;
 
@@ -61,7 +61,7 @@
     return { x: snapTo(p.x, ui.snap), y: snapTo(p.y, ui.snap) };
   }
 
-  /** Vero se una cella nuova in `p` si sovrapporrebbe a una esistente. */
+  /** True if a new cell at `p` would overlap an existing one. */
   function blockedAt(p: Point): boolean {
     for (const c of project.cells) {
       const r = (radii.get(c.typeId) ?? 9) + ghostRadius - 0.05;
@@ -71,7 +71,7 @@
   }
 
   const slotMode = $derived(ui.snap === 'slot');
-  /** Slot nella parte visibile (null se sono troppi per essere disegnati). */
+  /** Slots in the visible part (null if there are too many to draw). */
   const visibleSlots = $derived.by(() => {
     if (!slotMode || !ui.showGrid) return null;
     const slots = slotsInRect(
@@ -100,10 +100,10 @@
     });
   });
 
-  /** Millimetri per pixel: serve a tenere le quote di dimensione costante sullo schermo. */
+  /** Millimetres per pixel: used to keep dimension marks a constant size on screen. */
   const k = $derived(ui.view.w / cw);
   const bounds = $derived(packExtent(project, ui.holder, ui.showHolder));
-  /** Celle coinvolte in errori o avvisi (le informazioni non si evidenziano). */
+  /** Cells involved in errors or warnings (information is not highlighted). */
   const flagged = $derived.by(() => {
     const m = new Map<string, 'error' | 'warning'>();
     for (const issue of $drc) {
@@ -186,7 +186,7 @@
           ids: [...ui.selected],
           start: w,
           anchor: { x: anchorCell?.x ?? w.x, y: anchorCell?.y ?? w.y },
-          lat: lattice, // congelata a inizio gesto: il passo non cambia durante il trascinamento
+          lat: lattice, // frozen at the start of the gesture: the pitch does not change during the drag
           px: { x: e.clientX, y: e.clientY },
           active: false,
           applied: { dx: 0, dy: 0 },
@@ -232,7 +232,7 @@
       const id = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-id]')?.getAttribute('data-id');
       if (id) paintCell(id);
     } else if (drag.kind === 'move') {
-      // Soglia di 3 px: un semplice clic non sposta la cella.
+      // 3 px threshold: a simple click does not move the cell.
       if (!drag.active) {
         if (Math.hypot(e.clientX - drag.px.x, e.clientY - drag.px.y) < 3) return;
         drag.active = true;
@@ -240,7 +240,7 @@
       let dx: number;
       let dy: number;
       if (slotMode) {
-        // La cella afferrata va sullo slot più vicino; le altre la seguono.
+        // The grabbed cell goes to the nearest slot; the others follow it.
         const target = { x: drag.anchor.x + (w.x - drag.start.x), y: drag.anchor.y + (w.y - drag.start.y) };
         const snapped = snapToSlot(drag.lat, target.x, target.y);
         dx = round3(snapped.x - drag.anchor.x);
@@ -278,7 +278,7 @@
     if (svg?.hasPointerCapture(e.pointerId)) svg.releasePointerCapture(e.pointerId);
   }
 
-  // La rotella zooma attorno al puntatore: serve un listener non passivo per bloccare lo scroll della pagina.
+  // The wheel zooms around the pointer: a non-passive listener is needed to block page scrolling.
   $effect(() => {
     const el = svg;
     if (!el) return;
@@ -355,7 +355,7 @@
         {#if flag}
           <circle class="flag" class:error={flag === 'error'} class:warning={flag === 'warning'} r={r + 1.6} />
         {/if}
-        <!-- guaina: fascia larga del colore della serie -->
+        <!-- sleeve: wide band in the series colour -->
         <circle class="sleeve" {r} fill={c.group === null ? 'var(--muted)' : col} stroke-dasharray={c.group === null ? '4 3' : undefined} />
         {#if r / k >= 9}
           {#if endPlus}
@@ -372,7 +372,7 @@
           {#if c.group !== null}
             <text class="num" class:onplus={endPlus} font-size={r * 0.62} y={r * 0.03}>{c.group + 1}</text>
           {/if}
-          <!-- polarità: piccola, sul bordo della fascia colorata -->
+          <!-- polarity: small, on the edge of the coloured band -->
           <text class="sign" font-size={r * 0.26} y={-r * 0.84}>{endPlus ? '+' : '−'}</text>
         {:else}
           <text class="plain" font-size={r * 0.8} y={r * 0.05}>{endPlus ? '+' : '−'}</text>
@@ -421,12 +421,12 @@
         <line x1={bounds.minX} x2={bounds.minX} y1={bounds.minY - 2 * k} y2={bounds.minY - off - tick} />
         <line x1={bounds.maxX} x2={bounds.maxX} y1={bounds.minY - 2 * k} y2={bounds.minY - off - tick} />
         <text x={(bounds.minX + bounds.maxX) / 2} y={bounds.minY - off - 8 * k}>{len(w, 1)}</text>
-        <!-- profondità -->
+        <!-- depth -->
         <line x1={bounds.minX - off} x2={bounds.minX - off} y1={bounds.minY} y2={bounds.maxY} />
         <line x1={bounds.minX - 2 * k} x2={bounds.minX - off - tick} y1={bounds.minY} y2={bounds.minY} />
         <line x1={bounds.minX - 2 * k} x2={bounds.minX - off - tick} y1={bounds.maxY} y2={bounds.maxY} />
         <text transform="translate({bounds.minX - off - 8 * k} {(bounds.minY + bounds.maxY) / 2}) rotate(-90)">{len(d, 1)}</text>
-        <!-- altezza (asse verticale delle celle, non visibile da sopra) -->
+        <!-- height (vertical axis of the cells, not visible from above) -->
         <text class="h" x={bounds.maxX} y={labelY + 14 * k}>{t(bounds.withHolder ? 'editor.heightPack' : 'editor.heightCells', { height: len(bounds.heightMm, 1) })}</text>
       </g>
     {/if}
@@ -499,7 +499,7 @@
     pointer-events: none;
   }
   .cell circle.scaled {
-    vector-effect: none; /* anelli che crescono con la cella, non a spessore fisso */
+    vector-effect: none; /* rings that grow with the cell, not at a fixed thickness */
   }
   text {
     text-anchor: middle;

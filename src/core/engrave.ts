@@ -1,9 +1,9 @@
 import type { Pt } from './polygon';
 
 /**
- * Cifre a sette segmenti, fatte di rettangoli (anche sovrapposti: vanno bene per un'unione o una differenza
- * con Clipper). Servono a incidere numeri sui pezzi stampati senza dipendere da un font.
- * Coordinate del disegno: y verso il basso, il testo si legge dall'alto come nell'editor.
+ * Seven-segment digits made of rectangles (even overlapping: fine for a union or a difference
+ * with Clipper). They serve to engrave numbers on printed pieces without depending on a font.
+ * Drawing coordinates: y down, the text reads from the top as in the editor.
  */
 
 // segmenti: a alto, b alto-destra, c basso-destra, d basso, e basso-sinistra, f alto-sinistra, g centro
@@ -27,26 +27,26 @@ const rect = (x0: number, y0: number, x1: number, y1: number): Pt[] => [
   { x: x0, y: y1 },
 ];
 
-/** Larghezza di una cifra e spazio tra due cifre, in rapporto all'altezza. */
+/** Width of a digit and space between two digits, relative to the height. */
 const WIDTH_RATIO = 0.58;
 const GAP_RATIO = 0.22;
 
 /**
- * Ogni cifra è alzata di qualche centesimo di mm in più della precedente: se i bordi di cifre diverse stessero
- * sulla stessa riga, la triangolazione delle facce darebbe lati che passano per vertici altrui e gli slicer
- * segnalerebbero bordi aperti. Sotto i 0,05 mm non si vede e non si stampa.
+ * Each digit is raised a few hundredths of a mm more than the previous one: if the edges of different digits were
+ * on the same line, the triangulation of the faces would give sides passing through other vertices and slicers
+ * would report open edges. Below 0.05 mm it is invisible and does not print.
  */
 const JITTER_MM = 0.013;
 
-/** Larghezza totale di `text` (solo cifre), mm. */
+/** Total width of `text` (digits only), mm. */
 export function textWidth(text: string, heightMm: number): number {
   const n = [...text].length;
   return n === 0 ? 0 : n * heightMm * WIDTH_RATIO + (n - 1) * heightMm * GAP_RATIO;
 }
 
 /**
- * Poligoni delle cifre di `text`, centrati in (cx, cy). `strokeMm` è lo spessore del tratto:
- * per una stampa con ugello da 0,4 mm non scendere sotto 0,8.
+ * Polygons of the digits of `text`, centred at (cx, cy). `strokeMm` is the stroke thickness:
+ * for a print with a 0.4 mm nozzle do not go below 0.8.
  */
 export function digitPolygons(text: string, cx: number, cy: number, heightMm: number, strokeMm: number): Pt[][] {
   const w = heightMm * WIDTH_RATIO;

@@ -3,8 +3,8 @@
   import { getPrefs } from '../prefs';
 
   /**
-   * Campo numerico che mostra e accetta il valore nell'unità scelta nelle impostazioni (pollici, °F, oz, altra valuta).
-   * `value`, `min`, `max`, `step` e `onchange` restano nell'unità interna del progetto (mm, °C, g, euro).
+   * Number field that shows and accepts the value in the unit chosen in the settings (inches, °F, oz, other currency).
+   * `value`, `min`, `max`, `step` and `onchange` stay in the project's internal unit (mm, °C, g, euro).
    */
   type Kind = 'len' | 'tempAbs' | 'tempDelta' | 'mass' | 'money';
   let {
@@ -39,7 +39,7 @@
     money: { to: toMoney, from: fromMoney, round: () => (getPrefs().currency === 'EUR' ? null : 4) },
   };
 
-  /** Valore da mostrare: convertito, e arrotondato solo se la conversione lo richiede (in mm resta com'è). */
+  /** Value to show: converted, and rounded only if the conversion requires it (in mm it stays as is). */
   function show(v: number): number {
     const c = conv[kind];
     const x = c.to(v);
@@ -61,7 +61,7 @@
       if (max !== undefined) v = Math.min(max, v);
       onchange(v);
     }
-    // se il valore è stato limitato o rifiutato la proprietà può non cambiare: riallinea quello che si vede
+    // if the value was clamped or rejected the property may not change: realign what is shown
     queueMicrotask(() => {
       input.value = value === null || value === undefined || !Number.isFinite(value) ? '' : String(show(value));
     });

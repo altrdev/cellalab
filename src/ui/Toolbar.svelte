@@ -6,7 +6,7 @@
   import Icon from './Icon.svelte';
   import { ui } from './ui.svelte';
 
-  /** Passi di aggancio in mm: 0,5 / 1 / 5 mm, oppure 0,01 / 0,05 / 0,25 in con i pollici. */
+  /** Snap steps in mm: 0.5 / 1 / 5 mm, or 0.01 / 0.05 / 0.25 in with inches. */
   const snapSteps = ui.prefs.length === 'in' ? [0.254, 1.27, 6.35] : [0.5, 1, 5];
   let menuOpen = $state(false);
   const hasSelection = $derived(ui.selected.size > 0);

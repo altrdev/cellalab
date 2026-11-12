@@ -1,7 +1,7 @@
 /**
- * Preferenze di visualizzazione: unità di lunghezza, temperatura e peso, valuta. Modulo senza DOM (come i18n):
- * il progetto resta sempre in mm, °C, g ed euro, e queste scelte cambiano solo come si mostrano e si scrivono
- * i valori. Si ricordano nel browser.
+ * Display preferences: length, temperature and weight units, currency. Module with no DOM (like i18n):
+ * the project always stays in mm, °C, g and euro, and these choices only change how values are shown and
+ * typed. They are remembered in the browser.
  */
 
 export type LengthUnit = 'mm' | 'in';
@@ -20,7 +20,7 @@ export interface Prefs {
   temp: TempUnit;
   weight: WeightUnit;
   currency: Currency;
-  /** Unità della valuta scelta per 1 €: i prezzi del catalogo sono in euro. */
+  /** Units of the chosen currency per 1 €: catalogue prices are in euro. */
   rate: number;
 }
 
@@ -28,7 +28,7 @@ export const DEFAULT_PREFS: Prefs = { length: 'mm', temp: 'C', weight: 'metric',
 
 const STORAGE_KEY = 'cellalab:prefs';
 
-/** Preferenze valide da dati qualunque: i campi sbagliati o mancanti tornano al valore di partenza. */
+/** Valid preferences from any data: wrong or missing fields go back to the starting value. */
 export function sanitizePrefs(raw: unknown): Prefs {
   const out: Prefs = { ...DEFAULT_PREFS };
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return out;
@@ -57,13 +57,13 @@ let current: Prefs = load();
 export const getPrefs = (): Prefs => current;
 
 const listeners = new Set<() => void>();
-/** Chiama `cb` quando cambiano le preferenze: serve a ricalcolare i risultati che contengono valori formattati. */
+/** Calls `cb` when the preferences change: used to recompute results that contain formatted values. */
 export function onPrefsChange(cb: () => void): () => void {
   listeners.add(cb);
   return () => listeners.delete(cb);
 }
 
-/** Aggiorna le preferenze (cambiando valuta il cambio torna al valore di partenza della nuova). */
+/** Updates the preferences (changing currency the rate goes back to the new one's starting value). */
 export function setPrefs(patch: Partial<Prefs>): void {
   const merged: Prefs = { ...current, ...patch };
   if (patch.currency && patch.currency !== current.currency && patch.rate === undefined) merged.rate = CURRENCIES[patch.currency].defaultRate;
@@ -73,12 +73,12 @@ export function setPrefs(patch: Partial<Prefs>): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
   } catch {
-    /* storage non disponibile: la scelta vale per questa sessione */
+    /* storage not available: the choice holds for this session */
   }
   for (const cb of listeners) cb();
 }
 
-/** Solo per i test: riporta le preferenze ai valori di partenza senza salvare. */
+/** Tests only: resets the preferences to the starting values without saving. */
 export function resetPrefsForTests(): void {
   current = { ...DEFAULT_PREFS };
 }

@@ -1,4 +1,4 @@
-/** Azione per i cursori: calcola `--p`, la parte di traccia (da sinistra) fino alla maniglia, per colorarla. */
+/** Action for sliders: computes `--p`, the part of the track (from the left) up to the handle, to colour it. */
 export function rangeFill(node: HTMLInputElement, _value?: unknown) {
   const apply = () => {
     const min = Number(node.min) || 0;
@@ -7,7 +7,7 @@ export function rangeFill(node: HTMLInputElement, _value?: unknown) {
     if (getComputedStyle(node).direction === 'rtl') pos = 1 - pos;
     node.style.setProperty('--p', `${Math.min(1, Math.max(0, pos)) * 100}%`);
   };
-  // il valore del campo può essere aggiornato da Svelte subito dopo: si ricalcola anche al frame successivo
+  // the field value may be updated by Svelte right after: recompute on the next frame too
   const later = () => {
     apply();
     requestAnimationFrame(apply);

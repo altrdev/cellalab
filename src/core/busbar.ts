@@ -26,52 +26,52 @@ import type { Project } from './types';
 import { len, tempDelta } from '../units';
 
 /**
- * Analisi delle lamelle: spessore necessario, verifiche sulla saldatrice e sul taglio, alternative.
- * Il dimensionamento si fa sul caso peggiore tra tutte le lamelle, perché in pratica si usa un unico
- * foglio di un solo spessore.
+ * Busbar analysis: required thickness, checks on the welder and on cutting, alternatives.
+ * Sizing is done on the worst case among all the strips, because in practice a single
+ * sheet of one thickness is used.
  */
 
 export interface LamellaSettings {
   materialId: string;
-  /** Spessore del singolo strato, mm; null = automatico (il più sottile che basta). */
+  /** Thickness of a single layer, mm; null = automatic (the thinnest that is enough). */
   thicknessMm: number | null;
   /** Strati sovrapposti (saldati insieme). */
   layers: number;
   welderId: string;
-  /** Punti di saldatura per terminale; null = automatico (quanti servono per la corrente, a coppie). */
+  /** Weld spots per terminal; null = automatic (as many as the current needs, in pairs). */
   spotsPerTerminal: number | null;
-  /** Corrente continua che regge un punto, A; null = quella del profilo della saldatrice. */
+  /** Continuous current one spot can carry, A; null = the welder profile's value. */
   spotCurrentA: number | null;
-  /** Distanza minima tra i punti (tra gli elettrodi della penna), mm; null = quella del profilo. */
+  /** Minimum distance between spots (between the pen electrodes), mm; null = the profile's value. */
   spotSpacingMm: number | null;
   cutterId: string;
   cooling: CoolingId;
-  /** Aumento di temperatura ammesso a regime, K. */
+  /** Allowed steady-state temperature rise, K. */
   deltaTK: number;
   ambientC: number;
-  /** Di quanto si scaldano le celle sopra l'ambiente, K: le estremità delle bande stanno a quella temperatura. */
+  /** How much the cells heat above ambient, K: the band ends are at that temperature. */
   cellRiseK: number;
-  /** Picco = corrente × fattore, per `peakSeconds` secondi, con aumento ammesso `peakDeltaTK`. */
+  /** Peak = current × factor, for `peakSeconds` seconds, with allowed rise `peakDeltaTK`. */
   peakFactor: number;
   peakSeconds: number;
   peakDeltaTK: number;
-  /** Diametro dell'area di saldatura sulla cella, mm; null = il bottone. */
+  /** Diameter of the weld area on the cell, mm; null = the button. */
   contactDiameterMm: number | null;
-  /** Larghezza minima del collegamento, mm; null = automatica. */
+  /** Minimum width of the connection, mm; null = automatic. */
   widthMm: number | null;
-  /** Linguette di presa per i fili del BMS (solo se è scelto un BMS). */
+  /** Grip tabs for the BMS wires (only if a BMS is chosen). */
   tabs: boolean;
-  /** Linguette per i cavi di potenza di P+ e P−, indipendenti da quelle di bilanciamento (solo con un BMS). */
+  /** Tabs for the P+ and P− power cables, independent of the balance ones (only with a BMS). */
   powerTabs: boolean;
-  /** Lato del disegno verso cui sporgono (i fili escono tutti da lì); `auto` sceglie il primo lato libero (lo risolve l'interfaccia). */
+  /** Side of the drawing they stick out towards (the wires all leave from there); `auto` picks the first free side (resolved by the UI). */
   tabSide: TabSide | 'auto';
   tabWidthMm: number;
   tabLengthMm: number;
-  /** Sezione AWG del filo di bilanciamento. */
+  /** AWG gauge of the balance wire. */
   balanceAwg: number;
-  /** Sezione AWG dei cavi di potenza (P+ e P−). */
+  /** AWG gauge of the power cables (P+ and P−). */
   powerAwg: number;
-  /** Di quanto la piega supera il bordo del holder, mm. */
+  /** How far the bend goes past the holder edge, mm. */
   tabBendMm: number;
 }
 
@@ -103,7 +103,7 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
   powerAwg: 10,
 };
 
-/** Parametri di forma delle lamelle ricavati dalle impostazioni. */
+/** Strip shape parameters derived from the settings. */
 export const stripOptionsOf = (s: LamellaSettings, wireHoles = false): StripOptions => ({
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
@@ -125,24 +125,24 @@ export interface StripReport {
   /** Larghezza utile, mm. */
   neckMm: number;
   areaMm2: number;
-  /** Corrente che attraversa il collo, A (nei terminali si assume il cavo al centro: metà). */
+  /** Current through the neck, A (in the terminals the cable is assumed in the middle: half). */
   neckCurrentA: number;
-  /** Spessore totale richiesto dal criterio termico e da quello di picco, mm. */
+  /** Total thickness required by the thermal and peak criteria, mm. */
   thermalMm: number;
   peakMm: number;
   requiredMm: number;
-  /** Aumento di temperatura a regime con lo spessore scelto, K (null se non c'è uno spessore). */
+  /** Steady-state temperature rise with the chosen thickness, K (null if there is no thickness). */
   deltaTK: number | null;
   cellCurrentA: number;
-  /** Punti da mettere su ogni terminale: quelli scelti, o in automatico quelli per la corrente (a coppie). */
+  /** Spots to put on each terminal: the chosen ones, or automatically those for the current (in pairs). */
   spotsNeeded: number;
-  /** Punti che servirebbero come minimo per la corrente della cella. */
+  /** Spots needed at minimum for the cell current. */
   spotsForCurrent: number;
-  /** Corrente che reggono i punti scelti, A. */
+  /** Current the chosen spots can carry, A. */
   spotsCarryA: number;
-  /** Punti che entrano sul contatto più piccolo. */
+  /** Spots that fit on the smallest contact. */
   spotCapacity: number;
-  /** Raggio dell'area di saldatura più piccola, mm. */
+  /** Radius of the smallest weld area, mm. */
   contactRadiusMm: number;
 }
 
@@ -152,17 +152,17 @@ export interface LamellaReport {
   material: LamellaMaterial;
   welder: WelderProfile;
   cutter: CutterProfile;
-  /** Spessore di un singolo strato, mm; null se nessuno basta. */
+  /** Thickness of a single layer, mm; null if none is enough. */
   thicknessMm: number | null;
   layers: number;
   totalThicknessMm: number | null;
   auto: boolean;
-  /** Spessore totale richiesto dalla lamella più critica, mm. */
+  /** Total thickness required by the most critical strip, mm. */
   requiredMm: number;
   strips: StripReport[];
   issues: LamellaIssue[];
   alternatives: string[];
-  /** Area complessiva delle lamelle e massa di materiale, per l'ordine. */
+  /** Total area of the strips and mass of material, for the order. */
   totalAreaCm2: number;
   massG: number | null;
 }
@@ -183,7 +183,7 @@ function requirementFor(strip: Strip, material: LamellaMaterial, s: LamellaSetti
   const h = COOLING[s.cooling].h;
   const rhoHot = resistivityAt(material, s.ambientC + s.deltaTK);
   const thermalInput = { currentA: neckCurrent, resistivityOhmM: rhoHot, deltaTK: s.deltaTK, hWm2K: h };
-  // Una banda corta, saldata alle celle, scarica il calore verso di loro: conta la lunghezza libera.
+  // A short band, welded to the cells, sheds heat towards them: the free length counts.
   const thermal = minThicknessConductionMm(neck, {
     ...thermalInput,
     lengthMm: strip.bandLengthMm,
@@ -202,14 +202,14 @@ function requirementFor(strip: Strip, material: LamellaMaterial, s: LamellaSetti
   return { neckMm: neck, neckCurrentA: neckCurrent, thermalMm: thermal, peakMm: peak, requiredMm: Math.max(thermal, peak) };
 }
 
-/** Spessore totale richiesto dal caso peggiore con un dato materiale. */
+/** Total thickness required by the worst case with a given material. */
 export function worstRequiredMm(strips: readonly Strip[], material: LamellaMaterial, s: LamellaSettings, currentA: number): number {
   let worst = 0;
   for (const strip of strips) worst = Math.max(worst, requirementFor(strip, material, s, currentA).requiredMm);
   return worst;
 }
 
-/** Il più sottile spessore commerciale tale che strati·spessore ≥ richiesto. */
+/** The thinnest commercial thickness such that layers·thickness ≥ required. */
 function smallestThickness(material: LamellaMaterial, layers: number, requiredMm: number): number | null {
   for (const t of material.thicknessesMm) if (t * layers >= requiredMm - 1e-9) return t;
   return null;
@@ -273,7 +273,7 @@ export function analyzeLamelle(
     });
   }
 
-  // --- Requisiti per ogni lamella
+  // --- Requirements for each strip
   const groupSize = new Map<number, number>();
   for (const c of project.cells) if (c.group !== null) groupSize.set(c.group, (groupSize.get(c.group) ?? 0) + 1);
   const reqs = strips.map((s) => requirementFor(s, material, settings, currentA));
@@ -287,7 +287,7 @@ export function analyzeLamelle(
   const h = COOLING[settings.cooling].h;
   const rhoHot = resistivityAt(material, settings.ambientC + settings.deltaTK);
 
-  // --- Rapporto per lamella
+  // --- Report per strip
   const reports: StripReport[] = strips.map((s, i) => {
     const r = reqs[i]!;
     let maxCellCurrent = 0;
@@ -300,7 +300,7 @@ export function analyzeLamelle(
       contactR = Math.min(contactR, n.contactRadiusMm);
     }
     const capacity = Number.isFinite(cap) ? cap : 0;
-    // La penna salda due punti per volta: in automatico si sale a coppie, salvo che il contatto ne tenga uno solo in meno.
+    // The pen welds two spots at a time: automatically it goes up in pairs, unless the contact holds only one less.
     let chosen = settings.spotsPerTerminal ?? (forCurrent % 2 === 0 ? forCurrent : forCurrent + 1);
     if (settings.spotsPerTerminal === null && chosen > capacity && forCurrent <= capacity) chosen = forCurrent;
     return {
@@ -370,7 +370,7 @@ export function analyzeLamelle(
     });
   }
 
-  // --- Verifiche sulla saldatrice
+  // --- Welder checks
   if (layers > welder.maxLayers) {
     issues.push({
       severity: 'warning',
@@ -403,7 +403,7 @@ export function analyzeLamelle(
   for (const r of reports) {
     const where = t('lamelle.where', { strip: r.label, face: faceName(r.face) });
     if (r.spotCapacity < r.spotsNeeded) {
-      // dice perché: com'è l'area di saldatura e quanto serve per i punti voluti
+      // says why: what the weld area is like and how much is needed for the wanted spots
       const need = minRadiusForSpots(r.spotsNeeded, welder.spotDiameterMm, welder.spotSpacingMm);
       const needR = Math.ceil(need * 10) / 10;
       const how = Number.isFinite(need)
@@ -477,14 +477,14 @@ export function analyzeLamelle(
     }
   }
 
-  // Una linguetta sopra una cella di un'altra giunzione la metterebbe in corto (se tocca un'altra lamella lo dice già il controllo sopra).
+  // A tab over a cell of another joint would short it (if it touches another strip the check above already says so).
   for (const s of strips) {
     if (tabsOf(s).some((tb) => tb.blockedBy === 'cell')) {
       issues.push({ severity: 'warning', message: t('lamelle.issue.tabCell', { strip: s.label, face: faceName(s.face) }), stripIds: [s.id] });
     }
   }
 
-  // --- Alternative, se lo spessore è un problema
+  // --- Alternatives, if the thickness is a problem
   if (thicknessProblem && requiredMm > 0) {
     for (let l = Math.max(2, layers + 1); l <= welder.maxLayers; l++) {
       const th = smallestThickness(material, l, requiredMm);

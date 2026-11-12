@@ -15,8 +15,8 @@ export function createProject(name = t('project.defaultName')): Project {
 }
 
 /**
- * Impostazioni che stanno nel file del progetto ma non nella sua cronologia (lamelle, portacelle): valori già
- * pronti da scrivere. Chi li legge li ripulisce: qui sono opachi.
+ * Settings that live in the project file but not in its history (strips, holder): values ready
+ * to be written. Whoever reads them cleans them up: here they are opaque.
  */
 export interface ProjectSettings {
   lamella?: unknown;
@@ -31,7 +31,7 @@ export function serializeProject(project: Project, settings?: ProjectSettings): 
   return JSON.stringify(out, null, 2);
 }
 
-/** Impostazioni di lamelle e portacelle salvate nel file, se ci sono (non validate: vanno ripulite da chi le usa). */
+/** Strip and holder settings saved in the file, if any (not validated: whoever uses them must clean them up). */
 export function parseProjectSettings(json: string): ProjectSettings {
   try {
     const raw: unknown = JSON.parse(json);
@@ -88,7 +88,7 @@ function parseCellType(raw: unknown, index: number): CellType {
   return type;
 }
 
-/** Un BMS personalizzato malformato si scarta (il resto del progetto resta valido). */
+/** A malformed custom BMS is discarded (the rest of the project stays valid). */
 function parseBms(raw: unknown): BmsType | undefined {
   if (!isObj(raw)) return undefined;
   const { id, name, minSeries, maxSeries, maxCurrentA, chemistries, ntc } = raw;
@@ -131,7 +131,7 @@ function parseCell(raw: unknown, index: number): PlacedCell {
   };
 }
 
-/** La ricetta di generazione è facoltativa: se è malformata si ignora (il pacco resta valido, solo «a mano»). */
+/** The generation recipe is optional: if it is malformed it is ignored (the pack stays valid, just "by hand"). */
 function parseGenerator(raw: unknown): PackGenerator | undefined {
   if (!isObj(raw)) return undefined;
   const { series, parallel, kind, gapMm, pitchMm, typeId } = raw;
@@ -144,7 +144,7 @@ function parseGenerator(raw: unknown): PackGenerator | undefined {
   return { series, parallel, kind, gapMm, pitchMm, typeId };
 }
 
-/** Legge e valida un progetto salvato. Costruisce oggetti nuovi campo per campo: non copia chiavi sconosciute. */
+/** Reads and validates a saved project. Builds new objects field by field: it does not copy unknown keys. */
 export function parseProject(json: string): Project {
   let raw: unknown;
   try {
@@ -178,14 +178,14 @@ export function parseProject(json: string): Project {
       mode: m.mode === 'external' ? 'external' : 'pack',
       place: m.place === 'head' ? 'head' : 'flank',
       along: num(m.along, 0, 1, DEFAULT_BMS_MOUNT.along),
-      // vecchi file: 'back' (dietro) non esiste più, 'start'/'end' erano le testate
+      // old files: 'back' no longer exists, 'start'/'end' were the ends
       connector: m.connector === 'end' || m.connector === 'start' ? 'end' : 'top',
       connectorEnd: m.connectorEnd === 'end' || m.connector === 'end' ? 'end' : 'start',
       slackMm: num(m.slackMm, 0, 200, DEFAULT_BMS_MOUNT.slackMm),
       tailMm: num(m.tailMm, 0, 2000, DEFAULT_BMS_MOUNT.tailMm),
     };
   }
-  // Un BMS scelto che non esiste più (file modificato a mano) si ignora.
+  // A chosen BMS that no longer exists (file edited by hand) is ignored.
   if (typeof raw.bmsId === 'string' && findBmsType(project, raw.bmsId)) project.bmsId = raw.bmsId;
 
   const seen = new Set<string>();

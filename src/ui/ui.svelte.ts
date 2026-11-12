@@ -3,47 +3,47 @@ import { loadLocale, saveLocale, setLocale, type Locale } from '../i18n';
 import { getPrefs, setPrefs, type Prefs } from '../prefs';
 import { getTheme, setTheme, type Theme } from '../theme';
 import type { HolderSettings } from '../core/holder';
-import type { LamellaSettings } from '../core/lamelle';
+import type { LamellaSettings } from '../core/busbar';
 import type { LatticeKind } from '../core/lattice';
 import type { Face } from '../core/strips';
 import type { Project } from '../core/types';
 import { bindHolderCuts, loadHolderSettings, loadHolderView, type HolderView } from './holder';
-import { bindHolderSettings, holderCutsOf } from './lamelle';
-import { loadLamellaSettings } from './lamelleSettings';
+import { bindHolderSettings, holderCutsOf } from './busbar';
+import { loadLamellaSettings } from './busbarSettings';
 
 export type ViewMode = 'draw' | 'split' | '3d';
 export type Tool = 'select' | 'add' | 'series';
-/** 'slot' = aggancio alle posizioni della griglia di celle; un numero = passo in mm (0 = libero). */
+/** 'slot' = snap to the cell grid positions; a number = step in mm (0 = free). */
 export type Snap = 'slot' | number;
 
-/** Lingua di partenza: quella salvata o quella del browser. Si imposta subito, prima che si disegni qualcosa. */
+/** Starting language: the saved one or the browser's. Set immediately, before anything is drawn. */
 function initialLocale(): Locale {
   const l = loadLocale();
   setLocale(l);
   return l;
 }
 
-/** Stato dell'interfaccia (selezione, strumento, vista). Il progetto sta in `history`. */
+/** Interface state (selection, tool, view). The project lives in `history`. */
 class UiState {
   /** Lingua dell'interfaccia; cambiandola App.svelte rimonta tutto. */
   locale = $state<Locale>(initialLocale());
-  /** Popup delle impostazioni aperto: sta qui perché cambiando una scelta l'interfaccia si rimonta. */
+  /** Settings popup open: it lives here because changing a choice remounts the interface. */
   settingsOpen = $state(false);
-  /** Unità e valuta (si ricordano nel browser); cambiandole App.svelte rimonta tutto. */
+  /** Units and currency (remembered in the browser); changing them makes App.svelte remount everything. */
   prefs = $state<Prefs>({ ...getPrefs() });
-  /** Tema chiaro/scuro/automatico: non rimonta l'interfaccia, basta l'attributo su <html>. */
+  /** Light/dark/automatic theme: it does not remount the interface, the attribute on <html> is enough. */
   theme = $state<Theme>(getTheme());
   setTheme(theme: Theme) {
     setTheme(theme);
     this.theme = getTheme();
   }
   setPref(patch: Partial<Prefs>) {
-    // i passi di aggancio dipendono dall'unità: cambiandola si torna all'aggancio a slot
+    // snap steps depend on the unit: changing it goes back to slot snapping
     if (patch.length && patch.length !== getPrefs().length) this.snap = 'slot';
     setPrefs(patch);
     this.prefs = { ...getPrefs() };
   }
-  /** Cambia con la lingua e con le preferenze: chiave con cui App.svelte rimonta l'interfaccia. */
+  /** Changes with the language and the preferences: key App.svelte uses to remount the interface. */
   get viewKey() {
     return this.locale + JSON.stringify(this.prefs);
   }
@@ -56,38 +56,38 @@ class UiState {
   selected = $state<ReadonlySet<string>>(new Set());
   tool = $state<Tool>('select');
   snap = $state<Snap>('slot');
-  /** Disposizione e spazio tra le celle: definiscono la griglia a slot, usata da generatore ed editor. */
+  /** Layout and space between cells: they define the slot grid, used by generator and editor. */
   layoutKind = $state<LatticeKind>('hex');
   gapMm = $state(1.5);
-  /** Serie (indice 0-based) assegnata dal pennello. */
+  /** Series (0-based index) assigned by the brush. */
   activeSeries = $state(0);
-  /** Con il pennello imposta anche la polarità secondo la parità della serie. */
+  /** With the brush it also sets the polarity by the parity of the series. */
   alternateOnPaint = $state(true);
   showGrid = $state(true);
-  /** Mostra il contorno con le quote dell'ingombro. */
+  /** Shows the outline with the dimension marks. */
   showDims = $state(true);
-  /** Faccia del pacco che si sta guardando: "Sopra" o "Sotto" (si vedono i poli di quella faccia). */
+  /** Face of the pack being looked at: "Top" or "Bottom" (the poles of that face are seen). */
   face = $state<Face>('top');
-  /** Disegna le lamelle sulla faccia visibile. */
+  /** Draws the strips on the visible face. */
   showStrips = $state(false);
-  /** Segna i punti di saldatura consigliati. */
+  /** Marks the recommended weld spots. */
   showSpots = $state(true);
-  /** Nel DXF delle lamelle include anche i riferimenti di saldatura (layer MARK e SPOTS); spento il file è solo da tagliare. */
+  /** In the strips DXF it also includes the weld references (MARK and SPOTS layers); off, the file is cut-only. */
   dxfReferences = $state(false);
-  /** Opacità del disegno delle lamelle nel 2D (0.2–1). */
+  /** Opacity of the strips drawing in 2D (0.2–1). */
   stripOpacity = $state(0.85);
   lamella = $state<LamellaSettings>(loadLamellaSettings());
-  /** Disegna il portacelle (sagoma scura attorno alle celle). */
+  /** Draws the holder (dark outline around the cells). */
   showHolder = $state(true);
   holder = $state<HolderSettings>(loadHolderSettings());
   holderView = $state<HolderView>(loadHolderView());
-  /** Come si parte con un pacco vuoto: null = ancora da scegliere. */
+  /** How to start with an empty pack: null = still to choose. */
   startMode = $state<'auto' | 'manual' | null>(null);
-  /** Scheda aperta nella barra laterale. */
+  /** Tab open in the sidebar. */
   sideTab = $state<'pack' | 'strips' | 'holder' | 'file'>('pack');
-  /** Cosa mostra l'area di lavoro: solo disegno, disegno e 3D affiancati, solo 3D. */
+  /** What the work area shows: drawing only, drawing and 3D side by side, 3D only. */
   viewMode = $state<ViewMode>('draw');
-  /** Quota (in %) dell'area di lavoro occupata dal 3D quando è affiancato. */
+  /** Share (in %) of the work area taken by the 3D when side by side. */
   splitPct = $state(45);
   get show3d() {
     return this.viewMode !== 'draw';
@@ -95,19 +95,19 @@ class UiState {
   set show3d(v: boolean) {
     this.viewMode = v ? 'split' : 'draw';
   }
-  /** Passa da una vista all'altra: disegno → affiancati → 3D. */
+  /** Switches from one view to the next: drawing → side by side → 3D. */
   cycleView() {
     this.viewMode = this.viewMode === 'draw' ? 'split' : this.viewMode === 'split' ? '3d' : 'draw';
   }
   spaceDown = $state(false);
-  /** Tipo di cella inserito con lo strumento "aggiungi". */
+  /** Cell type inserted with the "add" tool. */
   addTypeId = $state('21700-5000-10a');
-  /** Finestra visibile in mm: origine e larghezza (l'altezza segue le proporzioni dell'editor). */
+  /** Visible window in mm: origin and width (the height follows the editor's proportions). */
   view = $state({ x: -20, y: -20, w: 200 });
-  /** Elemento SVG dell'editor, per misurarne le proporzioni. */
+  /** SVG element of the editor, to measure its proportions. */
   stage: SVGSVGElement | null = null;
 
-  /** Toglie dalla selezione le celle che non esistono più (es. dopo un annulla). */
+  /** Removes from the selection the cells that no longer exist (e.g. after an undo). */
   prune(project: Project) {
     if (this.selected.size === 0) return;
     const alive = new Set(project.cells.map((c) => c.id));
@@ -115,7 +115,7 @@ class UiState {
     if (kept.length !== this.selected.size) this.selected = new Set(kept);
   }
 
-  /** Inquadra tutte le celle, lasciando attorno un margine in pixel per le quote. */
+  /** Frames all the cells, leaving a margin in pixels around them for the dimension marks. */
   fit(project: Project) {
     const rect = this.stage?.getBoundingClientRect();
     const pw = rect && rect.width > 0 ? rect.width : 800;

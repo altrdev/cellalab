@@ -4,7 +4,7 @@ import { createProject } from './project';
 import { computeStats } from './stats';
 import type { Project } from './types';
 
-/** Costruisce un pacco S×P in 21700 energia (3,6 V, 5 Ah, 10 A, 69 g, Ø21,4). */
+/** Builds an S×P pack of 21700 energy cells (3.6 V, 5 Ah, 10 A, 69 g, Ø21.4). */
 function pack(s: number, p: number, typeId = '21700-5000-10a'): Project {
   let proj = createProject();
   for (let g = 0; g < s; g++) {
@@ -16,7 +16,7 @@ function pack(s: number, p: number, typeId = '21700-5000-10a'): Project {
 }
 
 describe('computeStats', () => {
-  it('progetto vuoto: niente valori elettrici', () => {
+  it('empty project: no electrical values', () => {
     const st = computeStats(createProject());
     expect(st.cellCount).toBe(0);
     expect(st.configLabel).toBeNull();
@@ -25,7 +25,7 @@ describe('computeStats', () => {
     expect(st.costEur).toBeNull();
   });
 
-  it('13S4P: tensione, capacità, energia, corrente, peso', () => {
+  it('13S4P: voltage, capacity, energy, current, weight', () => {
     const st = computeStats(pack(13, 4));
     expect(st.cellCount).toBe(52);
     expect(st.configLabel).toBe('13S4P');
@@ -38,7 +38,7 @@ describe('computeStats', () => {
     expect(st.weightG).toBe(52 * 69);
   });
 
-  it('ingombro: bordo esterno delle celle + altezza cella', () => {
+  it('footprint: outer edge of the cells + cell height', () => {
     const st = computeStats(pack(2, 2));
     // centri a 0 e 22 mm, raggio 10,7 → 22 + 21,4 = 43,4
     expect(st.boundsMm!.width).toBeCloseTo(43.4, 6);
@@ -46,9 +46,9 @@ describe('computeStats', () => {
     expect(st.boundsMm!.height).toBeCloseTo(70.4, 6);
   });
 
-  it('gruppi disuguali: P non definito e capacità = gruppo più debole', () => {
+  it('unequal groups: P undefined and capacity = weakest group', () => {
     let p = pack(2, 3);
-    p = addCell(p, { typeId: '21700-5000-10a', x: 0, y: 99, group: 0 }); // gruppo 0 ha 4 celle, gruppo 1 ne ha 3
+    p = addCell(p, { typeId: '21700-5000-10a', x: 0, y: 99, group: 0 }); // group 0 has 4 cells, group 1 has 3
     const st = computeStats(p);
     expect(st.parallel).toBeNull();
     expect(st.configLabel).toBeNull();
@@ -56,7 +56,7 @@ describe('computeStats', () => {
     expect(st.maxCurrentA).toBe(30);
   });
 
-  it('celle non assegnate: contate ma escluse dall elettrica', () => {
+  it('unassigned cells: counted but excluded from the electrical figures', () => {
     let p = pack(2, 2);
     p = addCell(p, { typeId: '21700-5000-10a', x: 0, y: 99 });
     const st = computeStats(p);
@@ -65,7 +65,7 @@ describe('computeStats', () => {
     expect(st.configLabel).toBe('2S2P');
   });
 
-  it('indici di gruppo con buchi vengono segnalati', () => {
+  it('group indices with gaps are flagged', () => {
     let p = createProject();
     p = addCell(p, { typeId: '21700-5000-10a', x: 0, y: 0, group: 0 });
     p = addCell(p, { typeId: '21700-5000-10a', x: 22, y: 0, group: 2 });
@@ -74,20 +74,20 @@ describe('computeStats', () => {
     expect(st.configLabel).toBeNull();
   });
 
-  it('tipi misti nello stesso gruppo vengono segnalati', () => {
+  it('mixed types in the same group are flagged', () => {
     let p = createProject();
     p = addCell(p, { typeId: '21700-5000-10a', x: 0, y: 0, group: 0 });
     p = addCell(p, { typeId: '21700-4000-30a', x: 22, y: 0, group: 0 });
     expect(computeStats(p).mixedTypesInGroup).toBe(true);
   });
 
-  it('LiFePO4: tensione nominale 3,2 V per cella', () => {
+  it('LiFePO4: nominal voltage 3.2 V per cell', () => {
     const st = computeStats(pack(4, 1, '26650-lfp-3200'));
     expect(st.nominalV).toBeCloseTo(12.8, 6);
     expect(st.maxV).toBeCloseTo(14.6, 6);
   });
 
-  it('costo: somma se tutte le celle hanno prezzo, altrimenti null', () => {
+  it('cost: sum if all the cells have a price, otherwise null', () => {
     const custom: Project = {
       ...createProject(),
       customCellTypes: [
@@ -110,12 +110,12 @@ describe('computeStats', () => {
     let p = addCell(custom, { typeId: 'x', x: 0, y: 0, group: 0 });
     p = addCell(p, { typeId: 'x', x: 20, y: 0, group: 0 });
     expect(computeStats(p).costEur).toBeCloseTo(7, 6);
-    p = addCell(p, { typeId: '21700-5000-10a', x: 40, y: 0, group: 0 }); // senza prezzo
+    p = addCell(p, { typeId: '21700-5000-10a', x: 40, y: 0, group: 0 }); // no price
     expect(computeStats(p).costEur).toBeNull();
   });
 
-  it('limite BMS: la corrente del pacco è la più bassa tra celle e limite', () => {
-    const base = pack(2, 3); // celle: 3 × 10 A = 30 A
+  it('BMS limit: the pack current is the lower of cells and limit', () => {
+    const base = pack(2, 3); // cells: 3 × 10 A = 30 A
     expect(computeStats(base).maxCurrentA).toBe(30);
     const low = computeStats(setCurrentLimit(base, 15));
     expect(low.maxCurrentA).toBe(15);
@@ -126,7 +126,7 @@ describe('computeStats', () => {
     expect(high.limitedByBms).toBe(false);
   });
 
-  it('setCurrentLimit: valori non validi tolgono il limite', () => {
+  it('setCurrentLimit: invalid values remove the limit', () => {
     const p = setCurrentLimit(pack(1, 1), 20);
     expect(p.currentLimitA).toBe(20);
     expect(setCurrentLimit(p, undefined).currentLimitA).toBeUndefined();

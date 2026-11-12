@@ -1,9 +1,9 @@
 /**
- * Modello dati di CellaLab.
+ * CellaLab data model.
  *
- * Unità: millimetri. Origine in alto a sinistra, asse y verso il basso (come il canvas).
- * La GEOMETRIA (posizione, polarità) è separata dalla TOPOLOGIA ELETTRICA (gruppo):
- * `group` è l'indice del gruppo in parallelo; i gruppi sono in serie in ordine di indice.
+ * Units: millimetres. Origin at the top left, y axis down (like the canvas).
+ * The GEOMETRY (position, polarity) is separate from the ELECTRICAL TOPOLOGY (group):
+ * `group` is the index of the parallel group; the groups are in series in index order.
  */
 
 export type Chemistry = 'li-ion' | 'lifepo4';
@@ -18,82 +18,82 @@ export interface CellType {
   maxV: number;
   minV: number;
   capacityAh: number;
-  /** Corrente massima di scarica continua per cella. */
+  /** Maximum continuous discharge current per cell. */
   maxDischargeA: number;
   weightG: number;
   priceEur?: number;
-  /** Valori generici del catalogo: da verificare sulla scheda tecnica della cella reale. */
+  /** Generic catalogue values: to be checked on the datasheet of the real cell. */
   generic?: boolean;
 }
 
-/** Ingombro di un BMS (scheda con i componenti), mm. */
+/** Size of a BMS (board with components), mm. */
 export interface BmsSize {
   lengthMm: number;
   widthMm: number;
   thicknessMm: number;
 }
 
-/** Dove sta il BMS rispetto al pacco: sul fianco dal lato delle linguette (a metà altezza) o fuori, solo come punto di uscita dei fili. */
+/** Where the BMS sits relative to the pack: on the flank on the tab side (at mid height) or outside, only as the wire exit point. */
 export type BmsConnectorPlace = 'top' | 'end';
 
 export type BmsPlace = 'flank' | 'head';
 
 export interface BmsMount {
   mode: 'pack' | 'external';
-  /** Sul pacco: sul fianco dal lato delle linguette (a metà altezza) o in testa, oltre un'estremità del fianco, con i fili che arrivano lungo il fianco. */
+  /** On the pack: on the flank on the tab side (at mid height) or at the head, beyond one end of the flank, with the wires coming along the flank. */
   place: BmsPlace;
-  /** Posizione lungo il lato di uscita: 0 = un'estremità, 1 = l'altra. */
+  /** Position along the exit side: 0 = one end, 1 = the other. */
   along: number;
-  /** Dove arrivano i fili sul BMS: sulla faccia superiore (pad o connettore: i fili girano attorno a una testata) o su un connettore oltre la testata. Solo con il BMS sul pacco e l'ingombro noto. */
+  /** Where the wires arrive on the BMS: on the top face (pad or connector: the wires go around an end) or on a connector beyond the end. Only with the BMS on the pack and known dimensions. */
   connector: BmsConnectorPlace;
-  /** Da quale testata arrivano i fili: 'start' = inizio del lato (`along` 0), 'end' = fine. In testa: l'estremità del pacco dove sta il BMS. */
+  /** From which end the wires arrive: 'start' = start of the side (`along` 0), 'end' = end. At the head: the pack end where the BMS sits. */
   connectorEnd: 'start' | 'end';
-  /** Scorta su ogni filo (saldatura e crimpatura del connettore), mm. */
+  /** Slack on each wire (soldering and crimping the connector), mm. */
   slackMm: number;
-  /** Solo esterno: lunghezza di filo oltre il punto di uscita, mm. */
+  /** External only: length of wire beyond the exit point, mm. */
   tailMm: number;
 }
 
 export const DEFAULT_BMS_MOUNT: BmsMount = { mode: 'pack', place: 'flank', along: 0.5, connector: 'top', connectorEnd: 'start', slackMm: 20, tailMm: 100 };
 
-/** BMS: quante celle in serie regge, quanta corrente continua e con quale chimica. */
+/** BMS: how many cells in series it handles, how much continuous current and with which chemistry. */
 export interface BmsType {
   id: string;
   name: string;
-  /** Numero di serie supportato: minimo e massimo (uguali per un BMS a S fissa). */
+  /** Supported series count: minimum and maximum (equal for a fixed-S BMS). */
   minSeries: number;
   maxSeries: number;
-  /** Corrente continua massima di scarica, A. */
+  /** Maximum continuous discharge current, A. */
   maxCurrentA: number;
   chemistries: Chemistry[];
-  /** Ha l'ingresso per il sensore di temperatura (NTC). */
+  /** Has the input for the temperature sensor (NTC). */
   ntc: boolean;
-  /** Ingombro, se noto (nei generici è una stima per classe). */
+  /** Dimensions, if known (for the generic ones it is an estimate per class). */
   sizeMm?: BmsSize;
-  /** Valori generici del catalogo: da verificare sulla scheda tecnica del BMS reale. */
+  /** Generic catalogue values: to be checked on the datasheet of the real BMS. */
   generic?: boolean;
 }
 
 export interface PlacedCell {
   id: string;
   typeId: string;
-  /** Centro della cella, in mm. */
+  /** Cell centre, in mm. */
   x: number;
   y: number;
-  /** true = polo positivo rivolto verso l'alto (faccia "sopra"). */
+  /** true = positive pole facing up (the "top" face). */
   plusUp: boolean;
-  /** Indice del gruppo parallelo (0-based), null se non ancora assegnata. */
+  /** Parallel group index (0-based), null if not yet assigned. */
   group: number | null;
 }
 
-/** Come è stato generato il pacco: serve per adeguare le celle quando si cambia passo o disposizione. */
+/** How the pack was generated: used to adapt the cells when the pitch or layout changes. */
 export interface PackGenerator {
   series: number;
   parallel: number;
   kind: 'hex' | 'square';
-  /** Spazio tra le celle, mm. */
+  /** Space between the cells, mm. */
   gapMm: number;
-  /** Distanza centro-centro usata dal reticolo, mm. */
+  /** Centre-to-centre distance used by the lattice, mm. */
   pitchMm: number;
   typeId: string;
 }
@@ -101,17 +101,17 @@ export interface PackGenerator {
 export interface Project {
   version: 1;
   name: string;
-  /** Tipi di cella definiti dall'utente, oltre al catalogo predefinito. */
+  /** User-defined cell types, in addition to the default catalogue. */
   customCellTypes: CellType[];
-  /** BMS definiti dall'utente, oltre al catalogo predefinito. */
+  /** User-defined BMS, in addition to the default catalogue. */
   customBmsTypes?: BmsType[];
-  /** BMS scelto per il pacco (catalogo o personalizzato); assente = nessun BMS. */
+  /** BMS chosen for the pack (catalogue or custom); absent = no BMS. */
   bmsId?: string;
-  /** Posizione di montaggio del BMS; assente = quella di default. */
+  /** BMS mounting position; absent = the default. */
   bmsMount?: BmsMount;
   cells: PlacedCell[];
-  /** Presente solo se il pacco è stato generato in automatico e le celle sono ancora sul suo reticolo. */
+  /** Present only if the pack was generated automatically and the cells are still on its lattice. */
   generator?: PackGenerator;
-  /** Limite di corrente continua del pacco (BMS o uso previsto), A; assente = solo il limite delle celle. */
+  /** Continuous current limit of the pack (BMS or intended use), A; absent = only the cells' limit. */
   currentLimitA?: number;
 }

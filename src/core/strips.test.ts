@@ -13,7 +13,7 @@ function pack(series: number, parallel: number, kind: 'hex' | 'square' = 'hex') 
 }
 
 describe('poleOnFace', () => {
-  it('polo + in alto: + sopra e − sotto; capovolta il contrario', () => {
+  it('+ pole up: + on top and − below; flipped the opposite', () => {
     expect(poleOnFace({ plusUp: true }, 'top')).toBe('+');
     expect(poleOnFace({ plusUp: true }, 'bottom')).toBe('-');
     expect(poleOnFace({ plusUp: false }, 'top')).toBe('-');
@@ -22,21 +22,21 @@ describe('poleOnFace', () => {
 });
 
 describe('contactRadiusMm', () => {
-  it('+ = bottone (≈41% del raggio); − = fondo meno il bordo', () => {
+  it('+ = button (≈41% of the radius); − = bottom minus the rim', () => {
     expect(contactRadiusMm(21.4, '+')).toBeCloseTo(0.41 * 10.7, 9);
     expect(contactRadiusMm(21.4, '-')).toBeCloseTo(10.7 - 1.5, 9);
   });
 });
 
 describe('buildStrips', () => {
-  it('senza gruppi non genera nulla', () => {
+  it('without groups it generates nothing', () => {
     const p = createProject();
     expect(buildStrips(p)).toEqual([]);
     const ungrouped = { ...pack(2, 1), cells: pack(2, 1).cells.map((c) => ({ ...c, group: null })) };
     expect(buildStrips(ungrouped)).toEqual([]);
   });
 
-  it('2S1P con polarità alternate: terminali + e − in alto, collegamento in serie sotto', () => {
+  it('2S1P with alternating polarities: + and − terminals on top, series connection below', () => {
     const strips = buildStrips(pack(2, 1));
     const top = strips.filter((s) => s.face === 'top').map((s) => s.kind);
     const bottom = strips.filter((s) => s.face === 'bottom').map((s) => s.kind);
@@ -48,7 +48,7 @@ describe('buildStrips', () => {
     expect(series.partial).toBe(false);
   });
 
-  it('4S3P: S+1 lamelle, ogni terminale di ogni cella in una sola lamella per faccia', () => {
+  it('4S3P: S+1 strips, each terminal of each cell in a single strip per face', () => {
     const p = pack(4, 3);
     const strips = buildStrips(p);
     expect(strips).toHaveLength(5);
@@ -59,7 +59,7 @@ describe('buildStrips', () => {
     }
   });
 
-  it('le lamelle della stessa faccia non si toccano (esagonale e quadrata)', () => {
+  it('the strips of the same face do not touch (hexagonal and square)', () => {
     for (const kind of ['hex', 'square'] as const) {
       const strips = buildStrips(pack(6, 4, kind));
       for (const face of ['top', 'bottom'] as const) {
@@ -73,17 +73,17 @@ describe('buildStrips', () => {
     }
   });
 
-  it('senza alternare le polarità (tutte + sopra) i collegamenti in serie risultano parziali', () => {
+  it('without alternating polarities (all + up) the series connections come out partial', () => {
     const p = pack(3, 2);
     const flat = { ...p, cells: p.cells.map((c) => ({ ...c, plusUp: true })) };
     const strips = buildStrips(flat);
     expect(strips.some((s) => s.kind === 'series' && s.partial)).toBe(true);
-    // alternando di nuovo torna tutto completo
+    // alternating again brings everything back to complete
     const fixed = alternateGroupPolarity(flat);
     expect(buildStrips(fixed).some((s) => s.partial)).toBe(false);
   });
 
-  it('il contorno racchiude le aree di contatto di tutti i suoi nodi', () => {
+  it('the outline encloses the contact areas of all its nodes', () => {
     const strips = buildStrips(pack(3, 3), { marginMm: 1 });
     for (const s of strips) {
       expect(s.areaMm2).toBeGreaterThan(0);
@@ -98,22 +98,22 @@ describe('buildStrips', () => {
 });
 
 describe('neckWidthMm', () => {
-  it('è la larghezza delle bande: di default il 60% dell’appoggio, uguale per tutte le lamelle in serie', () => {
+  it('it is the band width: by default 60% of the support, equal for all the series strips', () => {
     const strips = buildStrips(pack(2, 3));
     const series = strips.find((s) => s.kind === 'series')!;
     const pad = 2 * (contactRadiusMm(D, '+') + 1);
     expect(neckWidthMm(series)).toBeCloseTo(0.6 * pad, 6);
   });
 
-  it('terminali: la banda non è mai più stretta dell’appoggio', () => {
+  it('terminals: the band is never narrower than the support', () => {
     const term = buildStrips(pack(2, 3)).find((s) => s.kind === 'terminal-plus')!;
     const pad = 2 * (contactRadiusMm(D, '+') + 1);
     expect(neckWidthMm(term)).toBeCloseTo(pad, 6);
   });
 });
 
-describe('contorni rotondi', () => {
-  it('un appoggio singolo è un cerchio fitto: lati corti e tutti i vertici sul raggio', () => {
+describe('round outlines', () => {
+  it('a single support is a dense circle: short sides and all the vertices on the radius', () => {
     const strips = buildStrips(pack(1, 1));
     const s = strips.find((x) => x.nodes.length === 1)!;
     const n = s.nodes[0]!;

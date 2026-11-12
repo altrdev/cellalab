@@ -6,33 +6,33 @@ import { it as itDict } from './it';
 afterEach(() => setLocale('it'));
 
 describe('i18n', () => {
-  it('parte in italiano e cambia lingua', () => {
+  it('starts in Italian and switches language', () => {
     expect(getLocale()).toBe('it');
     expect(t('settings.language')).toBe('Lingua');
     setLocale('en');
     expect(t('settings.language')).toBe('Language');
   });
 
-  it('i numeri usano il separatore della lingua', () => {
+  it('numbers use the language\'s separator', () => {
     expect(fmtNum(1.5, 1)).toBe('1,5');
     setLocale('en');
     expect(fmtNum(1.5, 1)).toBe('1.5');
   });
 
-  it('le due lingue hanno le stesse chiavi e gli stessi parametri', () => {
+  it('the two languages have the same keys and the same parameters', () => {
     const params = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort();
     expect(Object.keys(en).sort()).toEqual(Object.keys(itDict).sort());
     for (const k of Object.keys(itDict) as (keyof typeof itDict)[]) {
-      expect(params(en[k]), `parametri di ${k}`).toEqual(params(itDict[k]));
+      expect(params(en[k]), `parameters of ${k}`).toEqual(params(itDict[k]));
     }
   });
 
-  it('nessun testo inglese è vuoto', () => {
+  it('no English text is empty', () => {
     for (const [k, v] of Object.entries(en)) expect(v.trim().length, k).toBeGreaterThan(0);
   });
 
-  it('tn sceglie singolare o plurale', () => {
-    // le chiavi di prova arrivano dai dizionari veri: qui si controlla solo che non esploda senza plurali
+  it('tn picks singular or plural', () => {
+    // the test keys come from the real dictionaries: here we only check it does not blow up without plurals
     expect(typeof tn).toBe('function');
   });
 });

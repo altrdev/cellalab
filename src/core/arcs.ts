@@ -1,9 +1,9 @@
 import { circumcenter, type Pt } from './polygon';
 
 /**
- * Da una polilinea chiusa che approssima dei cerchi a una polilinea con archi veri (vertici con «bulge», come
- * nel DXF): i lati consecutivi con i vertici sullo stesso cerchio noto diventano un arco solo. Serve perché
- * un taglio laser o CNC segua il cerchio e non una spezzata.
+ * From a closed polyline approximating circles to a polyline with true arcs (vertices with a "bulge", as in
+ * DXF): consecutive sides whose vertices lie on the same known circle become a single arc. This lets
+ * a laser or CNC cut follow the circle instead of a polyline.
  */
 
 export interface Circle {
@@ -12,20 +12,20 @@ export interface Circle {
   r: number;
 }
 
-/** Vertice della polilinea; `bulge` descrive il lato verso il vertice successivo: 0 = retto, altrimenti tan(angolo/4), positivo in senso antiorario. */
+/** Polyline vertex; `bulge` describes the side towards the next vertex: 0 = straight, otherwise tan(angle/4), positive counter-clockwise. */
 export interface ArcVertex extends Pt {
   bulge: number;
 }
 
 const DEFAULT_TOL_MM = 0.012;
-/** Un arco di DXF può arrivare a 360°, ma sotto i 90° resta ben definito in ogni programma. */
+/** A DXF arc can span 360°, but below 90° it stays well defined in every program. */
 const MAX_SWEEP = Math.PI / 2;
-/** Lato massimo di un segmento che si considera parte di un arco, mm. */
+/** Longest segment still considered part of an arc, mm. */
 const MAX_CHORD_MM = 1.2;
 
 const onCircle = (p: Pt, c: Circle, tol: number) => Math.abs(Math.hypot(p.x - c.cx, p.y - c.cy) - c.r) <= tol;
 
-/** Angolo con segno (rad) da `a` a `b` visti dal centro del cerchio, in (−π, π]. */
+/** Signed angle (rad) from `a` to `b` seen from the circle centre, in (−π, π]. */
 function sweep(a: Pt, b: Pt, c: Circle): number {
   const ax = a.x - c.cx;
   const ay = a.y - c.cy;
@@ -38,14 +38,14 @@ export function ringWithArcs(ring: readonly Pt[], circles: readonly Circle[], to
   const n = ring.length;
   if (n < 3 || circles.length === 0) return ring.map((p) => ({ x: p.x, y: p.y, bulge: 0 }));
 
-  // cerchio di ogni lato (indice nel vettore `circles`), o -1 se il lato è retto
+  // circle of each side (index into the `circles` array), or -1 if the side is straight
   const edgeCircle = ring.map((a, i) => {
     const b = ring[(i + 1) % n]!;
     if (Math.hypot(a.x - b.x, a.y - b.y) > MAX_CHORD_MM) return -1;
     return circles.findIndex((c) => onCircle(a, c, tolMm) && onCircle(b, c, tolMm));
   });
 
-  // si parte da un lato dove cambia il cerchio, così nessun arco attraversa l'inizio della lista
+  // start from a side where the circle changes, so no arc crosses the start of the list
   let start = 0;
   for (let i = 0; i < n; i++) {
     if (edgeCircle[i] !== edgeCircle[(i + n - 1) % n]) {
@@ -64,7 +64,7 @@ export function ringWithArcs(ring: readonly Pt[], circles: readonly Circle[], to
       i++;
       continue;
     }
-    // tutti i lati consecutivi sullo stesso cerchio, spezzati in archi di al massimo 90°
+    // all consecutive sides on the same circle, split into arcs of at most 90°
     const c = circles[ci]!;
     let pieceStart = e;
     let pieceSweep = 0;
@@ -87,9 +87,9 @@ export function ringWithArcs(ring: readonly Pt[], circles: readonly Circle[], to
 }
 
 /**
- * Cerchi non noti: una catena di lati corti consecutivi i cui vertici stanno su uno stesso cerchio (per esempio un angolo
- * arrotondato dal kerf, che arriva dal calcolo come una spezzata di 8–12 lati) diventa un arco solo. Lascia stare i lati
- * già archi e le catene quasi dritte; ogni arco fa al massimo 90°.
+ * Unknown circles: a chain of consecutive short sides whose vertices lie on one circle (for example a corner
+ * rounded by the kerf, which comes out of the calculation as a polyline of 8–12 sides) becomes a single arc. Leaves alone
+ * sides that are already arcs and nearly straight chains; each arc spans at most 90°.
  */
 export function fitFreeArcs(ring: readonly ArcVertex[], tolMm = DEFAULT_TOL_MM): ArcVertex[] {
   const n = ring.length;
@@ -99,7 +99,7 @@ export function fitFreeArcs(ring: readonly ArcVertex[], tolMm = DEFAULT_TOL_MM):
     const b = ring[(i + 1) % n]!;
     return a.bulge === 0 && Math.hypot(a.x - b.x, a.y - b.y) <= MAX_CHORD_MM;
   };
-  // si parte dopo un lato che non può far parte di un arco, così nessuna catena attraversa l'inizio (se sono tutti corti, da 0)
+  // start after a side that cannot be part of an arc, so no chain crosses the start (if all are short, from 0)
   let start = 0;
   for (let i = 0; i < n; i++) {
     if (!short(i)) {
@@ -108,7 +108,7 @@ export function fitFreeArcs(ring: readonly ArcVertex[], tolMm = DEFAULT_TOL_MM):
     }
   }
   const at = (k: number) => ring[(start + k) % n]!;
-  /** La catena dal punto i al punto j sta su un cerchio e gira sempre dalla stessa parte, per un angolo ≤ 90°? */
+  /** Does the chain from point i to point j lie on a circle and always turn the same way, by an angle ≤ 90°? */
   const fit = (i: number, j: number): { c: Circle; sweepRad: number } | null => {
     const a = at(i);
     const b = at(j);
@@ -138,7 +138,7 @@ export function fitFreeArcs(ring: readonly ArcVertex[], tolMm = DEFAULT_TOL_MM):
       i++;
       continue;
     }
-    // la catena più lunga che sta su un cerchio (almeno 3 lati e un po' di curva)
+    // the longest chain that lies on a circle (at least 3 sides and some curvature)
     let best: { j: number; sweepRad: number } | null = null;
     for (let j = i + 3; j <= n && j - i <= 64; j++) {
       if (j > i + 3 && !short(start + j - 1)) break;
@@ -157,7 +157,7 @@ export function fitFreeArcs(ring: readonly ArcVertex[], tolMm = DEFAULT_TOL_MM):
   return out;
 }
 
-/** Riporta una polilinea con archi a punti (per verificarla e per i programmi che non leggono il bulge). */
+/** Turns a polyline with arcs back into points (to check it, and for programs that do not read the bulge). */
 export function expandArcs(ring: readonly ArcVertex[], stepRad = 0.05): Pt[] {
   const out: Pt[] = [];
   for (let i = 0; i < ring.length; i++) {
@@ -170,7 +170,7 @@ export function expandArcs(ring: readonly ArcVertex[], stepRad = 0.05): Pt[] {
     const dy = b.y - a.y;
     const chord = Math.hypot(dx, dy);
     const radius = chord / (2 * Math.sin(Math.abs(theta) / 2));
-    // centro: a metà corda, spostato lungo la normale sinistra (arco antiorario) o destra (oraria)
+    // centre: at the midpoint of the chord, shifted along the left normal (counter-clockwise arc) or right (clockwise)
     const mx = (a.x + b.x) / 2;
     const my = (a.y + b.y) / 2;
     const h = radius * Math.cos(theta / 2);

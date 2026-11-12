@@ -4,32 +4,32 @@ import type { PlacedCell, Project } from './types';
 
 export interface PackStats {
   cellCount: number;
-  /** Celle non ancora assegnate a un gruppo: non entrano nei calcoli elettrici. */
+  /** Cells not yet assigned to a group: they do not enter the electrical calculations. */
   ungroupedCount: number;
-  /** Numero di gruppi in serie (S), null se nessuna cella è assegnata. */
+  /** Number of groups in series (S), null if no cell is assigned. */
   series: number | null;
-  /** Celle per gruppo (P) se tutti i gruppi ne hanno lo stesso numero, altrimenti null. */
+  /** Cells per group (P) if all groups have the same number, otherwise null. */
   parallel: number | null;
-  /** Es. "13S4P"; null se mancano gruppi o i gruppi sono disuguali. */
+  /** E.g. "13S4P"; null if groups are missing or the groups are unequal. */
   configLabel: string | null;
-  /** Gli indici di gruppo non sono contigui da 0 (es. 0,1,3): manca un gruppo. */
+  /** The group indices are not contiguous from 0 (e.g. 0,1,3): a group is missing. */
   groupGaps: boolean;
-  /** Nello stesso gruppo ci sono tipi di cella diversi. */
+  /** There are different cell types in the same group. */
   mixedTypesInGroup: boolean;
   nominalV: number | null;
   maxV: number | null;
   minV: number | null;
-  /** Capacità del pacco = quella del gruppo più debole. */
+  /** Pack capacity = that of the weakest group. */
   capacityAh: number | null;
   energyWh: number | null;
-  /** Corrente continua massima delle sole celle = quella del gruppo più debole. */
+  /** Maximum continuous current of the cells alone = that of the weakest group. */
   cellCurrentA: number | null;
-  /** Corrente continua del pacco: la più bassa tra celle e corrente di progetto impostata. */
+  /** Continuous pack current: the lower of the cells and the set design current. */
   maxCurrentA: number | null;
-  /** true se la corrente di progetto impostata è più bassa di quello delle celle. */
+  /** true if the set design current is lower than that of the cells. */
   limitedByBms: boolean;
   weightG: number;
-  /** Null se almeno una cella non ha prezzo. */
+  /** Null if at least one cell has no price. */
   costEur: number | null;
   boundsMm: { width: number; depth: number; height: number } | null;
 }
@@ -113,7 +113,7 @@ export function computeStats(project: Project): PackStats {
     const members = groups.get(g)!;
     sizes.add(members.length);
     const first = types.get(members[0]!.typeId)!;
-    // In un gruppo in parallelo la tensione è quella di una cella; con tipi misti si usa la prima.
+    // In a parallel group the voltage is that of one cell; with mixed types the first is used.
     if (members.some((m) => m.typeId !== first.id)) mixedTypesInGroup = true;
     nominalV += first.nominalV;
     maxV += first.maxV;
@@ -129,7 +129,7 @@ export function computeStats(project: Project): PackStats {
     maxCurrentA = Math.min(maxCurrentA, groupA);
   }
 
-  // Tetto di corrente: il più basso tra la corrente di progetto e quella del BMS scelto.
+  // Current cap: the lower of the design current and that of the chosen BMS.
   const limits = [project.currentLimitA, bmsOf(project)?.maxCurrentA].filter((v): v is number => v !== undefined && v > 0);
   const limit = limits.length > 0 ? Math.min(...limits) : undefined;
   const series = indices.length;

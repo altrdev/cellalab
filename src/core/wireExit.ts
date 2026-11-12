@@ -6,44 +6,44 @@ import { chosenStrips, frontNode, holderReach, type Face, type Strip, type Strip
 import type { Project } from './types';
 
 /**
- * Uscita dei fili di bilanciamento dal portacelle, senza linguette: il filo si salda sulla lamella vicino al suo bordo
- * verso il lato di uscita, passa in un piccolo foro del portacelle accanto alla lamella (attraverso fondo e pareti) e
- * scende lungo il fianco. Il foro sta sul materiale del portacelle (fuori dalle tasche delle celle), non sotto nessuna
- * lamella della stessa faccia, il più vicino possibile al punto di saldatura.
+ * Exit of the balance wires from the holder, without tabs: the wire is soldered on the strip near its edge
+ * towards the exit side, passes through a small hole in the holder next to the strip (through floor and walls) and
+ * goes down along the flank. The hole is on the holder material (outside the cell pockets), under no
+ * strip of the same face, as close as possible to the solder point.
  */
 export interface WireExit {
   stripId: string;
   face: Face;
   side: TabSide;
-  /** Punto di saldatura sulla lamella e centro del foro nel portacelle, mm del disegno. Senza foro (giro esterno) il filo corre sul piano del portacelle fino a `edge`, il bordo della piastra, e scende lungo il fianco. */
+  /** Solder point on the strip and centre of the hole in the holder, mm of the drawing. Without a hole (around route) the wire runs on the holder plane up to `edge`, the plate edge, and goes down along the flank. */
   solder: Pt;
   hole?: Pt;
   edge?: Pt;
-  /** Il corridoio dal punto di saldatura al bordo passa sopra un'altra lamella o un'altra apertura di cella. Non è un errore (il filo è isolato): è solo un percorso meno ordinato, che si sceglie dopo uno libero. */
+  /** The corridor from the solder point to the edge passes over another strip or another cell opening. It is not an error (the wire is insulated): it is just a less tidy route, chosen after a free one. */
   blocked?: boolean;
   diameterMm: number;
-  /** Spessore della piastra e del suo fondo, mm: il filo entra dalla faccia esterna ed esce dal bordo delle pareti. */
+  /** Thickness of the plate and its floor, mm: the wire enters from the outer face and leaves from the wall rim. */
   plateMm: number;
   floorMm: number;
-  /** Raggio del rinforzo da aggiungere al contorno attorno al foro (solo con il profilo della cella, dove tra le celle la plastica è sottile); 0 = non serve. */
+  /** Radius of the boss to add to the outline around the hole (only with the cell profile, where the plastic between cells is thin); 0 = not needed. */
   bossMm?: number;
 }
 
-/** Plastica che deve restare attorno al foro verso le tasche delle celle: almeno una parete stampabile, mm. */
+/** Plastic that must remain around the hole towards the cell pockets: at least a printable wall, mm. */
 const MARGIN_MM = MIN_PRINT_WALL_MM;
-/** Il foro sta nella fascia lungo il bordo larga così: più dentro il filo resterebbe chiuso tra le celle, mm. */
+/** The hole lies in the band along the edge this wide: further in, the wire would stay trapped between the cells, mm. */
 const RIM_MM = 7;
-/** Con il rinforzo il foro può stare fino a così fuori dal contorno (nell'incavo tra due celle), mm. */
+/** With the boss the hole can sit this far outside the outline (in the notch between two cells), mm. */
 const OUTSIDE_MM = 4;
-/** Quanto lontano dal punto di saldatura si cerca il foro, mm. */
+/** How far from the solder point the hole is searched for, mm. */
 const SEARCH_MM = 24;
 const STEP_MM = 0.5;
-/** Quanto pesa, nella scelta del foro, la distanza laterale dal punto di saldatura rispetto all'essere sul bordo (mm di bordo per mm di distanza). */
+/** How much, in choosing the hole, the lateral distance from the solder point weighs against being on the edge (mm of edge per mm of distance). */
 const LATERAL_WEIGHT = 0.15;
 
 /**
- * `wall` è la sagoma piena del portacelle (pareti con le tasche delle celle come buchi), `plateMm`/`floorMm` il suo
- * spessore. Restituisce un'uscita per giunzione; una giunzione senza posto per il foro non ne ha.
+ * `wall` is the solid outline of the holder (walls with the cell pockets as holes), `plateMm`/`floorMm` its
+ * thickness. Returns one exit per joint; a joint with no room for the hole gets none.
  */
 export function findWireExits(
   project: Project,
@@ -60,27 +60,27 @@ export function findWireExits(
   const d = SIDE_VECTOR[side];
   const out: WireExit[] = [];
   const holeR = holeMm / 2;
-  const rPocket = holeR + MARGIN_MM; // gioco verso le tasche delle celle
-  const rOut = holeR + MARGIN_MM; // e verso il bordo: il foro sta il più possibile sul bordo, con una parete stampabile
+  const rPocket = holeR + MARGIN_MM; // clearance towards the cell pockets
+  const rOut = holeR + MARGIN_MM; // and towards the edge: the hole sits as close to the edge as possible, with a printable wall
   const outlines = wall.map((r) => ({ outline: r.outline, holes: [] as Pt[][] }));
   const deep = offsetRegions(outlines, -RIM_MM);
   const pockets = wall.flatMap((r) => r.holes.map((h) => ({ outline: h, holes: [] as Pt[][] })));
   const taken: Pt[] = [];
   for (const s of chosenStrips(strips)) {
     const node = frontNode(s, side);
-    // punto di saldatura: sul lobo della lamella, dal lato di uscita, appena dentro il bordo
+    // solder point: on the strip lobe, on the exit side, just inside the edge
     const solder = { x: node.x + d.x * (node.reachMm - 0.7), y: node.y + d.y * (node.reachMm - 0.7) };
     const covering = strips.filter((o) => o.face === s.face).map((o) => ({ outline: o.outline, holes: o.holes }));
-    // Candidati vicini al punto di saldatura, dal più sul bordo (il più avanti verso il lato di uscita) al meno; a parità
-    // di posizione conta la vicinanza laterale alla saldatura. Poi si controlla dal primo in giù.
+    // Candidates near the solder point, from the most on the edge (the furthest towards the exit side) to the least; ties
+    // go to lateral closeness to the solder. Then check from the first down.
     const cands: { c: Pt; score: number }[] = [];
     for (let dx = -SEARCH_MM; dx <= SEARCH_MM; dx += STEP_MM) {
       for (let dy = -SEARCH_MM; dy <= SEARCH_MM; dy += STEP_MM) {
         const c = { x: solder.x + dx, y: solder.y + dy };
         const dist = Math.hypot(dx, dy);
         if (dist > SEARCH_MM) continue;
-        if (dx * d.x + dy * d.y < -2) continue; // il filo non torna indietro verso l'interno
-        if (!pointInRegions(c, wall) || pointInRegions(c, deep)) continue; // sul materiale, nella fascia lungo il bordo
+        if (dx * d.x + dy * d.y < -2) continue; // the wire does not go back inwards
+        if (!pointInRegions(c, wall) || pointInRegions(c, deep)) continue; // on the material, in the band along the edge
         cands.push({ c, score: -(c.x * d.x + c.y * d.y) + LATERAL_WEIGHT * dist });
       }
     }
@@ -88,7 +88,7 @@ export function findWireExits(
     let found: Pt | null = null;
     for (const { c } of cands) {
       if (taken.some((q) => Math.hypot(q.x - c.x, q.y - c.y) < 2 * rOut + 0.5)) continue;
-      if (!circlePoints(c.x, c.y, rOut, 16).every((q) => pointInRegions(q, outlines))) continue; // gioco verso il bordo
+      if (!circlePoints(c.x, c.y, rOut, 16).every((q) => pointInRegions(q, outlines))) continue; // clearance towards the edge
       const disk = circlePoints(c.x, c.y, rPocket, 16);
       if (pockets.some((q) => intersectRegions(q, [disk]).some((x) => regionArea(x) > 0.01))) continue;
       if (covering.some((r) => intersectRegions(r, [disk]).some((x) => regionArea(x) > 0.01))) continue;
@@ -97,8 +97,8 @@ export function findWireExits(
     }
     let bossMm = 0;
     if (!found && allowBoss) {
-      // Profilo della cella: la plastica tra le celle non basta, quindi si aggiunge al contorno un rinforzo tondo attorno al
-      // foro (che sta il più vicino possibile al punto di saldatura, anche nell'incavo appena fuori dal contorno).
+      // Cell profile: the plastic between the cells is not enough, so a round boss is added to the outline around the
+      // hole (which sits as close as possible to the solder point, even in the notch just outside the outline).
       const rBoss = holeR + Math.max(MARGIN_MM, chamferMm + 0.5);
       const near = offsetRegions(outlines, OUTSIDE_MM);
       const byDist: { c: Pt; dist: number }[] = [];
@@ -131,10 +131,10 @@ export function findWireExits(
 }
 
 /**
- * Giro esterno, senza foro né linguetta: il filo si salda sulla lamella, vicino al bordo dal lato di uscita, corre in
- * linea retta sul piano del portacelle fino al bordo della piastra e da lì scende lungo il fianco, all'esterno. Si
- * preferisce un corridoio libero (nessun'altra lamella della faccia, nessuna apertura di un'altra cella) perché il filo
- * resta ordinato e non finisce schiacciato; il filo è isolato, quindi passare sopra una lamella non è un corto.
+ * Around route, with no hole or tab: the wire is soldered on the strip, near the edge on the exit side, runs in a
+ * straight line on the holder plane to the plate edge and from there goes down along the flank, outside. A
+ * free corridor is preferred (no other strip of the face, no opening of another cell) because the wire
+ * stays tidy and does not get squashed; the wire is insulated, so passing over a strip is not a short.
  */
 export function findAroundExits(
   project: Project,
@@ -160,7 +160,7 @@ export function findAroundExits(
       for (const deg of [0, 25, -25, 50, -50]) {
         const ang = Math.atan2(d.y, d.x) + (deg * Math.PI) / 180;
         const solder = { x: node.x + Math.cos(ang) * (node.reachMm - 0.7), y: node.y + Math.sin(ang) * (node.reachMm - 0.7) };
-        // fin dove arriva il portacelle uscendo dal punto di saldatura in linea retta verso il lato di uscita
+        // how far the holder reaches going out from the solder point in a straight line towards the exit side
         const last = Math.max(0, holderReach(solder, d, [0], outlines));
         const reach = last + bendMm;
         const w = 1.2;
@@ -200,8 +200,8 @@ export function findAroundExits(
 }
 
 /**
- * Fori nel portacelle dove c'è posto; i giunti senza posto per il foro (plastica troppo sottile tra le celle) fanno il giro
- * esterno sul piano del portacelle, così nessun filo manca.
+ * Holes in the holder where there is room; joints with no room for the hole (plastic too thin between the cells) take the
+ * around route on the holder plane, so no wire is missing.
  */
 export function findWireRoutes(
   project: Project,

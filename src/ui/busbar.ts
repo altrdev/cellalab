@@ -1,7 +1,7 @@
 import { renderKey, t } from '../i18n';
 import { len } from '../units';
 import type { StripOptions } from '../core/strips';
-import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf, type LamellaReport, type LamellaSettings } from '../core/lamelle';
+import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf, type LamellaReport, type LamellaSettings } from '../core/busbar';
 import type { Pt } from '../core/polygon';
 import { spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
@@ -19,11 +19,11 @@ import { tabNotches } from '../core/tabNotches';
 import type { WelderProfile } from '../core/profiles';
 import type { Project } from '../core/types';
 
-/** Calcoli delle lamelle condivisi da editor e pannello, con una piccola cache per non rifarli due volte. */
+/** Strip calculations shared by editor and panel, with a small cache so they are not done twice. */
 
 const stripCache = new WeakMap<Project, { key: string; strips: Strip[] }>();
 
-/** Impostazioni del holder correnti: le registra lo stato dell'interfaccia (qui non si può importare senza un giro). */
+/** Current holder settings: registered by the interface state (it cannot be imported here without a cycle). */
 let holderSettings: () => HolderSettings = () => DEFAULT_HOLDER_SETTINGS;
 export function bindHolderSettings(get: () => HolderSettings): void {
   holderSettings = get;
@@ -35,13 +35,13 @@ export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
   const key = JSON.stringify(opts) + (hs ? JSON.stringify(hs) : '');
   const hit = stripCache.get(project);
   if (hit && hit.key === key) return hit.strips;
-  // Le linguette si piegano oltre il holder: serve la sua sagoma esterna (senza le tasche delle celle).
+  // The tabs fold beyond the holder: its outer outline is needed (without the cell pockets).
   const model = hs ? holderOf(project, hs).model : null;
   const outlineOf = (m: typeof model) => (m ? m.wall.map((r) => ({ outline: r.outline, holes: [] })) : null);
-  // Le due piastre possono avere scanalature diverse: ogni lamella si piega oltre il bordo della sua.
+  // The two plates may have different grooves: each strip folds beyond the edge of its own.
   const holderOutline = model ? { top: outlineOf(model.halves?.top ?? model)!, bottom: outlineOf(model.halves?.bottom ?? model)! } : null;
   const strips = buildStrips(project, { ...opts, holderOutline });
-  // Senza linguette di bilanciamento il filo esce da un foro del portacelle accanto alla lamella.
+  // Without balance tabs the wire exits from a holder hole next to the strip.
   if (hs) for (const e of wireExitsOf(project, settings, hs)) {
     const st = strips.find((x) => x.id === e.stripId);
     if (st) st.wireExit = e;
@@ -59,18 +59,18 @@ const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, wireHoles: { top
 
 const exitCache = new WeakMap<Project, { key: string; exits: WireExit[] }>();
 /**
- * Uscite dei fili dal portacelle (solo con i fori al posto delle linguette di bilanciamento): per ogni giunzione il
- * punto di saldatura sulla lamella e il foro accanto. Vuote se l'opzione è spenta o ci sono le linguette.
+ * Wire exits from the holder (only with holes in place of the balance tabs): for each joint the
+ * solder point on the strip and the hole next to it. Empty if the option is off or there are tabs.
  */
 export function wireExitsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): WireExit[] {
-  if (settings.tabs || !bmsOf(project)) return []; // con le linguette il filo parte da lì
+  if (settings.tabs || !bmsOf(project)) return []; // with tabs the wire starts from there
   const key = JSON.stringify([settings, holder]);
   const hit = exitCache.get(project);
   if (hit && hit.key === key) return hit.exits;
   const plain = buildHolder(project, holder, false);
   const opts = optionsOf(project, settings);
   const strips = plain && opts.tabs ? buildStrips(project, opts) : [];
-  // Con i fori nel portacelle il filo passa da lì; senza fori né linguette fa il giro esterno sul piano del portacelle.
+  // With holes in the holder the wire goes through there; with neither holes nor tabs it takes the around route on the holder plane.
   const exits = !plain || !opts.tabs ? [] : holder.wireHoles
     ? findWireRoutes(project, strips, plain.wall, opts.tabs.side, holeForWireMm(settings.balanceAwg), plain.totalMm, plain.floorMm, settings.tabBendMm, holder.chamferMm, holder.shape === 'profile')
     : findAroundExits(project, strips, plain.wall, opts.tabs.side, plain.totalMm, plain.floorMm, settings.tabBendMm);
@@ -79,8 +79,8 @@ export function wireExitsOf(project: Project, settings: LamellaSettings, holder:
 }
 
 /**
- * Il posto dell'NTC (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle). Preferisce i vuoti dove il
- * foro del filo non finisce sotto una lamella di nessuna faccia: per le lamelle usa la forma senza holder, che qui basta.
+ * The NTC place (if there is a BMS with NTC, the pocket is on and there is a gap between three cells). Prefers the gaps where the
+ * wire hole does not end up under a strip of any face: for the strips it uses the shape without holder, which is enough here.
  */
 export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: HolderSettings): NtcPlan {
   if (!holder.ntc || !bmsOf(project)?.ntc) return { site: null };
@@ -96,9 +96,9 @@ export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: H
 }
 
 /**
- * Tagli del portacelle legati al BMS: scanalature per le linguette (con un BMS e le linguette accese), tasca dell'NTC
- * con il suo foro per il filo. Le scanalature si ricavano dalle lamelle senza holder, perché la posizione delle
- * linguette non dipende da lui. Li usa `holderOf`.
+ * Holder cuts tied to the BMS: grooves for the tabs (with a BMS and tabs on), NTC pocket
+ * with its wire hole. The grooves come from the strips without holder, because the position of the
+ * tabs does not depend on it. Used by `holderOf`.
  */
 export function holderCutsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): HolderCuts {
   if (project.bmsId === undefined) return NO_CUTS;
@@ -111,7 +111,7 @@ export function holderCutsOf(project: Project, settings: LamellaSettings, holder
   const { site } = ntcPlanOf(project, settings, holder);
   const exits = wireExitsOf(project, settings, holder);
   const holeOf = (e: WireExit) => circlePoints(e.hole!.x, e.hole!.y, e.diameterMm / 2, 16);
-  const holed = exits.filter((e) => e.hole); // il giro esterno non fa fori
+  const holed = exits.filter((e) => e.hole); // the around route makes no holes
   const bossOf = (e: WireExit) => circlePoints(e.hole!.x, e.hole!.y, e.bossMm ?? 0, 24);
   const wireBosses = {
     top: holed.filter((e) => e.face === 'top' && (e.bossMm ?? 0) > 0).map(bossOf),
@@ -127,8 +127,8 @@ const TAB_SIDES: readonly TabSide[] = ['top', 'bottom', 'left', 'right'];
 const blocksCache = new WeakMap<Project, { key: string; blocks: Record<TabSide, number> }>();
 
 /**
- * Per ogni lato, quante linguette passerebbero sopra altre celle o lamelle (con il holder attuale, senza scanalature).
- * Serve al menu per non proporre i lati impossibili e alla scelta automatica.
+ * For each side, how many tabs would pass over other cells or strips (with the current holder, without grooves).
+ * Used by the menu not to offer impossible sides and by the automatic choice.
  */
 function tabBlocks(project: Project, settings: LamellaSettings): Record<TabSide, number> {
   const none: Record<TabSide, number> = { top: 0, bottom: 0, left: 0, right: 0 };
@@ -142,32 +142,32 @@ function tabBlocks(project: Project, settings: LamellaSettings): Record<TabSide,
   const holderOutline = model ? model.wall.map((r) => ({ outline: r.outline, holes: [] })) : null;
   const blocks = { ...none };
   for (const side of TAB_SIDES) {
-    blocks[side] = buildStrips(project, { ...opts, tabs: { ...opts.tabs, side }, holderOutline }).filter((s) => s.tab?.blockedBy).length; // conta solo le linguette di bilanciamento: il lato lo sceglie lei
+    blocks[side] = buildStrips(project, { ...opts, tabs: { ...opts.tabs, side }, holderOutline }).filter((s) => s.tab?.blockedBy).length; // counts only the balance tabs: they choose the side
   }
   blocksCache.set(project, { key, blocks });
   return blocks;
 }
 
-/** Lati da cui tutte le linguette escono liberamente. */
+/** Sides from which all the tabs exit freely. */
 export function freeTabSides(project: Project, settings: LamellaSettings): Record<TabSide, boolean> {
   const b = tabBlocks(project, settings);
   return { top: b.top === 0, bottom: b.bottom === 0, left: b.left === 0, right: b.right === 0 };
 }
 
-/** Il lato usato: quello scelto, o in automatico il primo libero (alto, basso, sinistra, destra), altrimenti il meno intralciato. */
+/** The side used: the chosen one, or automatically the first free one (top, bottom, left, right), otherwise the least obstructed. */
 export function tabSideOf(project: Project, settings: LamellaSettings): TabSide {
   if (settings.tabSide !== 'auto') return settings.tabSide;
   const b = tabBlocks(project, settings);
   return TAB_SIDES.reduce((best, s) => (b[s] < b[best] ? s : best), TAB_SIDES[0]!);
 }
 
-/** Opzioni di forma delle lamelle con il lato delle linguette già risolto. */
+/** Strip shape options with the tab side already resolved. */
 function optionsOf(project: Project, settings: LamellaSettings): StripOptions {
   const o = stripOptionsOf(settings, holderSettings().wireHoles);
   return o.tabs ? { ...o, tabs: { ...o.tabs, side: tabSideOf(project, settings) } } : o;
 }
 
-/** Avvisi sull'ingombro della scheda del BMS: se è più grande del posto che ha sul pacco, sporge. */
+/** Warnings about the BMS board footprint: if it is larger than the space it has on the pack, it sticks out. */
 export function bmsFitIssues(project: Project, settings: LamellaSettings): { severity: 'warning'; message: string; cellIds: string[] }[] {
   const fit = harnessOf(project, settings)?.fit;
   if (!fit) return [];
@@ -186,7 +186,7 @@ export function bmsFitIssues(project: Project, settings: LamellaSettings): { sev
   return out;
 }
 
-/** Cablaggio del BMS (posizione e lunghezza dei fili), con lo spessore delle lamelle che si vede nella scena. */
+/** BMS harness (position and length of the wires), with the strip thickness seen in the scene. */
 export function harnessOf(project: Project, settings: LamellaSettings): Harness | null {
   if (project.bmsId === undefined) return null;
   const report = reportOf(project, settings);
@@ -196,7 +196,7 @@ export function harnessOf(project: Project, settings: LamellaSettings): Harness 
 let last: { project: Project; key: string; report: LamellaReport } | null = null;
 
 export function reportOf(project: Project, settings: LamellaSettings): LamellaReport {
-  const key = renderKey() + JSON.stringify(settings); // i messaggi del rapporto dipendono da lingua e unità
+  const key = renderKey() + JSON.stringify(settings); // the report messages depend on language and units
   if (last && last.project === project && last.key === key) return last.report;
   const packCurrentA = computeStats(project).maxCurrentA ?? 0;
   const report = analyzeLamelle(project, stripsOf(project, settings), settings, packCurrentA);
@@ -204,7 +204,7 @@ export function reportOf(project: Project, settings: LamellaSettings): LamellaRe
   return report;
 }
 
-/** Posizioni assolute dei punti di saldatura consigliati su una lamella. */
+/** Absolute positions of the recommended weld spots on a strip. */
 export function spotMarks(strip: Strip, spotsPerTerminal: number, welder: WelderProfile): Pt[] {
   const out: Pt[] = [];
   for (const n of strip.nodes) {
@@ -216,5 +216,5 @@ export function spotMarks(strip: Strip, spotsPerTerminal: number, welder: Welder
 }
 
 const ring = (pts: readonly Pt[]) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(3)} ${p.y.toFixed(3)}`).join(' ') + ' Z';
-/** Percorso SVG di una lamella: contorno più finestre (da disegnare con fill-rule evenodd). */
+/** SVG path of a strip: outline plus windows (to draw with fill-rule evenodd). */
 export const pathOf = (strip: Pick<Strip, 'outline' | 'holes'>) => [strip.outline, ...strip.holes].map(ring).join(' ');

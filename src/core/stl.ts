@@ -1,6 +1,6 @@
 /**
- * Scrittura STL binario. `positions` è una lista di triangoli non indicizzati
- * (9 numeri per triangolo: x,y,z dei tre vertici), in millimetri.
+ * Binary STL writer. `positions` is a list of non-indexed triangles
+ * (9 numbers per triangle: x,y,z of the three vertices), in millimetres.
  */
 export function stlBinary(positions: ArrayLike<number>, name = 'CellaLab'): Uint8Array {
   const triangles = Math.floor(positions.length / 9);

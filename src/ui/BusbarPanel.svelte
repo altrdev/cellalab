@@ -12,7 +12,7 @@
   import { MIN_PRINT_WALL_MM } from '../core/holder';
   import { BALANCE_AWGS, POWER_AWGS, powerAmpacityA } from '../core/wire';
   import { history } from '../state';
-  import { freeTabSides, reportOf, tabSideOf } from './lamelle';
+  import { freeTabSides, reportOf, tabSideOf } from './busbar';
   import { ui } from './ui.svelte';
 
   const project = $derived($history.present);
@@ -41,7 +41,7 @@
   };
   const isPreset = $derived(PRESETS.some((p) => p.k === ui.lamella.deltaTK));
 
-  /** L'esito in una frase, senza gergo. */
+  /** The outcome in one sentence, no jargon. */
   const verdict = $derived.by(() => {
     const r = report;
     const name = r.material.name.replace(/\s*\(.*\)$/, '');

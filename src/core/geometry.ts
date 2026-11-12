@@ -17,12 +17,12 @@ export function normalizeRect(x0: number, y0: number, x1: number, y1: number): R
   };
 }
 
-/** Arrotonda al multiplo di `step` più vicino; con step <= 0 non fa nulla. */
+/** Rounds to the nearest multiple of `step`; with step <= 0 it does nothing. */
 export function snapTo(value: number, step: number): number {
-  return step > 0 ? Math.round(value / step) * step + 0 : value; // "+ 0" evita il -0
+  return step > 0 ? Math.round(value / step) * step + 0 : value; // "+ 0" avoids -0
 }
 
-/** Rettangolo che contiene tutte le celle (o solo quelle in `ids`), bordo esterno incluso. */
+/** Rectangle containing all the cells (or only those in `ids`), outer edge included. */
 export function boundsOfCells(project: Project, ids?: ReadonlySet<string>): Rect | null {
   let rect: Rect | null = null;
   for (const c of project.cells) {
@@ -42,7 +42,7 @@ export function boundsOfCells(project: Project, ids?: ReadonlySet<string>): Rect
   return rect;
 }
 
-/** Id delle celle il cui centro cade dentro il rettangolo (selezione a trascinamento). */
+/** Ids of the cells whose centre falls inside the rectangle (drag selection). */
 export function cellsInRect(project: Project, rect: Rect): string[] {
   return project.cells
     .filter((c) => c.x >= rect.minX && c.x <= rect.maxX && c.y >= rect.minY && c.y <= rect.maxY)

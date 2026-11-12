@@ -7,33 +7,33 @@ import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { ntcSite } from './ntc';
 import { T, pack } from './bmsFixtures';
 
-describe('posto dell’NTC', () => {
+describe('NTC place', () => {
   const p = pack(4, 3);
 
-  it('sta nel vuoto tra tre celle, fuori dalle loro tasche', () => {
+  it('it is in the gap between three cells, outside their pockets', () => {
     const site = ntcSite(p, 'top', 5, 0.15)!;
     expect(site).not.toBeNull();
     expect(site.cellIds).toHaveLength(3);
     for (const id of site.cellIds) {
       const c = p.cells.find((x) => x.id === id)!;
       const dist = Math.hypot(c.x - site.x, c.y - site.y);
-      expect(dist).toBeGreaterThan(10.7 + 0.15 - 1e-6); // fuori dalla tasca
-      expect(dist - (10.7 + 0.15)).toBeLessThan(site.radiusMm); // ma il foro la tocca: si apre sulla cella
+      expect(dist).toBeGreaterThan(10.7 + 0.15 - 1e-6); // outside the pocket
+      expect(dist - (10.7 + 0.15)).toBeLessThan(site.radiusMm); // but the hole touches it: it opens onto the cell
     }
   });
 
-  it('il lato di uscita sposta la scelta verso quel lato', () => {
+  it('the exit side shifts the choice towards that side', () => {
     const top = ntcSite(p, 'top', 5, 0.15)!;
     const bottom = ntcSite(p, 'bottom', 5, 0.15)!;
     expect(top.y).toBeLessThan(bottom.y);
   });
 
-  it('con meno di tre celle o tutte in fila non c’è', () => {
+  it('with fewer than three cells or all in a row there is none', () => {
     expect(ntcSite(pack(2, 1), 'top', 5, 0.15)).toBeNull();
     expect(ntcSite(replaceCells(createProject(), generateGrid({ typeId: T, diameterMm: 21.4, series: 4, parallel: 1, kind: 'square', gapMm: 1 })), 'top', 5, 0.15)).toBeNull();
   });
 
-  it('la tasca apre le pareti ma non il fondo', () => {
+  it('the pocket opens the walls but not the floor', () => {
     const site = ntcSite(p, 'top', 5, 0.15)!;
     const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true)!;
     const cut = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true, { extraPockets: [site.polygon] })!;
@@ -44,21 +44,21 @@ describe('posto dell’NTC', () => {
   });
 });
 
-describe('NTC in una griglia quadrata', () => {
+describe('NTC in a square grid', () => {
   const sq = (s: number, pp: number) =>
     setBms(replaceCells(createProject(), generateGrid({ typeId: T, diameterMm: 21.4, series: s, parallel: pp, kind: 'square', gapMm: 1.5 })), 'bms-4s-30a-li-ion');
 
-  it('usa il vuoto tra quattro celle, già aperto, e non scava nulla', () => {
+  it('uses the gap between four cells, already open, and digs nothing', () => {
     const p = sq(4, 3);
     const site = ntcSite(p, 'top', 5, 0.15)!;
     expect(site).not.toBeNull();
     expect(site.open).toBe(true);
-    // il centro è equidistante da quattro celle
+    // the centre is equidistant from four cells
     const ds = p.cells.map((c) => Math.hypot(c.x - site.x, c.y - site.y)).sort((a, b) => a - b);
     expect(ds[3]! - ds[0]!).toBeLessThan(1e-6);
   });
 
-  it('con la sagoma arrotondata il vuoto è riempito e il foro toglie materiale; con quella a profilo no', () => {
+  it('with the rounded outline the gap is filled and the hole removes material; with the profile one it does not', () => {
     const p = sq(4, 3);
     const site = ntcSite(p, 'top', 5, 0.15)!;
     const volume = (m: { layers: { z0: number; z1: number; regions: Parameters<typeof regionArea>[0][] }[] }) =>
@@ -71,15 +71,15 @@ describe('NTC in una griglia quadrata', () => {
     expect(removed('profile')).toBeLessThan(1e-6);
   });
 
-  it('con celle esagonali resta il vuoto tra tre celle', () => {
+  it('with hexagonal cells the gap between three cells remains', () => {
     expect(ntcSite(pack(4, 3), 'top', 5, 0.15)!.open).toBe(false);
   });
 });
 
-describe('filo dell’NTC', () => {
+describe('NTC wire', () => {
   const p = pack(4, 3);
 
-  it('il foro del filo passa anche nel fondo', () => {
+  it('the wire hole also goes through the floor', () => {
     const site = ntcSite(p, 'top', 5, 0.15)!;
     const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true)!;
     const cut = buildHolder(p, DEFAULT_HOLDER_SETTINGS, true, { extraPockets: [site.polygon], throughHoles: [site.wirePolygon] })!;
@@ -87,17 +87,17 @@ describe('filo dell’NTC', () => {
     expect(floorVol(cut)).toBeLessThan(floorVol(plain));
   });
 
-  it('preferisce i vuoti non coperti da una lamella', () => {
+  it('prefers gaps not covered by a strip', () => {
     const free = ntcSite(p, 'top', 5, 0.15)!;
     expect(free.covered).toBe(false);
-    // una lamella finta che copre il vuoto scelto: il sito si sposta
+    // a fake strip covering the chosen gap: the site moves
     const cover = [{ outline: [{ x: free.x - 6, y: free.y - 6 }, { x: free.x + 6, y: free.y - 6 }, { x: free.x + 6, y: free.y + 6 }, { x: free.x - 6, y: free.y + 6 }], holes: [] }];
     const moved = ntcSite(p, 'top', 5, 0.15, cover)!;
     expect(Math.hypot(moved.x - free.x, moved.y - free.y)).toBeGreaterThan(6);
     expect(moved.covered).toBe(false);
   });
 
-  it('se tutti i vuoti sono coperti lo dice', () => {
+  it('if all the gaps are covered it says so', () => {
     const all = [{ outline: [{ x: -500, y: -500 }, { x: 500, y: -500 }, { x: 500, y: 500 }, { x: -500, y: 500 }], holes: [] }];
     expect(ntcSite(p, 'top', 5, 0.15, all)!.covered).toBe(true);
   });

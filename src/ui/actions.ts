@@ -2,7 +2,7 @@ import { removeCells, flipPolarity, setGroup } from '../core/ops';
 import { history } from '../state';
 import { ui } from './ui.svelte';
 
-/** Azioni comuni a tastiera, barra degli strumenti e pannello. */
+/** Actions shared by keyboard, toolbar and panel. */
 
 export function flipSelected() {
   const ids = [...ui.selected];
@@ -20,7 +20,7 @@ export function selectAll() {
   ui.selected = new Set(history.get().present.cells.map((c) => c.id));
 }
 
-/** `group` è l'indice 0-based, null per dissociare. */
+/** `group` is the 0-based index, null to unassign. */
 export function assignGroupToSelected(group: number | null) {
   const ids = [...ui.selected];
   if (ids.length) history.commit((p) => setGroup(p, ids, group));
