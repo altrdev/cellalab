@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CLIP_FIT_MM, type ClipSpec } from '../core/cableClip';
+import { CABLE_GAP_MM } from '../core/harness';
 import { stlBinary } from '../core/stl';
 import { t } from '../i18n';
 
@@ -18,7 +19,46 @@ function boxAt(cx: number, cy: number, cz: number, sx: number, sy: number, sz: n
   return g;
 }
 
+/** Blocco nel vuoto tra due celle: origine sulla tangente del fianco; il cavo sta a z = gioco + metà diametro. */
+function valleyGeometry(spec: ClipSpec): THREE.BufferGeometry {
+  const od = spec.cableOdMm;
+  const H = od + 2 * (0.1 + JAW_T);
+  const body = 4; // spessore lungo il cavo
+  const zFloor = CABLE_GAP_MM; // piano su cui poggia il cavo
+  const zc = zFloor + od / 2;
+  const zTop = zFloor + od;
+  const parts: THREE.BufferGeometry[] = [];
+  const zBodyLow = -3.5;
+  parts.push(boxAt(0, 0, (zBodyLow + zFloor) / 2, body, H, zFloor - zBodyLow)); // corpo sotto il cavo
+  // lama nella fessura tra le due celle: sottile (entra nei decimi di millimetro tra le superfici) e lunga fin dove la fessura la regge
+  const bladeLen = Math.max(1, spec.bladeDepthMm - Math.abs(zBodyLow));
+  parts.push(boxAt(0, 0, zBodyLow - bladeLen / 2, spec.bladeMm, H, bladeLen));
+  for (const sy of [-1, 1]) {
+    const yJ = sy * (od / 2 + 0.1 + JAW_T / 2);
+    parts.push(boxAt(0, yJ, (zFloor + zTop) / 2, body, JAW_T, zTop - zFloor));
+    const yL = sy * (od / 2 + 0.1 - LIP_MM / 2);
+    parts.push(boxAt(0, yL, zc + od * 0.35, body, LIP_MM, od * 0.3)); // labbra: trattengono il cavo
+  }
+  return mergeParts(parts);
+}
+
+function mergeParts(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const total = parts.reduce((a, g) => a + g.getAttribute('position').count, 0);
+  const pos = new Float32Array(total * 3);
+  let off = 0;
+  for (const g of parts) {
+    pos.set(g.getAttribute('position').array as Float32Array, off);
+    off += g.getAttribute('position').count * 3;
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.computeVertexNormals();
+  return out;
+}
+
 export function clipGeometry(spec: ClipSpec): THREE.BufferGeometry {
+  if (spec.kind === 'valley') return valleyGeometry(spec);
   const r = spec.cellDiameterMm / 2;
   const rin = r + CLIP_FIT_MM;
   const rout = rin + spec.thicknessMm;
@@ -78,8 +118,9 @@ export function clipStl(spec: ClipSpec): Uint8Array {
   const g = clipGeometry(spec);
   const pos = g.getAttribute('position');
   const out: number[] = [];
-  // rotazione propria (X, Y, Z) → (X, −Z, Y): niente specchio, i triangoli restano rivolti verso l'esterno
-  for (let i = 0; i < pos.count; i++) out.push(pos.getX(i), -pos.getZ(i), pos.getY(i));
+  // fascia: rotazione propria (X, Y, Z) → (X, −Z, Y), cella in verticale; blocco: stampato in piedi con la lama in basso (nessuna rotazione)
+  if (spec.kind === 'valley') for (let i = 0; i < pos.count; i++) out.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+  else for (let i = 0; i < pos.count; i++) out.push(pos.getX(i), -pos.getZ(i), pos.getY(i));
   g.dispose();
   let minX = Infinity;
   let minY = Infinity;

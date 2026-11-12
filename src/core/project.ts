@@ -180,6 +180,7 @@ export function parseProject(json: string): Project {
       slackMm: num(m.slackMm, 0, 200, DEFAULT_BMS_MOUNT.slackMm),
       tailMm: num(m.tailMm, 0, 2000, DEFAULT_BMS_MOUNT.tailMm),
       powerConnector: POWER_CONNECTORS.find((c) => c === m.powerConnector) ?? DEFAULT_BMS_MOUNT.powerConnector,
+      cablesEnd: m.cablesEnd === 'low' ? 'low' : 'high',
     };
   }
   // Un BMS scelto che non esiste più (file modificato a mano) si ignora.

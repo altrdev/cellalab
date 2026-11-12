@@ -520,16 +520,33 @@ describe('cavi di potenza', () => {
     expect(buildHarness(p, strips, 0.1, { balanceAwg: 26, powerAwg: 8 })!.cables[0]!.odMm).toBeCloseTo(6, 6);
   });
 
-  it('i cavi partono dal bordo laterale e arrivano al lato di uscita, uno per ciascuna estremità', () => {
-    const [low, high] = [...h.cables].sort((a, b) => a.points[a.points.length - 1]!.x - b.points[b.points.length - 1]!.x);
+  it('i cavi partono dal bordo laterale e si incontrano nello stesso angolo del lato di uscita', () => {
+    const [plus, minus] = [h.cables.find((c) => c.label === 'P+')!, h.cables.find((c) => c.label === 'P−')!];
     for (const c of h.cables) {
       const first = c.points[0]!;
-      const end = c.points[c.points.length - 1]!;
-      // il lato di uscita è l'alto del disegno (z minore): il cavo parte in basso (z maggiore) e arriva in alto
-      expect(first.z).toBeGreaterThan(end.z + 15);
-      expect(c.points[1]!.y).toBeCloseTo(35.2, 6);
+      const corner = c.points[c.tailFrom]!;
+      // il lato di uscita è l'alto del disegno (z minore): il cavo parte più in basso e arriva in alto
+      expect(first.z).toBeGreaterThan(corner.z + 15);
+      expect(c.points[1]!.y).toBeCloseTo(35.2 + (c.label === 'P+' ? 1 : -1) * ((3.6 + 0.4) / 2), 6);
     }
-    expect(low!.points[low!.points.length - 1]!.x).toBeLessThan(high!.points[high!.points.length - 1]!.x);
+    // stesso punto in pianta, uno sopra l'altro
+    const [cp, cm] = [plus.points[plus.tailFrom]!, minus.points[minus.tailFrom]!];
+    expect(cp.x).toBeCloseTo(cm.x, 6);
+    expect(cp.z).toBeCloseTo(cm.z, 6);
+    expect(cp.y).toBeGreaterThan(cm.y);
+    // l'angolo è a destra del pacco (default) e la coda esce da lì
+    expect(cp.x).toBeGreaterThan(91); // oltre l'ultima cella (x = 91,2)
+    const tail = plus.points[plus.points.length - 1]!;
+    expect(tail.x - cp.x).toBeCloseTo(150, 6);
+    expect(tail.z).toBeCloseTo(cp.z, 6);
+  });
+
+  it('con l’angolo a sinistra i cavi si incontrano dall’altra parte', () => {
+    const left = buildHarness(setBmsMount(p, { cablesEnd: 'low' }), strips, 0.1)!;
+    const c = left.cables[0]!;
+    expect(c.points[c.tailFrom]!.x).toBeLessThan(0);
+    const t = c.points[c.points.length - 1]!;
+    expect(t.x).toBeLessThan(c.points[c.tailFrom]!.x - 100);
   });
 
   it('girano sul fianco laterale e rispettano scorta e arrotondamento', () => {
@@ -543,12 +560,17 @@ describe('cavi di potenza', () => {
     }
   });
 
-  it('il connettore sta alla fine del cavo e dipende dalla scelta', () => {
-    expect(h.connectors).toHaveLength(2);
-    expect(h.connectors.every((k) => k.kind === 'xt60')).toBe(true);
+  it('il connettore sta in fondo alla coda, lontano dal pacco, e dipende dalla scelta', () => {
+    // XT60: un involucro per la coppia; bullet: uno per cavo
+    expect(h.connectors).toHaveLength(1);
+    expect(h.connectors[0]!.kind).toBe('xt60');
+    expect(h.connectors[0]!.cable).toBe('P±');
+    const tail = h.cables[0]!.points[h.cables[0]!.points.length - 1]!;
+    expect(h.connectors[0]!.center.x).toBeGreaterThan(tail.x);
     const none = buildHarness(setBmsMount(p, { powerConnector: 'none' }), strips, 0.1)!;
     expect(none.connectors).toHaveLength(0);
     const bullet = buildHarness(setBmsMount(p, { powerConnector: 'bullet' }), strips, 0.1)!;
+    expect(bullet.connectors).toHaveLength(2);
     expect(bullet.connectors.every((k) => k.shape === 'cylinder')).toBe(true);
   });
 });

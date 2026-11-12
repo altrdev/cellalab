@@ -564,7 +564,7 @@ export class PackScene {
     // Fermacavi: una forma per misura, messa su ogni cella del fianco con la bocca verso l'esterno.
     const clipGeos = new Map<string, THREE.BufferGeometry>();
     for (const c of options.clips ?? []) {
-      const key = `${c.spec.cellDiameterMm}|${c.spec.cableOdMm}|${c.spec.thicknessMm}`;
+      const key = `${c.spec.kind}|${c.spec.cellDiameterMm}|${c.spec.cableOdMm}|${c.spec.thicknessMm}|${c.spec.bladeMm}`;
       let geo = clipGeos.get(key);
       if (!geo) {
         geo = clipGeometry(c.spec);

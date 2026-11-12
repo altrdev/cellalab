@@ -46,11 +46,14 @@ export interface HarnessCable {
   cutMm: number;
   /** Diametro del cavo con la guaina, mm. */
   odMm: number;
+  /** Indice del punto dove i due cavi si incontrano (l'angolo): da lì in poi c'è la coda libera fino al connettore. */
+  tailFrom: number;
 }
 
 /** Connettore a spina alla fine di un cavo di potenza. */
 export interface HarnessConnector {
-  cable: 'P+' | 'P−';
+  /** Un involucro per cavo (bullet) o uno per la coppia (XT60/XT90). */
+  cable: 'P+' | 'P−' | 'P±';
   kind: Exclude<PowerConnector, 'none'>;
   /** Centro dell'involucro e direzione del cavo (verso l'esterno del BMS), nella scena. */
   center: Pt3;
@@ -143,10 +146,15 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     pMin = Math.min(pMin, p - r);
     pMax = Math.max(pMax, p + r);
   }
+  const odMm = findAwg(awg.powerAwg).outerMm;
+  // Il cavo di potenza corre a filo del fianco, appoggiato alla cella (il fermacavo lo tiene lì); il BMS gli sta davanti.
+  const cableOff = CABLE_GAP_MM + odMm / 2;
+  const aCable = edge + cableOff;
   const aWire = edge + WIRE_CLEARANCE_MM;
   const size: BmsSize | undefined = bms.sizeMm;
   const box = mount.mode === 'pack' && size !== undefined;
-  const aConn = aWire; // il connettore sta sulla faccia del BMS verso il pacco
+  // La faccia del BMS verso il pacco, con il connettore di bilanciamento, sta oltre i cavi di potenza.
+  const aConn = Math.max(aWire, edge + CABLE_GAP_MM + odMm + 0.6);
   const pc = pMin + mount.along * (pMax - pMin);
 
   const to3 = (a: number, p: number, y: number): Pt3 => ({ x: d.x * a + perp.x * p, y, z: d.y * a + perp.y * p });
@@ -193,24 +201,22 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
 
   const connector = to3(aConn, pc, yMid);
 
-  // Cavi di potenza: dalla linguetta larga (lato opposto) giù o su fino a metà altezza, di lato lungo il fianco laterale
-  // più vicino, poi sul fianco di uscita fino alle estremità del BMS.
-  const odMm = findAwg(awg.powerAwg).outerMm;
-  // Il cavo di potenza corre a filo del fianco, appoggiato alla cella (il fermacavo lo tiene lì).
-  const cableOff = CABLE_GAP_MM + odMm / 2;
-  const aCable = edge + cableOff;
-  const sizeLen = box && size ? size.lengthMm : 30;
+  // Cavi di potenza: dalla linguetta larga (di lato) giù o su fino a metà altezza, lungo il fianco laterale, poi sul fianco
+  // di uscita fino all'angolo scelto. Lì i due cavi si incontrano e proseguono insieme, in una coda libera, fino al connettore.
   const terminals = withTab.filter((s) => s.kind !== 'series' && tabsOf(s).some((x) => x.power));
   const pOf = (s: Strip) => {
     const t = tabsOf(s).find((x) => x.power)!;
     return t.holeX * perp.x + t.holeY * perp.y;
   };
   const ordered = [...terminals].sort((a, b) => pOf(a) - pOf(b));
-  const extraCable = mount.slackMm + (mount.mode === 'external' ? mount.tailMm : 0);
+  const extraCable = mount.slackMm + mount.tailMm;
   const cables: HarnessCable[] = [];
-  const connectors: HarnessConnector[] = [];
+  const high = mount.cablesEnd === 'high';
+  const pCorner = high ? pMax + cableOff : pMin - cableOff;
+  const pTail = pCorner + (high ? 1 : -1) * mount.tailMm;
+  const dyStep = (odMm + 0.4) / 2; // i due cavi stanno uno sopra l'altro, +  sopra e − sotto
   const connKind = mount.powerConnector === 'none' ? null : mount.powerConnector;
-  ordered.forEach((s, i) => {
+  ordered.forEach((s) => {
     const tab = tabsOf(s).find((x) => x.power)!;
     const td = DIR[tab.side];
     const bend = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
@@ -220,34 +226,36 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     const yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
     const pHole = hx * perp.x + hy * perp.y;
     const aBend = hx * d.x + hy * d.y;
-    // Due cavi: quello con p minore va all'estremità di p minore, passando dal fianco laterale di p minore.
-    const low = ordered.length === 1 ? pHole <= pc : i === 0;
-    const pLat = low ? pMin - cableOff : pMax + cableOff;
-    const pEnd = pc + (low ? -1 : 1) * (sizeLen / 2);
-    const pts: Pt3[] = [
-      { x: hx, y: yHole, z: hy },
-      { x: hx, y: yMid, z: hy },
-      to3(aBend, pLat, yMid),
-      to3(aCable, pLat, yMid),
-      to3(aConn, pEnd, yMid),
-    ];
+    const label = s.kind === 'terminal-plus' ? 'P+' : 'P−';
+    const y = yMid + (label === 'P+' ? dyStep : -dyStep);
+    // Dal fianco laterale più vicino al foro; se non è quello dell'angolo, il cavo attraversa tutto il fianco di uscita.
+    const pLat = pHole <= pc ? pMin - cableOff : pMax + cableOff;
+    const pts: Pt3[] = [{ x: hx, y: yHole, z: hy }, { x: hx, y, z: hy }, to3(aBend, pLat, y), to3(aCable, pLat, y)];
+    if (Math.abs(pLat - pCorner) > 1e-6) pts.push(to3(aCable, pCorner, y));
+    const tailFrom = pts.length - 1;
+    pts.push(to3(aCable, pTail, y));
     let lengthMm = 0;
     for (let k = 0; k + 1 < pts.length; k++) lengthMm += Math.hypot(pts[k + 1]!.x - pts[k]!.x, pts[k + 1]!.y - pts[k]!.y, pts[k + 1]!.z - pts[k]!.z);
-    const label = s.kind === 'terminal-plus' ? 'P+' : 'P−';
-    cables.push({ label, stripId: s.id, face: s.face, points: pts, lengthMm, cutMm: Math.ceil((lengthMm + extraCable) / 5 - 1e-9) * 5, odMm });
-    if (connKind) {
-      const cs = CONNECTOR_SIZES[connKind];
-      const axis = to3(0, low ? -1 : 1, 0); // lungo il lato, verso l'esterno del BMS
-      const end = pts[pts.length - 1]!;
-      connectors.push({
-        cable: label,
-        kind: connKind,
-        center: { x: end.x + (axis.x * cs.lengthMm) / 2, y: end.y, z: end.z + (axis.z * cs.lengthMm) / 2 },
-        axis: { x: axis.x, y: 0, z: axis.z },
-        ...cs,
-      });
-    }
+    cables.push({ label, stripId: s.id, face: s.face, points: pts, lengthMm, cutMm: Math.ceil((lengthMm + extraCable) / 5 - 1e-9) * 5, odMm, tailFrom });
   });
+  const connectors: HarnessConnector[] = [];
+  if (connKind && cables.length > 0) {
+    const cs = CONNECTOR_SIZES[connKind];
+    const axis = to3(0, high ? 1 : -1, 0); // lungo il lato, verso fuori dal pacco
+    const place = (cable: HarnessConnector['cable'], y: number, size: { lengthMm: number; widthMm: number; heightMm: number }) => {
+      const end = to3(aCable, pTail, y);
+      connectors.push({
+        cable,
+        kind: connKind,
+        shape: cs.shape,
+        center: { x: end.x + (axis.x * size.lengthMm) / 2, y, z: end.z + (axis.z * size.lengthMm) / 2 },
+        axis: { x: axis.x, y: 0, z: axis.z },
+        ...size,
+      });
+    };
+    if (connKind === 'bullet') for (const c of cables) place(c.label, c.points[c.points.length - 1]!.y, cs);
+    else place('P±', yMid, { lengthMm: cs.lengthMm, widthMm: cs.heightMm, heightMm: cs.widthMm }); // poli uno sopra l'altro
+  }
   let boxOut: BmsBox | null = null;
   if (box && size) {
     // Lunghezza lungo il lato, larghezza in altezza, spessore verso l'esterno; la faccia verso il pacco è quella del connettore.

@@ -40,16 +40,18 @@ export interface BmsMount {
   along: number;
   /** Scorta su ogni filo (saldatura e crimpatura del connettore), mm. */
   slackMm: number;
-  /** Solo esterno: lunghezza di filo oltre il punto di uscita, mm. */
+  /** Coda dei cavi di potenza oltre l'angolo del pacco, fino al connettore; in esterno anche dei fili di bilanciamento, mm. */
   tailMm: number;
-  /** Connettore a spina sui cavi di potenza, verso il BMS o l'uscita. */
+  /** Connettore a spina sui cavi di potenza, in fondo alla coda. */
   powerConnector: PowerConnector;
+  /** Da quale estremità del lato di uscita escono insieme i due cavi di potenza: 'low' = p minore, 'high' = p maggiore. */
+  cablesEnd: 'low' | 'high';
 }
 
 export type PowerConnector = 'none' | 'bullet' | 'xt60' | 'xt90';
 export const POWER_CONNECTORS: readonly PowerConnector[] = ['none', 'bullet', 'xt60', 'xt90'];
 
-export const DEFAULT_BMS_MOUNT: BmsMount = { mode: 'pack', along: 0.5, slackMm: 20, tailMm: 100, powerConnector: 'xt60' };
+export const DEFAULT_BMS_MOUNT: BmsMount = { mode: 'pack', along: 0.5, slackMm: 20, tailMm: 150, powerConnector: 'xt60', cablesEnd: 'high' };
 
 /** BMS: quante celle in serie regge, quanta corrente continua e con quale chimica. */
 export interface BmsType {

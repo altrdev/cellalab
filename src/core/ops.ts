@@ -230,6 +230,7 @@ export function setBmsMount(project: Project, mount: Partial<BmsMount>): Project
       slackMm: clamp(cur.slackMm, 0, 200),
       tailMm: clamp(cur.tailMm, 0, 2000),
       powerConnector: POWER_CONNECTORS.includes(cur.powerConnector) ? cur.powerConnector : DEFAULT_BMS_MOUNT.powerConnector,
+      cablesEnd: cur.cablesEnd === 'low' ? 'low' : 'high',
     },
   };
 }

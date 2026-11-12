@@ -27,11 +27,16 @@ describe('fermacavi a scatto', () => {
     const clips = cableClips(project, harness);
     expect(clips.length).toBeGreaterThanOrEqual(2);
     for (const c of clips) {
-      const cell = project.cells.find((x) => x.id === c.cellId)!;
-      // il cavo corre a filo della cella: la distanza dal suo asse lungo la normale è raggio + gioco + mezzo cavo
-      expect(c.center.x).toBeCloseTo(cell.x, 6);
-      expect(c.center.z).toBeCloseTo(cell.y, 6);
       expect(Math.hypot(c.out.x, c.out.y)).toBeCloseTo(1, 6);
+      if (c.spec.kind === 'band') {
+        // fascia: asse della cella a metà altezza
+        const cell = project.cells.find((x) => x.id === c.cellId)!;
+        expect(c.center.x).toBeCloseTo(cell.x, 6);
+        expect(c.center.z).toBeCloseTo(cell.y, 6);
+      } else {
+        // blocco nel vuoto: sta tra due celle vicine, sulla tangente del fianco (non dentro una cella)
+        for (const cell of project.cells) expect(Math.hypot(c.center.x - cell.x, c.center.z - cell.y)).toBeGreaterThan(21.4 / 2 - 0.01);
+      }
     }
     // due fermacavi dello stesso cavo non si toccano (almeno 35 mm tra le celle sullo stesso tratto)
     for (const label of ['P+', 'P−'] as const) {
@@ -46,8 +51,41 @@ describe('fermacavi a scatto', () => {
     }
   });
 
+  it('sul lato di uscita (celle in fila) vanno nei vuoti tra le celle; sui lati laterali su una cella', () => {
+    const clips = cableClips(project, harness);
+    expect(clips.some((c) => c.spec.kind === 'valley')).toBe(true);
+    expect(clips.some((c) => c.spec.kind === 'band')).toBe(true);
+    // il blocco nel vuoto sta al centro tra due celle: a metà tra due centri della fila in alto (passo 22,9)
+    for (const c of clips.filter((x) => x.spec.kind === 'valley')) {
+      const u = c.along;
+      const along = c.center.x * u.x + c.center.z * u.y;
+      const rem = ((along % 22.9) + 22.9) % 22.9;
+      expect(Math.min(Math.abs(rem - 11.45), 99)).toBeLessThan(0.5);
+    }
+  });
+
   it('senza cavi non ci sono fermacavi', () => {
     expect(cableClips(project, { ...harness, cables: [] })).toEqual([]);
+  });
+
+  it('il blocco ha la lama sotto la tangente, il corpo e l’incavo per il cavo', () => {
+    const v = clipSpec(project, 21.4, 3.6, 'valley');
+    const g = clipGeometry(v);
+    g.computeBoundingBox();
+    const b = g.boundingBox!;
+    expect(b.min.z).toBeCloseTo(-v.bladeDepthMm, 6);
+    expect(b.max.z).toBeCloseTo(0.25 + 3.6, 6);
+    expect(b.max.x - b.min.x).toBeCloseTo(4, 6);
+    expect(b.max.y - b.min.y).toBeCloseTo(3.6 + 2 * (0.1 + 1.2), 6);
+    // l'asse del cavo (x) è libero: nessun vertice sul cavo (y≈0, z tra 0,25 e 3,85) a parte le pareti ai lati
+    const pos = g.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(pos.getY(i)) < 1.0 && pos.getZ(i) > 0.3 && pos.getZ(i) < 3.5) throw new Error('il cavo non passa');
+    }
+    // la lama entra nella fessura: spessore minore della distanza tra le celle (1,5)
+    expect(v.bladeMm).toBeLessThan(1.5);
+    g.dispose();
+    expect(clipStl(v).byteLength).toBeGreaterThan(84);
   });
 
   it('la forma ha la fascia attorno alla cella e la bocca verso l’esterno', () => {
