@@ -232,3 +232,16 @@ describe('tacche del portacelle per le linguette', () => {
     expect(a.tab!.bend[0].y).toBeGreaterThan(b.tab!.bend[0].y);
   });
 });
+
+describe('tacche con linguette intralciate', () => {
+  const tabs = { side: 'left', widthMm: 6, lengthMm: 8, holeMm: 2, bendMm: 0.3, powerHoleMm: 2.9 } as const;
+  const p = setBms(pack(4, 2), 'bms-4s-30a-li-ion');
+
+  it('nessuna scanalatura per le linguette che passano sopra altre celle', () => {
+    const strips = buildStrips(p, { tabs });
+    const blocked = strips.filter((s) => s.tab?.blockedBy);
+    expect(blocked.length).toBeGreaterThan(0);
+    const ids = tabNotches(strips, DEFAULT_HOLDER_SETTINGS, { balanceAwg: 26, powerAwg: 12 }).map((n) => n.stripId);
+    for (const s of blocked) expect(ids).not.toContain(s.id);
+  });
+});

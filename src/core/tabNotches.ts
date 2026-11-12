@@ -24,14 +24,16 @@ export interface Notch {
 /**
  * Scanalature sul bordo del portacelle dove si appoggiano la linguetta piegata e il suo filo. Profondità: quanto
  * serve al filo (AWG scelto), ma la parete deve restare almeno `MIN_PRINT_WALL_MM`. Partono dal bordo teorico della
- * parete della cella da cui esce la linguetta e vanno verso l'esterno.
+ * parete della cella da cui esce la linguetta e vanno verso l'esterno. Se la linguetta è intralciata (passa sopra altre
+ * celle) la scanalatura non c'è: taglierebbe le pareti delle celle vicine.
  */
 export function tabNotches(strips: readonly Strip[], holder: HolderSettings, wires: { balanceAwg: number; powerAwg: number }): Notch[] {
   const out: Notch[] = [];
   const maxDepth = holder.wallMm - MIN_PRINT_WALL_MM;
   for (const s of strips) {
     const tab = s.tab;
-    if (!tab) continue;
+    // Una linguetta che passa sopra altre celle o lamelle non ha un bordo libero dove stare: niente scanalatura.
+    if (!tab || tab.blockedBy) continue;
     const node = s.nodes.find((n) => Math.hypot(n.x - tab.anchor.x, n.y - tab.anchor.y) < 1e-6);
     if (!node) continue;
     const wanted = findAwg(tab.power ? wires.powerAwg : wires.balanceAwg).outerMm + DEPTH_EXTRA_MM;
@@ -40,7 +42,7 @@ export function tabNotches(strips: readonly Strip[], holder: HolderSettings, wir
     const d = DIR[tab.side];
     const perp = { x: -d.y, y: d.x };
     const a0 = node.cellRadiusMm + holder.clearanceMm + holder.wallMm - depth;
-    const a1 = a0 + depth + 8;
+    const a1 = a0 + depth + 2;
     const v = tab.widthMm / 2 + SIDE_CLEARANCE_MM;
     const at = (a: number, p: number): Pt => ({ x: tab.anchor.x + d.x * a + perp.x * p, y: tab.anchor.y + d.y * a + perp.y * p });
     out.push({ stripId: s.id, polygon: [at(a0, -v), at(a1, -v), at(a1, v), at(a0, v)], depthMm: depth, shallow: depth < wanted - 1e-9 });
