@@ -125,7 +125,7 @@
   <Help label={t('lam.what')}>{t('lam.weldAreaHelp', { edge: len(1, 0) })}</Help>
 
   {#if bmsOf(project)}
-    <label><span><input type="checkbox" bind:checked={ui.lamella.tabs} /> {t('lam.tabs')}</span></label>
+    <label><span><input type="checkbox" bind:checked={ui.lamella.tabs} onchange={() => { if (ui.lamella.tabs) ui.holder.wireHoles = false; }} /> {t('lam.tabs')}</span></label>
     {#if ui.lamella.tabs}
       <label>{t('lam.tabSide')}
         <select value={ui.lamella.tabSide} onchange={(e) => (ui.lamella.tabSide = e.currentTarget.value as typeof ui.lamella.tabSide)}>
@@ -150,6 +150,19 @@
       </div>
       <label>{t('lam.tabBend')}<UnitInput kind="len" min={0} max={20} step={0.1} value={ui.lamella.tabBendMm} onchange={(v) => { if (v !== null) ui.lamella.tabBendMm = v; }} /></label>
       <Help label={t('lam.what')}>{t('lam.tabsHelp', { min: len(MIN_PRINT_WALL_MM, 1) })}</Help>
+    {:else if ui.holder.wireHoles}
+      <p class="note">{t('lam.noTabsHoles')}</p>
+      <label>{t('lam.tabSide')}
+        <select value={ui.lamella.tabSide} onchange={(e) => (ui.lamella.tabSide = e.currentTarget.value as typeof ui.lamella.tabSide)}>
+          <option value="auto">{t('lam.tabSide.auto', { side: sideName[tabSide] })}</option>
+          {#each ['top', 'bottom', 'left', 'right'] as const as side (side)}<option value={side}>{sideName[side]}</option>{/each}
+        </select>
+      </label>
+      <label>{t('lam.balanceAwg')}
+        <select value={String(ui.lamella.balanceAwg)} onchange={(e) => (ui.lamella.balanceAwg = Number(e.currentTarget.value))}>
+          {#each BALANCE_AWGS as a (a)}<option value={String(a)}>AWG {a}</option>{/each}
+        </select>
+      </label>
     {/if}
   {/if}
 

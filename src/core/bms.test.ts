@@ -6,9 +6,11 @@ import { addCustomBms, removeCustomBms, replaceCells, setBms, setBmsMount, setCu
 import { createProject, parseProject, serializeProject } from './project';
 import { computeStats } from './stats';
 import { intersectRegions, pointInRegions, regionArea, unionPolygons } from './clip';
+import { circlePoints } from './polygon';
 import { buildDxf } from './dxf';
 import { buildHolder, DEFAULT_HOLDER_SETTINGS } from './holder';
 import { buildHarness } from './harness';
+import { findWireExits } from './wireExit';
 import { ntcSite, ntcSites } from './ntc';
 import { tabNotches } from './tabNotches';
 import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf } from './lamelle';
@@ -570,6 +572,63 @@ describe('cablaggio del BMS', () => {
 
   it('setBmsMount tiene i valori nei limiti', () => {
     expect(setBmsMount(p, { along: 3, slackMm: -5 }).bmsMount).toMatchObject({ along: 1, slackMm: 0 });
+  });
+});
+
+describe('uscita dei fili dal portacelle, senza linguette', () => {
+  const p = setBms(pack(4, 3), 'bms-4s-30a-li-ion');
+  const plain = buildHolder(p, DEFAULT_HOLDER_SETTINGS, false)!;
+  const strips = buildStrips(p, { tabs: { side: 'bottom', widthMm: 6, lengthMm: 8, holeMm: 1.21, bendMm: 0.3, style: 'none' } });
+  const exits = findWireExits(p, strips, plain.wall, 'bottom', 1.21, plain.totalMm, plain.floorMm);
+
+  it('niente linguette di bilanciamento: ogni giunzione ha il suo foro nel portacelle', () => {
+    expect(strips.some((x) => x.tab)).toBe(false);
+    expect(exits).toHaveLength(5);
+    expect(new Set(exits.map((e) => e.stripId)).size).toBe(5);
+  });
+
+  it('il foro sta sul materiale del portacelle, non sotto una lamella della sua faccia, e vicino al punto di saldatura', () => {
+    for (const e of exits) {
+      const r = e.diameterMm / 2;
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * 2 * Math.PI;
+        expect(pointInRegions({ x: e.hole.x + Math.cos(a) * r, y: e.hole.y + Math.sin(a) * r }, plain.wall)).toBe(true);
+      }
+      const covering = strips.filter((x) => x.face === e.face).map((x) => ({ outline: x.outline, holes: x.holes }));
+      expect(covering.some((c) => pointInRegions(e.hole, [c]))).toBe(false);
+      expect(Math.hypot(e.hole.x - e.solder.x, e.hole.y - e.solder.y)).toBeLessThanOrEqual(16);
+    }
+  });
+
+  it('i fori tolgono materiale alla piastra e il filo passa per il foro senza toccare gli altri', () => {
+    const holes = exits.map((e) => circlePoints(e.hole.x, e.hole.y, e.diameterMm / 2, 16));
+    const vol = (m: { layers: { z0: number; z1: number; regions: Parameters<typeof regionArea>[0][] }[] }) =>
+      m.layers.reduce((a, l) => a + (l.z1 - l.z0) * l.regions.reduce((b, r) => b + regionArea(r), 0), 0);
+    expect(vol(buildHolder(p, DEFAULT_HOLDER_SETTINGS, true)!) - vol(buildHolder(p, DEFAULT_HOLDER_SETTINGS, true, { throughHoles: holes })!)).toBeGreaterThan(0.5);
+    // cablaggio: le lamelle portano l'uscita
+    for (const e of exits) strips.find((x) => x.id === e.stripId)!.wireExit = e;
+    const h = buildHarness(p, strips, 0.1)!;
+    expect(h.wires).toHaveLength(5);
+    for (const w of h.wires) {
+      const ex = exits.find((e) => e.stripId === w.stripId)!;
+      expect(w.points[1]!.x).toBeCloseTo(ex.hole.x, 6); // dal punto di saldatura al foro…
+      expect(w.points[2]!.x).toBeCloseTo(ex.hole.x, 6); // …e attraverso la piastra
+      expect(Math.abs(w.points[2]!.y - w.points[1]!.y)).toBeGreaterThanOrEqual(ex.plateMm - 1e-6); // attraversa tutto lo spessore
+    }
+    const sample = (pts: { x: number; y: number; z: number }[]) => {
+      const out: { x: number; y: number; z: number }[] = [];
+      for (let k = 0; k + 1 < pts.length; k++) {
+        const a = pts[k]!;
+        const b = pts[k + 1]!;
+        const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / 0.1));
+        for (let t = 0; t <= steps; t++) out.push({ x: a.x + ((b.x - a.x) * t) / steps, y: a.y + ((b.y - a.y) * t) / steps, z: a.z + ((b.z - a.z) * t) / steps });
+      }
+      return out;
+    };
+    const paths = h.wires.map((w) => sample(w.points));
+    let closest = Infinity;
+    for (let i = 0; i < paths.length; i++) for (let j = i + 1; j < paths.length; j++) for (const a of paths[i]!) for (const b of paths[j]!) closest = Math.min(closest, Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z));
+    expect(closest).toBeGreaterThanOrEqual(0.9 - 1e-6);
   });
 });
 

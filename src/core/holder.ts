@@ -44,6 +44,8 @@ export interface HolderSettings {
   /** Tasca per il sensore NTC (solo se il BMS ha l'ingresso NTC) e diametro del sensore, mm. */
   ntc: boolean;
   ntcMm: number;
+  /** Senza linguette di bilanciamento: un piccolo foro nel portacelle accanto a ogni lamella, da cui esce il filo. */
+  wireHoles: boolean;
 }
 
 export const DEFAULT_HOLDER_SETTINGS: HolderSettings = {
@@ -60,6 +62,7 @@ export const DEFAULT_HOLDER_SETTINGS: HolderSettings = {
   bedYMm: 220,
   ntc: true,
   ntcMm: 5,
+  wireHoles: false,
 };
 
 /** Spessore minimo di parete tra due tasche per stamparla bene (due passate con ugello da 0,4). */

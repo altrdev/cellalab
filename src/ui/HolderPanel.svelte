@@ -6,7 +6,7 @@
   import UnitInput from './UnitInput.svelte';
   import { bmsOf } from '../core/bms';
   import { DEFAULT_HOLDER_SETTINGS } from '../core/holder';
-  import { ntcPlanOf } from './lamelle';
+  import { ntcPlanOf, wireExitsOf } from './lamelle';
   import { history } from '../state';
   import { clampHolder, holderOf } from './holder';
   import { ui } from './ui.svelte';
@@ -14,6 +14,7 @@
   const project = $derived($history.present);
   const ntcPlan = $derived(ntcPlanOf(project, ui.lamella, ui.holder));
   const ntcSite = $derived(ntcPlan.site);
+  const wireExits = $derived(wireExitsOf(project, ui.lamella, ui.holder));
   const built = $derived(holderOf(project, ui.holder));
   const model = $derived(built.model);
   const report = $derived(built.report);
@@ -147,6 +148,17 @@
   <Help label={t('hold.lockLabel')}>{noteLock}</Help>
 
   </section>
+
+  {#if bmsOf(project)}
+  <section class="sec">
+    <h3><Icon name="ruler" /> {t('hold.wireHolesSection')}</h3>
+    <label><span><input type="checkbox" bind:checked={ui.holder.wireHoles} onchange={() => { if (ui.holder.wireHoles) ui.lamella.tabs = false; }} /> {t('hold.wireHoles')}</span></label>
+    {#if ui.holder.wireHoles}
+      <p class="note">{t('hold.wireHolesNote', { n: wireExits.length })}</p>
+    {/if}
+    <Help label={t('hold.what')}>{t('hold.wireHolesHelp')}</Help>
+  </section>
+  {/if}
 
   {#if bmsOf(project)?.ntc}
   <section class="sec">

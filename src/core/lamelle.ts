@@ -101,10 +101,10 @@ export const DEFAULT_LAMELLA_SETTINGS: LamellaSettings = {
 };
 
 /** Parametri di forma delle lamelle ricavati dalle impostazioni. */
-export const stripOptionsOf = (s: LamellaSettings): StripOptions => ({
+export const stripOptionsOf = (s: LamellaSettings, wireHoles = false): StripOptions => ({
   contactDiameterMm: s.contactDiameterMm,
   widthMm: s.widthMm,
-  tabs: s.tabs ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), bendMm: s.tabBendMm, power: { widthMm: Math.max(s.tabWidthMm, holeForWireMm(s.powerAwg) + 4), holeMm: holeForWireMm(s.powerAwg) } } : null,
+  tabs: s.tabs || wireHoles ? { side: s.tabSide === 'auto' ? 'top' : s.tabSide, widthMm: s.tabWidthMm, lengthMm: s.tabLengthMm, holeMm: holeForWireMm(s.balanceAwg), style: s.tabs ? 'tab' : 'none', bendMm: s.tabBendMm, power: { widthMm: Math.max(s.tabWidthMm, holeForWireMm(s.powerAwg) + 4), holeMm: holeForWireMm(s.powerAwg) } } : null,
 });
 
 export type IssueSeverity = 'error' | 'warning' | 'info';

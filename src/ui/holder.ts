@@ -16,11 +16,13 @@ let last: { project: Project; key: string; model: HolderModel | null; report: Ho
 export interface HolderCuts {
   /** Scanalature per le linguette, per piastra: solo dove passano le lamelle di quella faccia. */
   notches: { top: Pt[][]; bottom: Pt[][] };
+  /** Fori per i fili di bilanciamento senza linguette: passano per fondo e pareti della piastra della faccia della lamella. */
+  wireHoles: { top: Pt[][]; bottom: Pt[][] };
   pockets: Pt[][];
   /** Fori che passano anche nel fondo (il filo dell'NTC). */
   through: Pt[][];
 }
-const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, pockets: [], through: [] };
+const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, wireHoles: { top: [], bottom: [] }, pockets: [], through: [] };
 let cutsSource: (project: Project, settings: HolderSettings) => HolderCuts = () => NO_CUTS;
 export function bindHolderCuts(get: (project: Project, settings: HolderSettings) => HolderCuts): void {
   cutsSource = get;
@@ -28,19 +30,20 @@ export function bindHolderCuts(get: (project: Project, settings: HolderSettings)
 
 export function holderOf(project: Project, settings: HolderSettings): { model: HolderModel | null; report: HolderReport | null; split: HolderSplit | null } {
   const cuts = cutsSource(project, settings);
-  const hasCuts = cuts.notches.top.length > 0 || cuts.notches.bottom.length > 0 || cuts.pockets.length > 0 || cuts.through.length > 0;
+  const hasCuts = cuts.notches.top.length > 0 || cuts.notches.bottom.length > 0 || cuts.wireHoles.top.length > 0 || cuts.wireHoles.bottom.length > 0 || cuts.pockets.length > 0 || cuts.through.length > 0;
   const key = renderKey() + JSON.stringify(settings) + (hasCuts ? JSON.stringify(cuts) : ''); // i messaggi del rapporto dipendono da lingua e unità
   if (last && last.project === project && last.key === key) return last;
-  const buildFor = (notches: Pt[][]) => ({ notches, extraPockets: cuts.pockets, throughHoles: cuts.through });
-  const same = JSON.stringify(cuts.notches.top) === JSON.stringify(cuts.notches.bottom);
-  const topModel = buildHolder(project, settings, true, buildFor(cuts.notches.top));
+  const buildFor = (face: 'top' | 'bottom') => ({ notches: cuts.notches[face], extraPockets: cuts.pockets, throughHoles: [...cuts.through, ...cuts.wireHoles[face]] });
+  const same = JSON.stringify([cuts.notches.top, cuts.wireHoles.top]) === JSON.stringify([cuts.notches.bottom, cuts.wireHoles.bottom]);
+  const topModel = buildHolder(project, settings, true, buildFor('top'));
   let model = topModel;
   if (!same && topModel) {
-    const bottomModel = buildHolder(project, settings, true, buildFor(cuts.notches.bottom));
+    const bottomModel = buildHolder(project, settings, true, buildFor('bottom'));
     if (bottomModel) model = { ...topModel, halves: { top: topModel, bottom: bottomModel } };
   }
-  // Le piastre a pezzi (troppo grandi per il piano) hanno ancora le scanalature di entrambe le facce.
-  const split = model ? splitHolder(project, settings, buildFor(same ? cuts.notches.top : [...cuts.notches.top, ...cuts.notches.bottom])) : null;
+  // Le piastre a pezzi (troppo grandi per il piano) hanno ancora scanalature e fori di entrambe le facce.
+  const both = { notches: [...cuts.notches.top, ...cuts.notches.bottom], extraPockets: cuts.pockets, throughHoles: [...cuts.through, ...cuts.wireHoles.top, ...cuts.wireHoles.bottom] };
+  const split = model ? splitHolder(project, settings, same ? buildFor('top') : both) : null;
   const report = model ? analyzeHolder(project, model, split) : null;
   last = { project, key, model, report, split };
   return last;
@@ -80,7 +83,7 @@ export const regionsPath = (regions: readonly Region[]) => regions.flatMap((r) =
 // ---- Impostazioni del portacelle: ricordate nel browser e scritte anche nel file del progetto
 
 const KEY = 'cellalab:holder:v2';
-type NumKey = Exclude<keyof HolderSettings, 'lockCells' | 'shape' | 'ntc'>;
+type NumKey = Exclude<keyof HolderSettings, 'lockCells' | 'shape' | 'ntc' | 'wireHoles'>;
 const LIMITS: Record<NumKey, [number, number]> = {
   wallMm: [0.8, 6],
   clearanceMm: [0, 1],
@@ -108,6 +111,7 @@ export function sanitizeHolderSettings(raw: unknown): HolderSettings {
   }
   if (typeof data.lockCells === 'boolean') base.lockCells = data.lockCells;
   if (typeof data.ntc === 'boolean') base.ntc = data.ntc;
+  if (typeof data.wireHoles === 'boolean') base.wireHoles = data.wireHoles;
   if (data.shape === 'profile' || data.shape === 'rounded') base.shape = data.shape;
   return base;
 }

@@ -68,6 +68,8 @@ export interface Strip {
   /** Indici dei gruppi collegati (1 per i terminali, 2 per le serie). */
   groups: number[];
   nodes: StripNode[];
+  /** Uscita del filo dal portacelle senza linguette (la mette l'interfaccia, che conosce il portacelle). */
+  wireExit?: import('./wireExit').WireExit;
   /** Linguetta di potenza (solo P+ e P−, se accesa): accanto a quella di bilanciamento, con il foro per il cavo. */
   powerTab?: StripTab;
   /** Contorno esterno, a area positiva, in mm del disegno (convesso se la forma è piena). */
@@ -111,6 +113,8 @@ export interface TabOptions {
   /** Lunghezza della parte piegata, oltre la linea di piega, mm. */
   lengthMm: number;
   holeMm: number;
+  /** 'tab' (default): linguetta di bilanciamento per ogni giunzione; 'none': niente (restano le linguette di potenza di P+ e P−). */
+  style?: 'tab' | 'none';
   /** Linguetta del cavo di potenza su P+ e P−; assente = niente. */
   power?: { widthMm: number; holeMm: number } | null;
   /** Margine della piega oltre il bordo del holder, mm. */
@@ -325,7 +329,7 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holderOpt: St
     const bNode = frontNode(s, o.side);
     const plans: Plan[] = [];
     const bW = Math.min(o.widthMm, 2 * bNode.reachMm);
-    plans.push({ kind: 'balance', side: o.side, node: bNode, w: bW, holeWant: o.holeMm, lengthMm: Math.max(o.lengthMm, 1), rect: [] });
+    if (o.style !== 'none') plans.push({ kind: 'balance', side: o.side, node: bNode, w: bW, holeWant: o.holeMm, lengthMm: Math.max(o.lengthMm, 1), rect: [] });
     if (o.power && s.kind !== 'series') {
       const pw = o.power;
       const lengthMm = Math.max(o.lengthMm, pw.holeMm + 4);

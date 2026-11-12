@@ -7,6 +7,9 @@ import { COOLING, spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
 import { buildStrips, type Face, type Strip, type TabSide } from '../core/strips';
 import { buildHolder } from '../core/holder';
+import { findWireExits, type WireExit } from '../core/wireExit';
+import { circlePoints } from '../core/polygon';
+import { holeForWireMm } from '../core/wire';
 import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
 import { holderOf, type HolderCuts } from './holder';
 import { bmsOf } from '../core/bms';
@@ -38,6 +41,11 @@ export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
   // Le due piastre possono avere scanalature diverse: ogni lamella si piega oltre il bordo della sua.
   const holderOutline = model ? { top: outlineOf(model.halves?.top ?? model)!, bottom: outlineOf(model.halves?.bottom ?? model)! } : null;
   const strips = buildStrips(project, { ...opts, holderOutline });
+  // Senza linguette di bilanciamento il filo esce da un foro del portacelle accanto alla lamella.
+  if (hs) for (const e of wireExitsOf(project, settings, hs)) {
+    const st = strips.find((x) => x.id === e.stripId);
+    if (st) st.wireExit = e;
+  }
   stripCache.set(project, { key, strips });
   return strips;
 }
@@ -47,7 +55,24 @@ interface NtcPlan {
   site: NtcSite | null;
 }
 const ntcCache = new WeakMap<Project, { key: string; plan: NtcPlan }>();
-const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, pockets: [], through: [] };
+const NO_CUTS: HolderCuts = { notches: { top: [], bottom: [] }, wireHoles: { top: [], bottom: [] }, pockets: [], through: [] };
+
+const exitCache = new WeakMap<Project, { key: string; exits: WireExit[] }>();
+/**
+ * Uscite dei fili dal portacelle (solo con i fori al posto delle linguette di bilanciamento): per ogni giunzione il
+ * punto di saldatura sulla lamella e il foro accanto. Vuote se l'opzione è spenta o ci sono le linguette.
+ */
+export function wireExitsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): WireExit[] {
+  if (!holder.wireHoles || settings.tabs || !bmsOf(project)) return [];
+  const key = JSON.stringify([settings, holder]);
+  const hit = exitCache.get(project);
+  if (hit && hit.key === key) return hit.exits;
+  const plain = buildHolder(project, holder, false);
+  const opts = optionsOf(project, settings);
+  const exits = plain && opts.tabs ? findWireExits(project, buildStrips(project, opts), plain.wall, opts.tabs.side, holeForWireMm(settings.balanceAwg), plain.totalMm, plain.floorMm) : [];
+  exitCache.set(project, { key, exits });
+  return exits;
+}
 
 /**
  * Il posto dell'NTC (se c'è un BMS con NTC, la tasca è accesa e c'è un vuoto tra tre celle). Preferisce i vuoti dove il
@@ -74,13 +99,16 @@ export function ntcPlanOf(project: Project, settings: LamellaSettings, holder: H
 export function holderCutsOf(project: Project, settings: LamellaSettings, holder: HolderSettings): HolderCuts {
   if (project.bmsId === undefined) return NO_CUTS;
   const opts = optionsOf(project, settings);
-  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg, holder.ntc, holder.ntcMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm]);
+  const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg, holder.ntc, holder.ntcMm, holder.shape, holder.filletMm, holder.ledgeMm, holder.lockCells, holder.floorMm, holder.wireHoles, settings.tabs, settings.tabSide]);
   const hit = cutsCache.get(project);
   if (hit && hit.key === key) return hit.cuts;
   const all = opts.tabs ? tabNotches(buildStrips(project, opts), holder, settings) : [];
   const notches = { top: all.filter((n) => n.face === 'top').map((n) => n.polygon), bottom: all.filter((n) => n.face === 'bottom').map((n) => n.polygon) };
   const { site } = ntcPlanOf(project, settings, holder);
-  const cuts = { notches, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
+  const exits = wireExitsOf(project, settings, holder);
+  const holeOf = (e: WireExit) => circlePoints(e.hole.x, e.hole.y, e.diameterMm / 2, 16);
+  const wireHoles = { top: exits.filter((e) => e.face === 'top').map(holeOf), bottom: exits.filter((e) => e.face === 'bottom').map(holeOf) };
+  const cuts = { notches, wireHoles, pockets: site ? [site.polygon] : [], through: site ? [site.wirePolygon] : [] };
   cutsCache.set(project, { key, cuts });
   return cuts;
 }
@@ -94,7 +122,7 @@ const blocksCache = new WeakMap<Project, { key: string; blocks: Record<TabSide, 
  */
 function tabBlocks(project: Project, settings: LamellaSettings): Record<TabSide, number> {
   const none: Record<TabSide, number> = { top: 0, bottom: 0, left: 0, right: 0 };
-  const opts = stripOptionsOf(settings);
+  const opts = stripOptionsOf(settings, holderSettings().wireHoles);
   if (!opts.tabs || project.bmsId === undefined) return none;
   const hs = holderSettings();
   const key = JSON.stringify([opts, hs]);
@@ -125,7 +153,7 @@ export function tabSideOf(project: Project, settings: LamellaSettings): TabSide 
 
 /** Opzioni di forma delle lamelle con il lato delle linguette già risolto. */
 function optionsOf(project: Project, settings: LamellaSettings): StripOptions {
-  const o = stripOptionsOf(settings);
+  const o = stripOptionsOf(settings, holderSettings().wireHoles);
   return o.tabs ? { ...o, tabs: { ...o.tabs, side: tabSideOf(project, settings) } } : o;
 }
 

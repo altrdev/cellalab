@@ -88,10 +88,10 @@ export const bmsMountOf = (project: Project): BmsMount => ({ ...DEFAULT_BMS_MOUN
  */
 export function buildHarness(project: Project, strips: readonly Strip[], thicknessMm: number): Harness | null {
   const bms = bmsOf(project) ?? (project.bmsId ? findBmsType(project, project.bmsId) : undefined);
-  const withTab = strips.filter((s) => s.tab);
+  const withTab = strips.filter((s) => s.tab || s.wireExit); // con linguetta, oppure con il foro nel portacelle
   if (!bms || withTab.length === 0 || project.cells.length === 0) return null;
   const mount = bmsMountOf(project);
-  const side = withTab[0]!.tab!.side;
+  const side = withTab[0]!.tab?.side ?? withTab[0]!.wireExit!.side;
   const d = DIR[side];
   const perp = { x: -d.y, y: d.x };
 
@@ -141,7 +141,8 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   // Corsia di ogni filo tra quelli della stessa faccia: il più lontano dal BMS sta sulla corsia più vicina alla scatola
   // (la più bassa per la faccia sopra), quello della linguetta più vicina sulla più alta. Così le discese dalle linguette
   // non incrociano le corsie degli altri e il nastro si apre come nelle foto dei pacchi veri.
-  const holeP = (x: Strip) => x.tab!.holeX * perp.x + x.tab!.holeY * perp.y;
+  const startPt = (x: Strip): Pt => (x.tab ? { x: x.tab.holeX, y: x.tab.holeY } : x.wireExit!.hole);
+  const holeP = (x: Strip) => startPt(x).x * perp.x + startPt(x).y * perp.y;
   const faceRank = new Map<string, number>();
   for (const face of ['top', 'bottom'] as const) {
     withTab
@@ -150,23 +151,41 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
       .forEach((x, i) => faceRank.set(x.id, i));
   }
   // Profondità: corsie vicino alle celle, discese dalle linguette più in fuori, salita al connettore ancora più fuori.
-  const bendAt = (s: Strip) => ((s.tab!.bend[0].x + s.tab!.bend[1].x) / 2) * d.x + ((s.tab!.bend[0].y + s.tab!.bend[1].y) / 2) * d.y;
+  const bendAt = (s: Strip) =>
+    s.tab ? ((s.tab.bend[0].x + s.tab.bend[1].x) / 2) * d.x + ((s.tab.bend[0].y + s.tab.bend[1].y) / 2) * d.y : s.wireExit!.hole.x * d.x + s.wireExit!.hole.y * d.y + 0.5;
   const aDown = Math.max(aIn + DEPTH_SEP_MM, ...withTab.map(bendAt));
   const aUp = aDown + DEPTH_SEP_MM;
   const wires: HarnessWire[] = withTab
     .map((s): HarnessWire => {
-      const tab = s.tab!;
       const node = last - s.joint;
-      const bend = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
-      const u = (tab.holeX - bend.x) * d.x + (tab.holeY - bend.y) * d.y; // dal piegamento al foro, lungo la linguetta
-      const aBend = bend.x * d.x + bend.y * d.y;
-      const pHole = tab.holeX * perp.x + tab.holeY * perp.y;
-      const yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
       const pPin = pConn + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
-      const aOut = Math.max(aBend, aDown); // le discese stanno più in fuori delle corsie
-      const p0 = to3(aBend, pHole, yHole);
       const len = (x: Pt3, y: Pt3) => Math.hypot(x.x - y.x, x.y - y.y, x.z - y.z);
-      const points: Pt3[] = [p0];
+      const points: Pt3[] = [];
+      let pHole: number;
+      let yHole: number;
+      let aOut: number;
+      if (s.tab) {
+        const tab = s.tab;
+        const bend = { x: (tab.bend[0].x + tab.bend[1].x) / 2, y: (tab.bend[0].y + tab.bend[1].y) / 2 };
+        const u = (tab.holeX - bend.x) * d.x + (tab.holeY - bend.y) * d.y; // dal piegamento al foro, lungo la linguetta
+        const aBend = bend.x * d.x + bend.y * d.y;
+        pHole = tab.holeX * perp.x + tab.holeY * perp.y;
+        yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
+        aOut = Math.max(aBend, aDown); // le discese stanno più in fuori delle corsie
+        points.push(to3(aBend, pHole, yHole));
+      } else {
+        // Senza linguetta: il filo parte dal punto di saldatura sulla lamella, va al foro del portacelle, lo attraversa
+        // (fondo e pareti) ed esce dal bordo interno della piastra, da dove scende lungo il fianco.
+        const ex = s.wireExit!;
+        const top = s.face === 'top';
+        const ySurf = top ? sheetTop + 0.3 : sheetBottom - 0.3;
+        const yInner = top ? height + ex.floorMm - ex.plateMm : -ex.floorMm + ex.plateMm;
+        const aH = ex.hole.x * d.x + ex.hole.y * d.y;
+        pHole = ex.hole.x * perp.x + ex.hole.y * perp.y;
+        yHole = yInner;
+        aOut = Math.max(aH, aDown);
+        points.push(to3(ex.solder.x * d.x + ex.solder.y * d.y, ex.solder.x * perp.x + ex.solder.y * perp.y, ySurf), to3(aH, pHole, ySurf), to3(aH, pHole, yInner));
+      }
       // Ogni filo ha la sua corsia (quota) e non ne tocca nessun altro: scende (o sale) lungo il bordo del pacco, entra
       // sotto (verso il pacco) dove deve incrociare, corre sulla sua corsia e arriva al pad o al connettore. Le discese
       // dalle linguette e quelle sui pad stanno a profondità diverse dalle corsie, quindi quando si incrociano un filo
