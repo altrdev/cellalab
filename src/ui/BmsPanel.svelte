@@ -87,6 +87,15 @@
       <option value="external">{t('bms.mountExternal')}</option>
     </select>
   </label>
+  {#if mount.mode === 'pack' && bms.sizeMm}
+    <label>{t('bms.connector')}
+      <select value={mount.connector} onchange={(e) => history.commit((p) => setBmsMount(p, { connector: e.currentTarget.value === 'start' ? 'start' : e.currentTarget.value === 'end' ? 'end' : 'back' }))}>
+        <option value="back">{t('bms.connBack')}</option>
+        <option value="start">{t('bms.connStart')}</option>
+        <option value="end">{t('bms.connEnd')}</option>
+      </select>
+    </label>
+  {/if}
   <label>
     <span class="top"><span>{t('bms.along')}</span><b>{Math.round(mount.along * 100)}%</b></span>
     <input

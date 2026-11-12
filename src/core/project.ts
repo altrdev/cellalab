@@ -177,6 +177,7 @@ export function parseProject(json: string): Project {
     project.bmsMount = {
       mode: m.mode === 'external' ? 'external' : 'pack',
       along: num(m.along, 0, 1, DEFAULT_BMS_MOUNT.along),
+      connector: m.connector === 'start' || m.connector === 'end' ? m.connector : 'back',
       slackMm: num(m.slackMm, 0, 200, DEFAULT_BMS_MOUNT.slackMm),
       tailMm: num(m.tailMm, 0, 2000, DEFAULT_BMS_MOUNT.tailMm),
     };

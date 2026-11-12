@@ -360,6 +360,28 @@ describe('cablaggio del BMS', () => {
     for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeCloseTo(2.5, 6);
   });
 
+  it('il connettore su una testata sta oltre la scatola e i fili non la attraversano', () => {
+    const box = h.box!;
+    const alongX = box.size.x > box.size.z; // il lato di uscita è orizzontale (top/bottom)
+    const half = (alongX ? box.size.x : box.size.z) / 2;
+    const c = (v: { x: number; z: number }) => (alongX ? v.x : v.z);
+    for (const place of ['start', 'end'] as const) {
+      const e = buildHarness(setBmsMount(p, { connector: place }), strips, 0.1)!;
+      const off = Math.abs(c(e.connector) - c(box.center));
+      expect(off).toBeGreaterThan(half);
+      expect(Math.sign(c(e.connector) - c(box.center))).not.toBe(0);
+      for (const w of e.wires) {
+        const a = alongX ? w.points[2].z : w.points[2].x;
+        const faceA = alongX ? h.connector.z : h.connector.x;
+        expect(a).toBeCloseTo(faceA, 6); // stessa quota del retro della scatola
+      }
+    }
+    const s = buildHarness(setBmsMount(p, { connector: 'start' }), strips, 0.1)!;
+    const e2 = buildHarness(setBmsMount(p, { connector: 'end' }), strips, 0.1)!;
+    expect(c(s.connector)).toBeLessThan(c(box.center));
+    expect(c(e2.connector)).toBeGreaterThan(c(box.center));
+  });
+
   it('la posizione lungo il lato sposta il connettore; esterno aggiunge la coda e toglie la scatola', () => {
     const left = buildHarness(setBmsMount(p, { along: 0 }), strips, 0.1)!;
     const right = buildHarness(setBmsMount(p, { along: 1 }), strips, 0.1)!;

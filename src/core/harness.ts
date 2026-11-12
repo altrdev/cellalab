@@ -56,6 +56,8 @@ export interface Harness {
 export const CONNECTOR_PITCH_MM = 2.5;
 /** Distanza tra il fianco delle celle e il fascio, mm. */
 const WIRE_CLEARANCE_MM = 1.5;
+/** Distanza tra la testata del BMS e il connettore di bilanciamento quando sta oltre la testata, mm. */
+const CONNECTOR_END_GAP_MM = 3;
 
 const DIR: Record<TabSide, Pt> = { top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
@@ -107,6 +109,10 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
   const box = mount.mode === 'pack' && size !== undefined;
   const aConn = aWire; // il connettore sta sulla faccia del BMS verso il pacco
   const pc = pMin + mount.along * (pMax - pMin);
+  // Il connettore può stare oltre una testata della scatola, alla stessa distanza dal pacco: i fili non entrano mai nella scatola.
+  const pins = withTab.length * CONNECTOR_PITCH_MM;
+  const place = box && size && mount.connector !== 'back' ? mount.connector : 'back';
+  const pConn = place === 'back' || !size ? pc : pc + (place === 'end' ? 1 : -1) * (size.lengthMm / 2 + pins / 2 + CONNECTOR_END_GAP_MM);
 
   const to3 = (a: number, p: number, y: number): Pt3 => ({ x: d.x * a + perp.x * p, y, z: d.y * a + perp.y * p });
 
@@ -124,7 +130,7 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
       const aBend = bend.x * d.x + bend.y * d.y;
       const pHole = bh.x * perp.x + bh.y * perp.y;
       const yHole = s.face === 'top' ? sheetTop - u : sheetBottom + u;
-      const pPin = pc + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
+      const pPin = pConn + (node - (n - 1) / 2) * CONNECTOR_PITCH_MM;
       const p0 = to3(aBend, pHole, yHole);
       const p1 = to3(aBend, pHole, yMid);
       const p2 = to3(aConn, pPin, yMid);
@@ -143,7 +149,7 @@ export function buildHarness(project: Project, strips: readonly Strip[], thickne
     })
     .sort((a, b) => a.node - b.node);
 
-  const connector = to3(aConn, pc, yMid);
+  const connector = to3(aConn, pConn, yMid);
   let boxOut: BmsBox | null = null;
   if (box && size) {
     // Lunghezza lungo il lato, larghezza in altezza, spessore verso l'esterno; la faccia verso il pacco è quella del connettore.

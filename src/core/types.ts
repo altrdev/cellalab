@@ -34,17 +34,21 @@ export interface BmsSize {
 }
 
 /** Dove sta il BMS rispetto al pacco: sul fianco dal lato delle linguette (a metà altezza) o fuori, solo come punto di uscita dei fili. */
+export type BmsConnectorPlace = 'back' | 'start' | 'end';
+
 export interface BmsMount {
   mode: 'pack' | 'external';
   /** Posizione lungo il lato di uscita: 0 = un'estremità, 1 = l'altra. */
   along: number;
+  /** Dove sta il connettore di bilanciamento sul BMS: sulla faccia verso il pacco, o oltre una testata (0 = inizio del lato, 1 = fine). Solo con il BMS sul pacco e l'ingombro noto. */
+  connector: BmsConnectorPlace;
   /** Scorta su ogni filo (saldatura e crimpatura del connettore), mm. */
   slackMm: number;
   /** Solo esterno: lunghezza di filo oltre il punto di uscita, mm. */
   tailMm: number;
 }
 
-export const DEFAULT_BMS_MOUNT: BmsMount = { mode: 'pack', along: 0.5, slackMm: 20, tailMm: 100 };
+export const DEFAULT_BMS_MOUNT: BmsMount = { mode: 'pack', along: 0.5, connector: 'back', slackMm: 20, tailMm: 100 };
 
 /** BMS: quante celle in serie regge, quanta corrente continua e con quale chimica. */
 export interface BmsType {
