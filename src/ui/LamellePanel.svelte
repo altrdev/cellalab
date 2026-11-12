@@ -12,11 +12,14 @@
   import { MIN_PRINT_WALL_MM } from '../core/holder';
   import { BALANCE_AWGS, POWER_AWGS } from '../core/wire';
   import { history } from '../state';
-  import { reportOf } from './lamelle';
+  import { freeTabSides, reportOf, tabSideOf } from './lamelle';
   import { ui } from './ui.svelte';
 
   const project = $derived($history.present);
   const report = $derived(reportOf(project, ui.lamella));
+  const sides = $derived(freeTabSides(project, ui.lamella));
+  const sideName = { top: t('lam.tabSide.top'), bottom: t('lam.tabSide.bottom'), left: t('lam.tabSide.left'), right: t('lam.tabSide.right') } as const;
+  const tabSide = $derived(tabSideOf(project, ui.lamella));
   const material = $derived(report.material);
   const weldLabel = { good: t('lam.weld.good'), fair: t('lam.weld.fair'), poor: t('lam.weld.poor') } as const;
   const fmt = (n: number | null, d = 2) => (n === null ? '—' : fmtNum(n, d));
@@ -125,11 +128,13 @@
     <label><span><input type="checkbox" bind:checked={ui.lamella.tabs} /> {t('lam.tabs')}</span></label>
     {#if ui.lamella.tabs}
       <label>{t('lam.tabSide')}
-        <select bind:value={ui.lamella.tabSide}>
-          <option value="top">{t('lam.tabSide.top')}</option>
-          <option value="bottom">{t('lam.tabSide.bottom')}</option>
-          <option value="left">{t('lam.tabSide.left')}</option>
-          <option value="right">{t('lam.tabSide.right')}</option>
+        <select value={ui.lamella.tabSide} onchange={(e) => (ui.lamella.tabSide = e.currentTarget.value as typeof ui.lamella.tabSide)}>
+          <option value="auto">{t('lam.tabSide.auto', { side: sideName[tabSide] })}</option>
+          {#each ['top', 'bottom', 'left', 'right'] as const as side (side)}
+            {#if sides[side] || ui.lamella.tabSide === side}
+              <option value={side}>{sideName[side]}{sides[side] ? '' : ` ${t('lam.tabSide.blocked')}`}</option>
+            {/if}
+          {/each}
         </select>
       </label>
       <div class="row">

@@ -421,6 +421,8 @@ export const it = {
   'lam.tabSide.bottom': 'Basso del disegno',
   'lam.tabSide.left': 'Sinistra del disegno',
   'lam.tabSide.right': 'Destra del disegno',
+  'lam.tabSide.auto': 'Automatico ({side})',
+  'lam.tabSide.blocked': '(passerebbe sopra altre celle)',
   'lam.tabWidth': 'Larghezza linguetta (mm)',
   'lam.tabLength': 'Lunghezza dopo la piega (mm)',
   'lam.balanceAwg': 'Filo bilanciamento',

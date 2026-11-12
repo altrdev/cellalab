@@ -423,6 +423,8 @@ export const en: Record<keyof typeof it, string> = {
   'lam.tabSide.bottom': 'Bottom of the drawing',
   'lam.tabSide.left': 'Left of the drawing',
   'lam.tabSide.right': 'Right of the drawing',
+  'lam.tabSide.auto': 'Automatic ({side})',
+  'lam.tabSide.blocked': '(would run over other cells)',
   'lam.tabWidth': 'Tab width (mm)',
   'lam.tabLength': 'Length after the bend (mm)',
   'lam.balanceAwg': 'Balance wire',

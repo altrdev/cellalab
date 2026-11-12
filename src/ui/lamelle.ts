@@ -1,10 +1,12 @@
 import { renderKey } from '../i18n';
+import type { StripOptions } from '../core/strips';
 import { analyzeLamelle, DEFAULT_LAMELLA_SETTINGS, stripOptionsOf, type LamellaReport, type LamellaSettings } from '../core/lamelle';
 import type { Pt } from '../core/polygon';
 import { AWG_TABLE } from '../core/wire';
 import { COOLING, spotPositions } from '../core/sizing';
 import { computeStats } from '../core/stats';
-import { buildStrips, type Strip } from '../core/strips';
+import { buildStrips, type Strip, type TabSide } from '../core/strips';
+import { buildHolder } from '../core/holder';
 import { DEFAULT_HOLDER_SETTINGS, type HolderSettings } from '../core/holder';
 import { holderOf } from './holder';
 import { tabNotches } from '../core/tabNotches';
@@ -22,7 +24,7 @@ export function bindHolderSettings(get: () => HolderSettings): void {
 }
 
 export function stripsOf(project: Project, settings: LamellaSettings): Strip[] {
-  const opts = stripOptionsOf(settings);
+  const opts = optionsOf(project, settings);
   const hs = opts.tabs && project.bmsId !== undefined ? holderSettings() : null;
   const key = JSON.stringify(opts) + (hs ? JSON.stringify(hs) : '');
   const hit = stripCache.get(project);
@@ -42,7 +44,7 @@ const notchCache = new WeakMap<Project, { key: string; polygons: Pt[][] }>();
  * holder, perché la posizione delle linguette non dipende da lui. Le usa `holderOf`.
  */
 export function notchesOf(project: Project, settings: LamellaSettings, holder: HolderSettings): Pt[][] {
-  const opts = stripOptionsOf(settings);
+  const opts = optionsOf(project, settings);
   if (!opts.tabs || project.bmsId === undefined) return [];
   const key = JSON.stringify([opts, holder.wallMm, holder.clearanceMm, settings.balanceAwg, settings.powerAwg]);
   const hit = notchCache.get(project);
@@ -50,6 +52,50 @@ export function notchesOf(project: Project, settings: LamellaSettings, holder: H
   const polygons = tabNotches(buildStrips(project, opts), holder, settings).map((n) => n.polygon);
   notchCache.set(project, { key, polygons });
   return polygons;
+}
+
+const TAB_SIDES: readonly TabSide[] = ['top', 'bottom', 'left', 'right'];
+const blocksCache = new WeakMap<Project, { key: string; blocks: Record<TabSide, number> }>();
+
+/**
+ * Per ogni lato, quante linguette passerebbero sopra altre celle o lamelle (con il holder attuale, senza scanalature).
+ * Serve al menu per non proporre i lati impossibili e alla scelta automatica.
+ */
+function tabBlocks(project: Project, settings: LamellaSettings): Record<TabSide, number> {
+  const none: Record<TabSide, number> = { top: 0, bottom: 0, left: 0, right: 0 };
+  const opts = stripOptionsOf(settings);
+  if (!opts.tabs || project.bmsId === undefined) return none;
+  const hs = holderSettings();
+  const key = JSON.stringify([opts, hs]);
+  const hit = blocksCache.get(project);
+  if (hit && hit.key === key) return hit.blocks;
+  const model = buildHolder(project, hs, false);
+  const holderOutline = model ? model.wall.map((r) => ({ outline: r.outline, holes: [] })) : null;
+  const blocks = { ...none };
+  for (const side of TAB_SIDES) {
+    blocks[side] = buildStrips(project, { ...opts, tabs: { ...opts.tabs, side }, holderOutline }).filter((s) => s.tab?.blockedBy).length;
+  }
+  blocksCache.set(project, { key, blocks });
+  return blocks;
+}
+
+/** Lati da cui tutte le linguette escono liberamente. */
+export function freeTabSides(project: Project, settings: LamellaSettings): Record<TabSide, boolean> {
+  const b = tabBlocks(project, settings);
+  return { top: b.top === 0, bottom: b.bottom === 0, left: b.left === 0, right: b.right === 0 };
+}
+
+/** Il lato usato: quello scelto, o in automatico il primo libero (alto, basso, sinistra, destra), altrimenti il meno intralciato. */
+export function tabSideOf(project: Project, settings: LamellaSettings): TabSide {
+  if (settings.tabSide !== 'auto') return settings.tabSide;
+  const b = tabBlocks(project, settings);
+  return TAB_SIDES.reduce((best, s) => (b[s] < b[best] ? s : best), TAB_SIDES[0]!);
+}
+
+/** Opzioni di forma delle lamelle con il lato delle linguette già risolto. */
+function optionsOf(project: Project, settings: LamellaSettings): StripOptions {
+  const o = stripOptionsOf(settings);
+  return o.tabs ? { ...o, tabs: { ...o.tabs, side: tabSideOf(project, settings) } } : o;
 }
 
 let last: { project: Project; key: string; report: LamellaReport } | null = null;
@@ -96,7 +142,7 @@ export function sanitizeLamellaSettings(raw: unknown): LamellaSettings {
       out[k] = v === null ? null : typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
     } else if (typeof v === typeof def && (typeof v !== 'number' || Number.isFinite(v))) out[k] = v;
   }
-  if (!['top', 'bottom', 'left', 'right'].includes(base.tabSide)) base.tabSide = DEFAULT_LAMELLA_SETTINGS.tabSide;
+  if (!['auto', 'top', 'bottom', 'left', 'right'].includes(base.tabSide)) base.tabSide = DEFAULT_LAMELLA_SETTINGS.tabSide;
   for (const k of ['tabWidthMm', 'tabLengthMm', 'tabHoleMm', 'tabBendMm'] as const) {
     if (!(base[k] > 0)) base[k] = DEFAULT_LAMELLA_SETTINGS[k];
   }
