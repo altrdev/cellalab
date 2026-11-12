@@ -292,6 +292,7 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
   }
   const chosen = new Set(byJoint.values());
   const dot = (n: { x: number; y: number }, v: Pt) => n.x * v.x + n.y * v.y;
+  const centre = { x: project.cells.reduce((a, c) => a + c.x, 0) / Math.max(1, project.cells.length), y: project.cells.reduce((a, c) => a + c.y, 0) / Math.max(1, project.cells.length) };
   const cellDisc = project.cells.map((c) => ({ id: c.id, x: c.x, y: c.y, r: (findCellType(project, c.typeId)?.diameterMm ?? 0) / 2 }));
 
   interface Spec {
@@ -351,6 +352,13 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
     return made;
   };
 
+  /** Una linguetta che passa sopra celle di altre giunzioni o lamelle della stessa faccia non può stare lì. */
+  const blocked = (rect: Pt[], s: Strip): boolean => {
+    const own = new Set(s.nodes.map((n) => n.cellId));
+    if (cellDisc.some((c) => !own.has(c.id) && distToRect(c, rect) < c.r - 0.01)) return true;
+    return strips.some((o2) => o2 !== s && o2.face === s.face && intersectRegions({ outline: o2.outline, holes: o2.holes }, [rect]).some((h) => regionArea(h) > 0.01));
+  };
+
   for (const s of strips) {
     if (!chosen.has(s)) continue;
     const extreme = (dir: Pt) =>
@@ -371,13 +379,24 @@ function addTabs(project: Project, strips: Strip[], o: TabOptions, holder: reado
       made = makeTabs(node, d, [{ lateral: 0, width: Math.min(o.widthMm, reachSpan), holeWant: balHole, length: Math.max(o.lengthMm, 1), power: false, carriesBalance: true }]);
     } else {
       // Terminali: il filo di bilanciamento sta con gli altri dal lato scelto (linguetta piccola); il cavo di potenza esce
-      // dal lato opposto (linguetta larga), dall'altro capo della lamella.
-      const opposite = { x: -d.x, y: -d.y };
-      const nodeP = extreme(opposite);
-      const powSpec: Spec = { lateral: 0, width: Math.min(Math.max(o.widthMm, o.powerHoleMm + 4), 2 * nodeP.reachMm), holeWant: o.powerHoleMm, length: Math.max(o.lengthMm, o.powerHoleMm + 3), power: true, carriesBalance: false };
-      const pw = makeTabs(nodeP, opposite, [powSpec]);
+      // di lato (linguetta larga), dal bordo laterale più vicino, dalla cella più lontana da quella del bilanciamento.
+      // Se di lato è intralciato, dal lato opposto a quello scelto.
       const bal = makeTabs(node, d, [balSpec]);
-      made = { tabs: [...pw.tabs, ...bal.tabs], rects: [...pw.rects, ...bal.rects], holes: [...pw.holes, ...bal.holes] };
+      const away = dot(node, perp) >= dot(centre, perp) ? perp : { x: -perp.x, y: -perp.y };
+      const candidates = [away, { x: -away.x, y: -away.y }, { x: -d.x, y: -d.y }];
+      let pw: Made | null = null;
+      for (const dir of candidates) {
+        const top = s.nodes.reduce((m, n) => Math.max(m, dot(n, dir) + n.reachMm), -Infinity);
+        // tra le celle più avanti verso quel lato, la più lontana da quella del bilanciamento
+        const nodeP = s.nodes
+          .filter((n) => dot(n, dir) + n.reachMm >= top - 1e-6)
+          .reduce((best, n) => (Math.hypot(n.x - node.x, n.y - node.y) > Math.hypot(best.x - node.x, best.y - node.y) ? n : best));
+        const powSpec: Spec = { lateral: 0, width: Math.min(Math.max(o.widthMm, o.powerHoleMm + 4), 2 * nodeP.reachMm), holeWant: o.powerHoleMm, length: Math.max(o.lengthMm, o.powerHoleMm + 3), power: true, carriesBalance: false };
+        const m = makeTabs(nodeP, dir, [powSpec]);
+        pw = m;
+        if (!blocked(m.rects[0]!, s)) break;
+      }
+      made = { tabs: [...pw!.tabs, ...bal.tabs], rects: [...pw!.rects, ...bal.rects], holes: [...pw!.holes, ...bal.holes] };
     }
     const region: Region = unionPolygons([s.outline, ...made.rects]);
     s.outline = region.outline;

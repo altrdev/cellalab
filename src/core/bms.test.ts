@@ -157,10 +157,13 @@ describe('linea di piega della linguetta', () => {
     for (const s of strips.filter((x) => x.tab)) {
       for (const tab of tabsOf(s)) {
         const [a, b] = tab.bend;
-        expect(a.y).toBeCloseTo(b.y, 6);
-        const out = tab.side === 'top' ? -1 : 1; // verso dove sporge la linguetta (y verso il basso)
-        expect((tab.holeY - a.y) * out).toBeGreaterThan(0); // il foro sta oltre la piega, in fuori
-        expect(Math.abs(a.x - b.x)).toBeCloseTo(tab.widthMm, 6);
+        const horizontal = tab.side === 'top' || tab.side === 'bottom'; // la piega è una retta orizzontale o verticale
+        if (horizontal) expect(a.y).toBeCloseTo(b.y, 6);
+        else expect(a.x).toBeCloseTo(b.x, 6);
+        const out = tab.side === 'top' || tab.side === 'left' ? -1 : 1; // verso dove sporge (y e x verso il basso e destra)
+        const beyond = horizontal ? (tab.holeY - a.y) * out : (tab.holeX - a.x) * out;
+        expect(beyond).toBeGreaterThan(0); // il foro sta oltre la piega, in fuori
+        expect(horizontal ? Math.abs(a.x - b.x) : Math.abs(a.y - b.y)).toBeCloseTo(tab.widthMm, 6);
         if (!tab.power) expect(tab.widthMm).toBeGreaterThanOrEqual(3 - 1e-6);
         else expect(tab.widthMm).toBeGreaterThanOrEqual(2.85 + 2.4 - 1e-6);
       }
@@ -463,14 +466,16 @@ describe('linguette dei terminali: potenza e bilanciamento separate', () => {
     }
   });
 
-  it('il bilanciamento esce dal lato scelto con gli altri, la potenza dal lato opposto', () => {
-    for (const s of terminals) {
-      expect(s.balanceTab!.side).toBe('top');
-      expect(s.tab!.side).toBe('bottom');
-    }
+  it('il bilanciamento esce dal lato scelto con gli altri, la potenza di lato', () => {
+    for (const s of terminals) expect(s.balanceTab!.side).toBe('top');
     for (const s of series) expect(s.tab!.side).toBe('top');
-    // la potenza parte dall'altro capo della lamella: la sua cella sta dalla parte opposta
-    for (const s of terminals) expect(s.tab!.anchor.y).toBeGreaterThan(s.balanceTab!.anchor.y);
+    const plus = terminals.find((s) => s.kind === 'terminal-plus')!;
+    const minus = terminals.find((s) => s.kind === 'terminal-minus')!;
+    // P+ è la colonna a sinistra, P− quella a destra: la potenza esce dal bordo laterale più vicino
+    expect(plus.tab!.side).toBe('left');
+    expect(minus.tab!.side).toBe('right');
+    // la potenza non parte dalla cella del bilanciamento
+    for (const s of terminals) expect(Math.hypot(s.tab!.anchor.x - s.balanceTab!.anchor.x, s.tab!.anchor.y - s.balanceTab!.anchor.y)).toBeGreaterThan(5);
   });
 
   it('nessuna linguetta è intralciata', () => {
@@ -511,13 +516,13 @@ describe('cavi di potenza', () => {
     expect(buildHarness(p, strips, 0.1, { balanceAwg: 26, powerAwg: 8 })!.cables[0]!.odMm).toBeCloseTo(6, 6);
   });
 
-  it('i cavi partono dal lato opposto e arrivano al lato di uscita, uno per ciascuna estremità', () => {
+  it('i cavi partono dal bordo laterale e arrivano al lato di uscita, uno per ciascuna estremità', () => {
     const [low, high] = [...h.cables].sort((a, b) => a.points[a.points.length - 1]!.x - b.points[b.points.length - 1]!.x);
     for (const c of h.cables) {
       const first = c.points[0]!;
       const end = c.points[c.points.length - 1]!;
       // il lato di uscita è l'alto del disegno (z minore): il cavo parte in basso (z maggiore) e arriva in alto
-      expect(first.z).toBeGreaterThan(end.z + 40);
+      expect(first.z).toBeGreaterThan(end.z + 15);
       expect(c.points[1]!.y).toBeCloseTo(35.2, 6);
     }
     expect(low!.points[low!.points.length - 1]!.x).toBeLessThan(high!.points[high!.points.length - 1]!.x);
